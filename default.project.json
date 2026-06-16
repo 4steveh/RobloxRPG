@@ -1,0 +1,12 @@
+{
+  "name": "WildWorld",
+  "globIgnorePaths": ["**/*.spec.luau", "tests/**"],
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "WildWorld": {
+        "$path": "src"
+      }
+    }
+  }
+}
