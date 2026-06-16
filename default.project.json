@@ -7,6 +7,12 @@
       "WildWorld": {
         "$path": "src"
       }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$path": "client"
+      }
     }
   }
 }

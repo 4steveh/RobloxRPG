@@ -12,13 +12,18 @@ fail=0
 hr() { printf '%s\n' "────────────────────────────────────────────────────────"; }
 
 hr; echo "1) STRICT TYPE-CHECK (luau-analyze, languageMode=strict)"; hr
+# Headless set = ModuleScripts. EXCLUDED: *.server.luau / *.client.luau / client/** are Studio-only
+# Roblox-runtime scripts (reference Workspace/Humanoid/DataStore); they are verified by the Studio
+# playtest checklist in the README, NOT by this headless harness.
 while IFS= read -r f; do
   if out=$(luau-analyze "$f" 2>&1); then
     echo "  ✓ $f"
   else
     echo "  ✗ $f"; echo "$out" | sed 's/^/      /'; fail=1
   fi
-done < <(find src tests -name '*.luau' -not -path '*/negative/*' | sort)
+done < <(find src tests -name '*.luau' -not -path '*/negative/*' -not -name '*.server.luau' -not -name '*.client.luau' | sort)
+echo "  ── Studio-only (NOT headless-analyzed; see README playtest checklist) ──"
+find src client \( -name '*.server.luau' -o -name '*.client.luau' \) 2>/dev/null | sort | sed 's/^/    ⌂ /'
 
 hr; echo "2) UNIT TESTS (luau tests/run.luau)"; hr
 if luau tests/run.luau; then echo "  ✓ all specs passed"; else echo "  ✗ test failures"; fail=1; fi

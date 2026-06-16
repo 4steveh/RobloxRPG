@@ -20,6 +20,9 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/Gauntlet.spec"),
 	require("@tests/Idle.spec"),
 	require("@tests/Integrity.spec"),
+	-- Step 3 (movement + Bayou shell — the data/logic seams)
+	require("@tests/Shell.spec"),
+	require("@tests/Arrival.spec"),
 }
 
 for _, spec in specs do

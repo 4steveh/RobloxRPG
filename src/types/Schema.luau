@@ -222,6 +222,42 @@ export type PlayerData = {
 }
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Destination SHELL (Step 3 — the navigable place). Pure DATA: positions are plain {x,y,z} tables (not
+-- Roblox Vector3) so the shell is headless. The world blockout converts to Vector3 at runtime. Keyed by
+-- DestinationId so a second Destination (Appalachia, Step 10) reuses the framework with new data.
+-- ─────────────────────────────────────────────────────────────────────────────
+export type Vec3 = { x: number, y: number, z: number }
+export type ZoneKind = "arrival" | "hunting" | "fishing" | "rareSite" | "vendor"
+export type Zone = {
+	id: string,
+	name: string,
+	kind: ZoneKind,
+	center: Vec3,
+	size: Vec3, -- bounding box of the region (placeholder geometry + ambiance scatter)
+	description: string,
+}
+export type Landmark = {
+	id: string,
+	name: string,
+	anchor: Vec3,
+	isBeacon: boolean, -- the Old Cypress: visible from most of the map, the wayfinding beacon
+	description: string,
+}
+export type Shell = {
+	destinationId: DestinationId,
+	arrivalZoneId: string, -- the §2.6 arrival/spawn clearing
+	zones: { [string]: Zone }, -- the §2.3 functional regions (named, reusable)
+	landmarks: { [string]: Landmark }, -- the §2.2 navigate-by points
+	vendorOutpostAnchor: Vec3, -- The Landing (Outfitter + Tackle Shop), §2.3
+	travelSignpostAnchor: Vec3, -- co-located with the vendor outpost (§2.6.3)
+	ambiancePlacements: { [TargetId]: string }, -- ambianceOnly species id → home zone id (target species are NOT mapped here — Steps 4/5)
+	render: { fogStart: number, fogEnd: number, drawDistance: number }, -- §2.5 fog-as-cull budget
+}
+-- Character-controller tunables (Tier 1 is on-foot only). walkSpeed is applied server-side to the
+-- Humanoid on arrival; the camera tunables are read by the client controller.
+export type Movement = { walkSpeed: number, jumpPower: number, cameraMinZoom: number, cameraMaxZoom: number }
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Aggregated config the pure functions consume. Logic takes this as `config`; it holds the catalogs,
 -- the tuning constants, and the derived target→(loop, home, tier, milestone) index.
 -- ─────────────────────────────────────────────────────────────────────────────
