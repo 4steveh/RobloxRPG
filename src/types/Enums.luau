@@ -99,14 +99,24 @@ Enums.Vendor = table.freeze({
 	StarterLoadout = "StarterLoadout" :: Vendor,
 })
 
--- Monetization role (build prompt's EquipmentItem enum — `power` is deliberately NOT a value).
--- EQUIPMENT_MASTER's "power-progression" gating gear maps to `convenience` here (real-money touch =
--- grind-compression / currency packs, pay-proof); the *gate* role is carried by tier+tierInput.
-export type MonetizationRole = "identity" | "convenience" | "access"
+-- Monetization role (02 Template B — the full four-value set). An item carries a SET of roles
+-- (EquipmentItem.monetizationRoles), e.g. a gating weapon is {power-progression, convenience}.
+-- `power-progression` is a legitimate DESCRIPTOR (gear IS the progression gate); no-real-money-power is
+-- enforced elsewhere (gear is Cash-cost; RankPerkCategory excludes `power`; real money never touches a
+-- milestone), so the descriptor only adds fidelity to EQUIPMENT_MASTER §4.
+export type MonetizationRole = "identity" | "convenience" | "access" | "power-progression"
+local monetizationRoleSet: { [MonetizationRole]: boolean } = {
+	identity = true,
+	convenience = true,
+	access = true,
+	["power-progression"] = true,
+}
+Enums.MonetizationRoleSet = table.freeze(monetizationRoleSet)
 Enums.MonetizationRole = table.freeze({
 	identity = "identity" :: MonetizationRole,
 	convenience = "convenience" :: MonetizationRole,
 	access = "access" :: MonetizationRole,
+	powerProgression = "power-progression" :: MonetizationRole,
 })
 
 -- Rank-perk category (progression §4 / build-time guarantee): `power` is NOT a legal value.

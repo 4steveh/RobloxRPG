@@ -12,20 +12,20 @@ type Loop = Enums.Loop
 
 local M = {}
 
--- Resolve an equipped slot to a tier: ref → commodity → catalog item.tier. Empty/unresolved = Tier 0.
-local function tierOfSlot(profile: PlayerData, config: Config, slotIndex: number?): number
-	if slotIndex == nil then
+-- Resolve an equipped slot to a tier: instanceId → commodity → catalog item.tier. Resolving by the
+-- STABLE instanceId (not a list index) is what makes an equipped ref survive inventory mutation +
+-- a load/save round-trip. Empty/unresolved = Tier 0.
+local function tierOfSlot(profile: PlayerData, config: Config, instanceId: string?): number
+	if instanceId == nil then
 		return 0
 	end
-	local commodity = profile.inventory.commodities[slotIndex]
-	if commodity == nil then
-		return 0
+	for _, commodity in profile.inventory.commodities do
+		if commodity.instanceId == instanceId then
+			local item = config.equipment[commodity.catalogId]
+			return item ~= nil and item.tier or 0
+		end
 	end
-	local item = config.equipment[commodity.catalogId]
-	if item == nil then
-		return 0
-	end
-	return item.tier
+	return 0
 end
 
 function M.weaponTier(profile: PlayerData, config: Config): number

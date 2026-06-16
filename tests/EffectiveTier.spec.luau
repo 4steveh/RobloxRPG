@@ -33,4 +33,12 @@ return function(t: Harness.T)
 	-- the starter loadout computes EHT = EFT = 1
 	t.eq("starter (weapon T1, no armor) → EHT 1", eht({ weapon = 1 }), 1)
 	t.eq("starter (rod T1, reel T1) → EFT 1", eft({ rod = 1, reel = 1 }), 1)
+
+	t.section("EffectiveTier — equipped ref is a STABLE key (survives inventory mutation)")
+	-- Carry-over fix #2: equipped points at a commodity instanceId, not a list index. Reordering the
+	-- commodities (here: prepend one, shifting every index) must NOT re-point the equipped weapon.
+	local p = Util.mkProfile(Catalog, { weapon = 2, armor = 2 }) -- ci1=weapon T2, ci2=armor T2; equipped.weapon="ci1"
+	t.eq("EHT before mutation", EHT.effectiveHuntingTier(p, Catalog), 2)
+	table.insert(p.inventory.commodities, 1, { instanceId = "ci-extra", catalogId = "bait_cut_bait", intraLevel = 0, equipped = false })
+	t.eq("EHT unchanged after prepending a commodity (list indices shifted)", EHT.effectiveHuntingTier(p, Catalog), 2)
 end

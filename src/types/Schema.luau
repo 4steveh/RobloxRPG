@@ -46,7 +46,7 @@ export type EquipmentItem = {
 	tradeable: boolean, -- routes the persistence path (data-integrity RD1): false=commodity, true=artifact
 	tierInput: boolean, -- derived from category; TRUE only for weapon/armor/rod/reel (asserted)
 	cosmeticOnly: boolean, -- cosmetics are balance-free (no stats, no accessGrant, no tier slot)
-	monetizationRole: MonetizationRole?, -- nil for free starter loadout
+	monetizationRoles: { MonetizationRole }, -- the Template-B set ({} for free starter / friction-free items)
 	accessGrant: WaterType?, -- vehicles that gate a water type (e.g. Coastal Skiff → coastal). Access, never a stat.
 	notes: string,
 }
@@ -157,13 +157,16 @@ export type RankPerk = {
 -- PlayerData (in-memory authoritative profile — the irreducible set, data-integrity §1).
 -- Derived-never-stored: Cash balance, EHT/EFT, gate satisfaction (functions, not fields).
 -- ─────────────────────────────────────────────────────────────────────────────
-export type Commodity = { catalogId: ItemId, intraLevel: number, equipped: boolean }
+-- `instanceId` is a stable per-commodity identity (server-minted, monotonic per player). It survives
+-- inventory mutation + a load/save round-trip — UNLIKE a list index (Step 1's broken model). It is what
+-- equipped refs point at, so removing/reordering a commodity never re-points an equipped slot.
+export type Commodity = { instanceId: string, catalogId: ItemId, intraLevel: number, equipped: boolean }
 export type EquippedRefs = {
-	-- 1-based indices into inventory.commodities; nil = empty slot. The input to derived EHT/EFT.
-	weapon: number?,
-	armor: number?,
-	rod: number?,
-	reel: number?,
+	-- the equipped commodity's stable instanceId (nil = empty slot). The input to derived EHT/EFT.
+	weapon: string?,
+	armor: string?,
+	rod: string?,
+	reel: string?,
 }
 export type Inventory = {
 	fungible: { [ItemId]: number }, -- ammo/bait counts
@@ -181,20 +184,25 @@ export type Artifact = {
 	kind: ArtifactKind, -- gates which dispositions are legal (data-integrity §4)
 	disposition: Disposition, -- the single source of truth; mutually exclusive
 	tradeable: boolean,
+	tombstoned: boolean, -- SALVAGED or traded-away artifacts are MARKED, never erased (audit/rollback)
 	provenance: Provenance,
 }
 export type LedgerLoop = "Hunting" | "Fishing" | "none"
 export type LedgerEntry = {
-	entryId: number, -- server-minted unique, monotonic per player (data-integrity §3); Step 2 mints these
-	kind: string, -- faucet/sink subtype (kill, catch, gear, idle, salvage, currencypack, …)
+	entryId: number, -- server-minted unique, monotonic per player (data-integrity §3)
+	type: string, -- faucet/sink subtype (kill, catch, gear, idle, salvage, currencypack, …)
 	amount: number, -- signed Cash (faucets +, sinks −)
 	tier: number?,
 	loop: LedgerLoop?,
 	timestamp: number,
-	validatingEventId: string, -- the kill/catch/trade/purchase event that authorized it
+	validatingEventId: string, -- the kill/catch/trade/purchase event that authorized it (= PurchaseId for real money)
 	realMoneyTag: string?, -- set for currency-pack / boost / VIP-attributable faucets
 }
-export type Entitlement = { kind: string, expiryTimestamp: number }
+-- Cash storage layout (§3): a balance CHECKPOINT (sum of compacted/offloaded history) + a bounded recent
+-- TAIL. balanceOf = checkpoint.balance + Σ(tail). lastEntryId is the monotonic id source (survives compaction).
+export type LedgerCheckpoint = { balance: number, compactedCount: number, lastEntryId: number }
+export type Ledger = { checkpoint: LedgerCheckpoint, tail: { LedgerEntry } }
+export type Entitlement = { kind: string, expiryTimestamp: number } -- expiry is a server-time absolute (wall-clock)
 export type PlayerData = {
 	unlockedDestinations: { [DestinationId]: boolean }, -- one-time threshold, permanent
 	conqueredDestinations: { [DestinationId]: boolean }, -- idempotent set membership (the Passport spine)
@@ -203,8 +211,13 @@ export type PlayerData = {
 	inventory: Inventory,
 	equipped: EquippedRefs,
 	artifacts: { [ArtifactId]: Artifact },
-	cashLedger: { LedgerEntry },
-	logoutTimestamp: number, -- field exists; Step 2 owns WRITING it
+	cash: Ledger, -- §3 checkpoint+tail (replaces Step 1's flat cashLedger)
+	-- ── integrity-mechanism fields (extend §1's table; each implied/required by §3/§6) ──
+	nextCommodityInstanceSeq: number, -- monotonic source for commodity instanceIds (Step 6 mints on buy)
+	redeemedPurchaseIds: { [string]: boolean }, -- real-money idempotency tokens (§3 PurchaseId-uniqueness)
+	logoutTimestamp: number, -- written at CLEAN session-end (§6 idle input); Step 2 writes it
+	lastSaveTimestamp: number, -- written at every save; the §6 hard-crash idle fallback basis
+	sessionOpen: boolean, -- true while a live session holds the profile; a loaded `true` ⇒ prior session crashed (§6)
 	activeEntitlements: { Entitlement },
 }
 

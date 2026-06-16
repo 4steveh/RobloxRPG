@@ -114,4 +114,27 @@ Tuning.progression = table.freeze({
 Tuning.tierCoefficient = table.freeze({ [1] = 1.0, [2] = 1.0, [3] = 1.0, [4] = 1.0 })
 Tuning.TIER_COEFFICIENT_KAPPA = 1.4 -- κ for TierCoefficient(T)=κ^(T−1) past T4 (combat/fishing ratify, OQ-A)
 
+-- Data-integrity / persistence tuning (SYS_data_integrity §tuning). Consumed by Step 2's substrate.
+Tuning.persistence = table.freeze({
+	saveCadenceSeconds = 60, -- periodic dirty-flag autosave interval
+	sessionLockTimeoutSeconds = 30, -- a stale lock (no heartbeat past this) may be stolen; a LIVE lock never is
+	lockHeartbeatIntervalSeconds = 6, -- the holding server refreshes the lock this often (< timeout)
+	saveRetryMaxAttempts = 5, -- failed-save retry budget (§7); on exhaustion revert to last good
+	saveRetryBackoffSeconds = 2, -- base backoff between retries
+	ledgerTailLength = 50, -- entries kept in the live profile before compaction folds the oldest away (§3)
+	ledgerTailDays = 7, -- the audit-log-vs-in-profile rollback boundary (§7); Step 2 uses length for MVL
+	escrowTimeoutSeconds = 120, -- pending-trade auto-cancel window (Step 12 consumes)
+	-- artifactIdScheme = GUID (globally unique; injected IdGenerator). auditLogDestination = separate DataStore.
+})
+
+-- The mutations that force a write-through save (§1). Extensible config set, not a number.
+Tuning.criticalSaveTriggers = table.freeze({
+	tradeCommit = true,
+	dispositionTransition = true,
+	realMoneyCredit = true,
+	destinationUnlock = true,
+	conquest = true,
+	gearPurchase = true,
+})
+
 return table.freeze(Tuning)

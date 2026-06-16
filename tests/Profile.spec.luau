@@ -5,6 +5,7 @@ local Profile = require("@src/logic/Profile")
 local EHT = require("@src/logic/EffectiveTier")
 local Balance = require("@src/logic/Balance")
 local Ids = require("@src/types/Ids")
+local Schema = require("@src/types/Schema")
 
 return function(t: Harness.T)
 	t.section("freshProfile — a valid Tier-1 starter (asserted invariants)")
@@ -37,9 +38,15 @@ return function(t: Harness.T)
 	end)())
 	t.ok("no entitlements, no artifacts, no fungibles", #p.activeEntitlements == 0 and next(p.artifacts) == nil and next(p.inventory.fungible) == nil)
 
-	-- the equipped starter weapon resolves to a Tier-1 catalog item
-	local wIdx = assert(p.equipped.weapon)
-	local starterWeapon = Catalog.equipment[p.inventory.commodities[wIdx].catalogId]
+	-- the equipped starter weapon resolves (by stable instanceId) to a Tier-1 catalog item
+	local weaponInstanceId = assert(p.equipped.weapon)
+	local starterWeaponItem: Schema.EquipmentItem? = nil
+	for _, c in p.inventory.commodities do
+		if c.instanceId == weaponInstanceId then
+			starterWeaponItem = Catalog.equipment[c.catalogId]
+		end
+	end
+	local starterWeapon = assert(starterWeaponItem, "equipped weapon instanceId resolves to an owned commodity")
 	t.ok("equipped starter weapon is Tier 1", starterWeapon.tier == 1)
 	t.ok("equipped starter weapon is from the StarterLoadout (free)", starterWeapon.availableAt == "StarterLoadout")
 end

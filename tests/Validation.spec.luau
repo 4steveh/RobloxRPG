@@ -74,7 +74,7 @@ return function(t: Harness.T)
 		local bad: Schema.EquipmentItem = {
 			id = "bad_mount", name = "Bad Mount", category = "mount", tier = 3, availableAt = "KennelAndStable",
 			cost = { cash = 1 }, tradeable = false, tierInput = true, cosmeticOnly = false,
-			monetizationRole = "convenience", accessGrant = nil, notes = "",
+			monetizationRoles = { "convenience" }, accessGrant = nil, notes = "",
 		}
 		Validation.assertEquipmentItem(bad)
 	end)
@@ -82,7 +82,7 @@ return function(t: Harness.T)
 		local bad: Schema.EquipmentItem = {
 			id = "bad_cosmetic", name = "Bad Cosmetic", category = "cosmetic", tier = 1, availableAt = "Outfitter",
 			cost = { cash = 1 }, tradeable = false, tierInput = false, cosmeticOnly = true,
-			monetizationRole = "identity", accessGrant = "coastal", notes = "",
+			monetizationRoles = { "identity" }, accessGrant = "coastal", notes = "",
 		}
 		Validation.assertEquipmentItem(bad)
 	end)
@@ -90,7 +90,7 @@ return function(t: Harness.T)
 		local bad: Schema.EquipmentItem = {
 			id = "bad_access", name = "Bad Access", category = "dog", tier = 2, availableAt = "KennelAndStable",
 			cost = { cash = 1 }, tradeable = false, tierInput = false, cosmeticOnly = false,
-			monetizationRole = "convenience", accessGrant = "coastal", notes = "",
+			monetizationRoles = { "convenience" }, accessGrant = "coastal", notes = "",
 		}
 		Validation.assertEquipmentItem(bad)
 	end)

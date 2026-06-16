@@ -3,17 +3,35 @@
 -- NO stat numbers are transcribed: damage/DR/Pressure/drain are generated from the §1 curves at
 -- consumption time (Steps 4–5), and armor has no item stat at all. `tierInput` is DERIVED from category
 -- here so the "bait/tackle/vehicle/mount/dog/tool/cosmetic are never tier inputs" invariant cannot drift.
+-- `monetizationRoles` is the Template-B SET; it defaults from category (DEFAULT_ROLES) and is overridden
+-- per row where EQUIPMENT_MASTER §4 differs (free starters, heavy armor, premium consumables).
 
 local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 
 type EquipmentItem = Schema.EquipmentItem
 type ItemId = string
+type Roles = { Enums.MonetizationRole }
 
 local C = Enums.Category
 local V = Enums.Vendor
 local M = Enums.MonetizationRole
 local W = Enums.WaterType
+
+-- Category → default monetization-role set (EQUIPMENT_MASTER §4). Per-row overrides where it differs.
+local DEFAULT_ROLES: { [Enums.Category]: Roles } = {
+	weapon = { M.powerProgression, M.convenience }, -- the gate + the intra-tier climb
+	armor = { M.powerProgression }, -- T2 (T3/T4 add convenience via override)
+	rod = { M.powerProgression },
+	reel = { M.powerProgression },
+	vehicle = { M.access }, -- boats: access only
+	mount = { M.convenience },
+	dog = { M.convenience, M.identity }, -- §4.7 convenience + identity (rare breeds collectible)
+	tool = { M.convenience },
+	bait = {}, -- basic = friction-free (premium overrides to convenience)
+	tackle = {}, -- basic = friction-free
+	cosmetic = { M.identity },
+}
 
 type ItemInput = {
 	id: string,
@@ -23,7 +41,7 @@ type ItemInput = {
 	availableAt: Enums.Vendor,
 	cost: Schema.Cost,
 	tradeable: boolean,
-	monetizationRole: Enums.MonetizationRole?,
+	monetizationRoles: Roles?, -- override; nil → DEFAULT_ROLES[category]
 	accessGrant: Enums.WaterType?,
 	cosmeticOnly: boolean?,
 	notes: string,
@@ -40,7 +58,7 @@ local function item(i: ItemInput): EquipmentItem
 		tradeable = i.tradeable,
 		tierInput = Enums.TIER_INPUT_CATEGORIES[i.category] == true, -- derived, never authored
 		cosmeticOnly = i.cosmeticOnly or false,
-		monetizationRole = i.monetizationRole,
+		monetizationRoles = i.monetizationRoles or DEFAULT_ROLES[i.category] or {},
 		accessGrant = i.accessGrant,
 		notes = i.notes,
 	}
@@ -60,7 +78,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.StarterLoadout,
 		cost = cash(0),
 		tradeable = false,
-		monetizationRole = nil, -- free; onboarding
+		monetizationRoles = {}, -- free; onboarding
 		notes = "Free starter weapon; clears Bayou floor; the ~60-second first-kill weapon.",
 	}),
 	item({
@@ -71,8 +89,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(3000), -- c·Income(1)
 		tradeable = false,
-		monetizationRole = M.convenience, -- gear gate; real-money touch is grind-compression (pay-proof)
-		notes = "First real-commitment weapon; contributes to EHT 2 → Appalachia.",
+		notes = "First real-commitment weapon; contributes to EHT 2 → Appalachia. {power-progression, convenience}.",
 	}),
 	item({
 		id = "weapon_scoped_hunting_rifle",
@@ -82,7 +99,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(5100), -- c·Income(2)
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Post-launch (Rockies) weapon; the T−1 reference that makes Alaska's floor comfortable.",
 	}),
 	item({
@@ -93,7 +109,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(8670), -- c·Income(3)
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "MVL top hunting weapon; clears Alaska floor/mid + the moose milestone; does NOT solo the grizzly.",
 	}),
 
@@ -106,8 +121,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(3000),
 		tradeable = false,
-		monetizationRole = M.convenience,
-		notes = "First armor on the bill (Tier 1 has no armor cost). Survives the T2 mid (boar).",
+		notes = "First armor on the bill (Tier 1 has no armor cost). Survives the T2 mid (boar). {power-progression}.",
 	}),
 	item({
 		id = "armor_brush_guard_vest",
@@ -117,7 +131,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(5100),
 		tradeable = false,
-		monetizationRole = M.convenience,
+		monetizationRoles = { M.powerProgression, M.convenience }, -- §4.2 heavy-gear → Mount convenience
 		notes = "Makes the T2 apex safe; clears Rockies.",
 	}),
 	item({
@@ -128,7 +142,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(8670),
 		tradeable = false,
-		monetizationRole = M.convenience,
+		monetizationRoles = { M.powerProgression, M.convenience }, -- §4.2 heavy Parka → Mount convenience
 		notes = "The legible 'of course you need this for Alaska' gate item; keeps the moose milestone survivable.",
 	}),
 
@@ -141,7 +155,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.StarterLoadout,
 		cost = cash(0),
 		tradeable = false,
-		monetizationRole = nil,
+		monetizationRoles = {}, -- free; onboarding
 		notes = "Free starter rod; lands all Bayou panfish/catfish; paired with the Starter Spincast Reel.",
 	}),
 	item({
@@ -152,7 +166,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(3000),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "EFT 2 with the matching reel; lands the trophy bass.",
 	}),
 	item({
@@ -163,7 +176,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(5100),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Post-launch (Rockies) rod tier.",
 	}),
 	item({
@@ -174,7 +186,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(8670),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Headroom to land the king salmon milestone; first stat curve to reach the 1–100 cap (OQ-A).",
 	}),
 
@@ -187,7 +198,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.StarterLoadout,
 		cost = cash(0),
 		tradeable = false,
-		monetizationRole = nil,
+		monetizationRoles = {}, -- free; onboarding
 		notes = "Free starter reel; the binding slot that caps the Bayou fish ladder.",
 	}),
 	item({
@@ -198,7 +209,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(3000),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "EFT 2 with the matching rod.",
 	}),
 	item({
@@ -209,7 +219,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(5100),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Post-launch (Rockies) reel tier.",
 	}),
 	item({
@@ -220,7 +229,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(8670),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Lands the king salmon milestone; the binding slot on the co-op-only giant halibut.",
 	}),
 
@@ -233,7 +241,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.BoatDealer,
 		cost = cash(1500), -- feel-set placeholder, not a formula output (OQ-D)
 		tradeable = false,
-		monetizationRole = M.access,
 		accessGrant = W.lake, -- opens lake/slow river; cosmetic convenience at MVL tiers 1–3
 		notes = "Convenience only at MVL; Bayou/Appalachia fish are shore-accessible (no Boat required).",
 	}),
@@ -245,7 +252,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.BoatDealer,
 		cost = cash(6000), -- feel-set placeholder (OQ-D)
 		tradeable = false,
-		monetizationRole = M.access,
 		accessGrant = W.lake,
 		notes = "T3 lake convenience; opens nothing required.",
 	}),
@@ -257,7 +263,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.BoatDealer,
 		cost = cash(18000), -- ≈ b·Income(4); the marquee Alaska save-up
 		tradeable = false,
-		monetizationRole = M.access,
 		accessGrant = W.coastal, -- THE MVL Boat gate: opens Alaska's coastal fishing sub-area (enforcement: Steps 5/11)
 		notes = "Gates Alaska's coastal fishing sub-area (king salmon + halibut), NOT Alaska entry.",
 	}),
@@ -271,7 +276,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(10200), -- ≈ mountMultiplier·GearCost_slot(3)
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "First Mount; faster traversal + chase fleeing game. No combat/catch power.",
 	}),
 	item({
@@ -282,7 +286,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(10200),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Alaska regional Mount reskin; chases fleeing caribou. Convenience, never a gate.",
 	}),
 
@@ -295,7 +298,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(8000), -- ≈ dogMultiplier·GearCost_slot(T)
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Bayou breed; widens rare-spawn detection radius. Never a gate.",
 	}),
 	item({
@@ -306,7 +308,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(8000),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Appalachia breed; finds rares / tracks wounded fleeing game.",
 	}),
 	item({
@@ -317,7 +318,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(8000),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Alaska breed; convenience companion.",
 	}),
 	item({
@@ -328,7 +328,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.KennelAndStable,
 		cost = cash(0), -- rare breeds are P2P trade items, not shop-Cash priced (value flows to the Trading Post)
 		tradeable = true, -- rare-breed dog → unique-artifact path (data-integrity RD1), but still tierInput=false
-		monetizationRole = M.convenience,
 		notes = "Rare breed; a tradeable unique artifact that can never enter a Gate (tradeable=true, tierInput=false).",
 	}),
 
@@ -341,8 +340,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(10),
 		tradeable = false,
-		monetizationRole = nil, -- friction-free; auto-restocked
-		notes = "Basic required-item for catfish; never a timer (auto-restocked).",
+		notes = "Basic required-item for catfish; never a timer (auto-restocked). Friction-free ({}).",
 	}),
 	item({
 		id = "bait_fly",
@@ -352,7 +350,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(10),
 		tradeable = false,
-		monetizationRole = nil,
 		notes = "Basic required-item for trout (fly water).",
 	}),
 	item({
@@ -363,7 +360,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(10),
 		tradeable = false,
-		monetizationRole = nil,
 		notes = "Effectively free; a player can never be blocked from the core loop by running out.",
 	}),
 	item({
@@ -374,7 +370,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(200),
 		tradeable = false,
-		monetizationRole = M.convenience, -- shortens TimeToBite; capped at Uncommon bias; never mandatory
+		monetizationRoles = { M.convenience }, -- shortens TimeToBite; capped at Uncommon bias; never mandatory
 		notes = "Convenience; never raises Legendary/Mythic rate; no fish catchable only with it.",
 	}),
 	item({
@@ -385,7 +381,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(200),
 		tradeable = false,
-		monetizationRole = M.convenience,
+		monetizationRoles = { M.convenience },
 		notes = "Convenience settle edge; capped — never clears a gate the player's gear could not.",
 	}),
 	item({
@@ -396,7 +392,7 @@ local rows: { EquipmentItem } = {
 		availableAt = V.TackleShop,
 		cost = cash(800),
 		tradeable = false,
-		monetizationRole = M.convenience,
+		monetizationRoles = { M.convenience, M.identity }, -- §4.8 convenience + identity (winter cosmetics)
 		notes = "Region-specific (Alaska); required-item for the seasonal Frozen Lake. Never a tier input.",
 	}),
 	item({
@@ -407,7 +403,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(600),
 		tradeable = false,
-		monetizationRole = M.convenience,
 		notes = "Region-specific (Alaska); restores on-foot pace over snow. No combat/catch/survivability stat.",
 	}),
 
@@ -420,7 +415,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = cash(500),
 		tradeable = false,
-		monetizationRole = M.identity,
 		cosmeticOnly = true,
 		notes = "Identity; zero stats; standard Cash-priced skin.",
 	}),
@@ -432,7 +426,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.Outfitter,
 		cost = { realMoney = { kind = Enums.RealMoneyKind.gamepass } }, -- exercises the real-money Cost leg
 		tradeable = false,
-		monetizationRole = M.identity,
 		cosmeticOnly = true,
 		notes = "Game-pass flagship cosmetic; identity only.",
 	}),
@@ -444,7 +437,6 @@ local rows: { EquipmentItem } = {
 		availableAt = V.BoatDealer,
 		cost = cash(0), -- a tradeable rare cosmetic — value flows P2P, not shop-Cash
 		tradeable = true, -- tradeable cosmetic → unique-artifact path (data-integrity RD1)
-		monetizationRole = M.identity,
 		cosmeticOnly = true,
 		notes = "Tradeable rare cosmetic; unique artifact; balance-free.",
 	}),

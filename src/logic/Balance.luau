@@ -9,9 +9,12 @@ type PlayerData = Schema.PlayerData
 
 local M = {}
 
+-- balance = checkpoint (sum of compacted/offloaded entries) + Σ(tail). Never a stored mutable int.
+-- (The checkpoint + bounded-tail storage layout is §3's Roblox concession; the invariant — balance is
+-- a fold over entries — is preserved exactly. Compaction/offload is owned by the Step 2 Ledger.)
 function M.balanceOf(profile: PlayerData): number
-	local sum = 0
-	for _, entry in profile.cashLedger do
+	local sum = profile.cash.checkpoint.balance
+	for _, entry in profile.cash.tail do
 		sum += entry.amount
 	end
 	return sum

@@ -34,11 +34,12 @@ function M.freshProfile(config: Config): PlayerData
 	local starterRod = findStarter(config, Enums.Category.rod)
 	local starterReel = findStarter(config, Enums.Category.reel)
 
-	-- commodities: deterministic order weapon(1), rod(2), reel(3); all equipped; intra-tier level 0; NO armor.
+	-- commodities: deterministic order weapon, rod, reel; all equipped; intra-tier level 0; NO armor.
+	-- Each carries a stable instanceId (the equipped refs point at these, not list positions).
 	local commodities: { Commodity } = {
-		{ catalogId = starterWeapon.id, intraLevel = 0, equipped = true },
-		{ catalogId = starterRod.id, intraLevel = 0, equipped = true },
-		{ catalogId = starterReel.id, intraLevel = 0, equipped = true },
+		{ instanceId = "ci1", catalogId = starterWeapon.id, intraLevel = 0, equipped = true },
+		{ instanceId = "ci2", catalogId = starterRod.id, intraLevel = 0, equipped = true },
+		{ instanceId = "ci3", catalogId = starterReel.id, intraLevel = 0, equipped = true },
 	}
 
 	-- The free, gate-less starter Destination (requiredTier 0) seeds unlockedDestinations.
@@ -65,14 +66,18 @@ function M.freshProfile(config: Config): PlayerData
 			artifactIds = {},
 		},
 		equipped = {
-			weapon = 1,
+			weapon = "ci1",
 			armor = nil, -- empty armor slot (armor is not a gating slot at Tier 1)
-			rod = 2,
-			reel = 3,
+			rod = "ci2",
+			reel = "ci3",
 		},
 		artifacts = {},
-		cashLedger = {}, -- balance 0
-		logoutTimestamp = 0, -- Step 2 owns WRITING it
+		cash = { checkpoint = { balance = 0, compactedCount = 0, lastEntryId = 0 }, tail = {} }, -- balance 0
+		nextCommodityInstanceSeq = 4, -- ci1..ci3 used; next mint is ci4 (Step 6 buys mint from here)
+		redeemedPurchaseIds = {},
+		logoutTimestamp = 0, -- Step 2 writes it at clean session-end
+		lastSaveTimestamp = 0,
+		sessionOpen = false,
 		activeEntitlements = {},
 	}
 end
@@ -94,6 +99,7 @@ function M.newArtifact(args: {
 		kind = args.kind,
 		disposition = args.disposition,
 		tradeable = args.tradeable,
+		tombstoned = false,
 		provenance = args.provenance or {},
 	}
 end

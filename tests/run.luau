@@ -6,12 +6,20 @@ local Harness = require("@tests/harness")
 local t = Harness.new("Wild World — Step 1")
 
 local specs: { (Harness.T) -> () } = {
+	-- Step 1 (data model + pure logic)
 	require("@tests/Catalog.spec"),
 	require("@tests/EffectiveTier.spec"),
 	require("@tests/Gate.spec"),
 	require("@tests/Balance.spec"),
 	require("@tests/Profile.spec"),
 	require("@tests/Validation.spec"),
+	-- Step 2 (persistence + server-authority substrate)
+	require("@tests/ProfileStore.spec"),
+	require("@tests/Ledger.spec"),
+	require("@tests/ArtifactStore.spec"),
+	require("@tests/Gauntlet.spec"),
+	require("@tests/Idle.spec"),
+	require("@tests/Integrity.spec"),
 }
 
 for _, spec in specs do

@@ -74,6 +74,13 @@ function V.assertEquipmentItem(it: EquipmentItem)
 	if it.accessGrant ~= nil then
 		assert(it.category == Enums.Category.vehicle, it.id .. ": only vehicles may carry an accessGrant")
 	end
+	-- monetizationRoles must be a set of legal Template-B values; cosmetics are identity-only (balance-free).
+	for _, role in it.monetizationRoles do
+		assert(Enums.MonetizationRoleSet[role] == true, it.id .. ": illegal monetization role '" .. tostring(role) .. "'")
+		if it.category == Enums.Category.cosmetic then
+			assert(role == Enums.MonetizationRole.identity, it.id .. ": a cosmetic's monetization is identity-only")
+		end
+	end
 end
 
 function V.assertCreature(c: Creature)

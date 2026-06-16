@@ -33,13 +33,16 @@ export type Equip = {
 -- mkProfile(config, equip): a PlayerData with the given equipped gear tiers (nil = empty slot).
 function U.mkProfile(config: Config, equip: Equip): PlayerData
 	local commodities: { Schema.Commodity } = {}
-	local function addSlot(category: Enums.Category, tier: number?): number?
+	local seq = 0
+	local function addSlot(category: Enums.Category, tier: number?): string?
 		if tier == nil then
 			return nil
 		end
 		local it = findByCatTier(config, category, tier)
-		table.insert(commodities, { catalogId = it.id, intraLevel = 0, equipped = true })
-		return #commodities
+		seq += 1
+		local instanceId = "ci" .. seq
+		table.insert(commodities, { instanceId = instanceId, catalogId = it.id, intraLevel = 0, equipped = true })
+		return instanceId
 	end
 
 	local equipped: Schema.EquippedRefs = {
@@ -57,9 +60,9 @@ function U.mkProfile(config: Config, equip: Equip): PlayerData
 	for _, id in equip.unlocked or {} do
 		unlocked[id] = true
 	end
-	local ledger: { Schema.LedgerEntry } = {}
+	local tail: { Schema.LedgerEntry } = {}
 	for i, amt in equip.ledger or {} do
-		table.insert(ledger, { entryId = i, kind = "test", amount = amt, timestamp = i, validatingEventId = "test:" .. i })
+		table.insert(tail, { entryId = i, type = "test", amount = amt, timestamp = i, validatingEventId = "test:" .. i })
 	end
 
 	return {
@@ -70,8 +73,12 @@ function U.mkProfile(config: Config, equip: Equip): PlayerData
 		inventory = { fungible = {}, commodities = commodities, artifactIds = {} },
 		equipped = equipped,
 		artifacts = {},
-		cashLedger = ledger,
+		cash = { checkpoint = { balance = 0, compactedCount = 0, lastEntryId = #tail }, tail = tail },
+		nextCommodityInstanceSeq = seq + 1,
+		redeemedPurchaseIds = {},
 		logoutTimestamp = 0,
+		lastSaveTimestamp = 0,
+		sessionOpen = false,
 		activeEntitlements = {},
 	}
 end
