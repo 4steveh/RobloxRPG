@@ -1,10 +1,14 @@
 --!strict
--- PURE SPAWNER LOGIC (SYS_combat §5) — the loop-agnostic cap/engagement accounting the server enforces.
--- The PHYSICAL spawn (Workspace placement, respawn timers, positions) is server-authoritative and lives
--- in the Studio HuntingService; this module is the headless-provable economy core: the engagement rate,
--- the anti-low-tier-farming cap, the ambiance exclusion, the condition-gated rare predicate, and the
--- build-time placement guarantee. Zero content literals — values come from `config` + the Spawning config.
--- Step 5 (fishing) reuses every function here unchanged (a kill and a catch are the same Income(T) math).
+-- PURE SPAWNER LOGIC (SYS_combat §5 / SYS_fishing §6) — the LOOP-AGNOSTIC cap/engagement accounting the
+-- server enforces. The PHYSICAL spawn (Workspace placement, respawn timers, positions, spot-depletion) is
+-- server-authoritative and lives in the Studio Hunting/Fishing services; this module is the headless-
+-- provable economy core: the engagement rate, the anti-low-tier-farming cap, the ambiance/rare exclusion,
+-- the condition-gated rare predicate, and the build-time placement guarantee.
+--
+-- GENERALIZED for both loops (Step 5): the anti-farming `min(3600/TimePerTarget, ceiling)` line is
+-- SINGLE-SOURCED in `ratePerHour`; the per-loop differences (engagement table, target collection,
+-- ambiance handling) are parameterized by `loop` (default Hunting → Step-4 callers are unchanged). A kill
+-- and a catch are the same Income(T) math; only the inputs differ.
 
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
@@ -12,60 +16,86 @@ local Spawning = require("@src/config/Spawning")
 
 type Config = Schema.Config
 type Shell = Schema.Shell
+type Loop = Enums.Loop
 type LoopSpawn = Spawning.LoopSpawn
 
 local M = {}
 
--- ── §5 engagement rate ──
--- TimePerTarget(T) = TimeToFind + TimeToKill + Overhead; ExpectedTargetsPerHour = min(3600/TPT, ceiling).
-function M.timePerTarget(config: Config, tier: number, killSeconds: number): number
-	local e = assert(config.tuning.combat.engagement[tier], "Spawner: no engagement model for tier " .. tier)
-	return e.timeToFind + killSeconds + e.overhead
+-- The per-loop engagement profile, normalized to {find, active, overhead} so the rate math is loop-agnostic.
+-- Hunting: TimeToFind + TimeToKill + Overhead; Fishing: TimeToBite + FightTime + Overhead.
+local function engagementFor(config: Config, tier: number, loop: Loop): { find: number, active: number, overhead: number }
+	if loop == Enums.Loop.Fishing then
+		local e = assert(config.tuning.fishing.engagement[tier], "Spawner: no fishing engagement model for tier " .. tier)
+		return { find = e.timeToBite, active = e.fightTime, overhead = e.overhead }
+	end
+	local e = assert(config.tuning.combat.engagement[tier], "Spawner: no hunting engagement model for tier " .. tier)
+	return { find = e.timeToFind, active = e.timeToKill, overhead = e.overhead }
 end
 
--- The realized routine rate for ANY kill speed — the ceiling binds it regardless of how fast the player
--- kills (the anti-farming invariant: an over-geared player → tiny killSeconds → still capped at ceiling).
-function M.realizedRoutineRatePerHour(config: Config, tier: number, ceilingPerHour: number, killSeconds: number): number
-	return math.min(3600 / M.timePerTarget(config, tier, killSeconds), ceilingPerHour)
+-- THE single anti-farming line (both loops): the ceiling binds the rate independent of how fast the player
+-- kills/catches — an over-geared player → tiny active time → still capped at the ceiling.
+local function ratePerHour(timePerTarget: number, ceilingPerHour: number): number
+	return math.min(3600 / timePerTarget, ceilingPerHour)
 end
 
--- The modeled rate for a normal at-tier player (killSeconds = the tier's modeled TimeToKill).
-function M.expectedTargetsPerHour(config: Config, tier: number, ceilingPerHour: number): number
-	local e = assert(config.tuning.combat.engagement[tier], "Spawner: no engagement model for tier " .. tier)
-	return M.realizedRoutineRatePerHour(config, tier, ceilingPerHour, e.timeToKill)
+-- TimePerTarget(T) = find + active + overhead. `loop` defaults to Hunting (Step-4 callers unchanged).
+function M.timePerTarget(config: Config, tier: number, activeSeconds: number, loop: Loop?): number
+	local e = engagementFor(config, tier, loop or Enums.Loop.Hunting)
+	return e.find + activeSeconds + e.overhead
 end
 
--- ── the reward-bearing ROUTINE population of a zone ── (§8 / RD5)
--- The Common/Uncommon non-ambiance targets the ceiling normalizes over. AMBIANCE is excluded (it occupies
--- world density for atmosphere but can never pad/starve the farmable population) and so are RARES (bonus
--- on top — condition-gated independent spawns, not part of the routine band).
-function M.routineTargetsInZone(config: Config, destinationId: string, zoneId: string): { string }
+-- The realized routine rate for ANY active time (the anti-farming proof: over-geared → capped at ceiling).
+function M.realizedRoutineRatePerHour(config: Config, tier: number, ceilingPerHour: number, activeSeconds: number, loop: Loop?): number
+	return ratePerHour(M.timePerTarget(config, tier, activeSeconds, loop), ceilingPerHour)
+end
+
+-- The modeled rate for a normal at-tier player (active = the tier's modeled TimeToKill / FightTime).
+function M.expectedTargetsPerHour(config: Config, tier: number, ceilingPerHour: number, loop: Loop?): number
+	local e = engagementFor(config, tier, loop or Enums.Loop.Hunting)
+	return ratePerHour(e.find + e.active + e.overhead, ceilingPerHour)
+end
+
+local function zonesContain(zones: { string }?, zoneId: string): boolean
+	if zones == nil then
+		return false
+	end
+	for _, z in zones do
+		if z == zoneId then
+			return true
+		end
+	end
+	return false
+end
+
+-- The reward-bearing ROUTINE population of a zone (§8 / RD5): Common/Uncommon non-ambiance targets the
+-- ceiling normalizes over. AMBIANCE and RARES are excluded (ambiance occupies world density only; rares are
+-- bonus-on-top condition-gated spawns). `loop` selects the target collection (creatures vs fish).
+function M.routineTargetsInZone(config: Config, destinationId: string, zoneId: string, loop: Loop?): { string }
 	local ids: { string } = {}
-	for id, c in config.creatures do
-		local routine = c.destinationId == destinationId
-			and not c.ambianceOnly
-			and Enums.RarityRank[c.rarity] < Enums.RARE_AND_ABOVE_RANK
-			and c.spawnZones ~= nil
-		if routine then
-			for _, z in c.spawnZones :: { string } do
-				if z == zoneId then
-					table.insert(ids, id)
-					break
-				end
+	if (loop or Enums.Loop.Hunting) == Enums.Loop.Fishing then
+		for id, f in config.fish do
+			if f.destinationId == destinationId and Enums.RarityRank[f.rarity] < Enums.RARE_AND_ABOVE_RANK and zonesContain(f.spawnZones, zoneId) then
+				table.insert(ids, id)
+			end
+		end
+	else
+		for id, c in config.creatures do
+			if c.destinationId == destinationId and not c.ambianceOnly and Enums.RarityRank[c.rarity] < Enums.RARE_AND_ABOVE_RANK and zonesContain(c.spawnZones, zoneId) then
+				table.insert(ids, id)
 			end
 		end
 	end
 	return ids
 end
 
--- ── condition-gated RARE spawn predicate ── (§5 / RD-E)
--- A rare is eligible iff every present condition field matches the current world. This is a per-WINDOW
--- presence check — explicitly NOT coupled to kill rate (no per-kill upgrade roll; the 1-in-N roll is
--- separate and the LiveOps calendar owns condition frequency, Step 13). Token semantics (e.g. parsing
--- "dawn or dusk") is a Studio/LiveOps concern; here equality of present fields proves the mechanism.
+-- Condition-gated RARE spawn predicate (§5 / RD-E, Decision 3/4) — works for a creature OR a fish (both
+-- carry `spawn.conditions`). A rare is eligible iff every present condition field matches the world. This is
+-- a per-WINDOW presence check, NOT coupled to kill/catch rate, and it takes NO bait input (Decision 4 — you
+-- cannot buy your way to a rare; a basic-bait condition gates the ATTEMPT via baitRequired, not this roll).
 export type WorldState = { time: string?, weather: string?, season: string?, event: string? }
-function M.rareSpawnEligible(creature: Schema.Creature, world: WorldState): boolean
-	local cond = creature.spawn.conditions
+export type ConditionsBearer = Schema.Creature | Schema.Fish -- both carry spawn.conditions (the only field read)
+function M.rareSpawnEligible(target: ConditionsBearer, world: WorldState): boolean
+	local cond = target.spawn.conditions
 	if cond == nil then
 		return true
 	end
@@ -75,18 +105,29 @@ function M.rareSpawnEligible(creature: Schema.Creature, world: WorldState): bool
 	return ok(cond.time, world.time) and ok(cond.weather, world.weather) and ok(cond.season, world.season) and ok(cond.event, world.event)
 end
 
--- ── build-time placement guarantee (Step 4 P1) ──
--- Every routine spawn AREA resolves to a real Step-3 zone, and every non-ambiance hunting TARGET's
--- spawnZones resolve to real zones in this shell. Called from Shells.luau on load (a bad map fails require).
-function M.validatePlacement(config: Config, shell: Shell, huntingSpawn: LoopSpawn)
-	for zoneId in huntingSpawn.areas do
-		assert(shell.zones[zoneId] ~= nil, "Spawner: routine area zone '" .. zoneId .. "' is not a zone in shell '" .. shell.destinationId .. "'")
+-- BUILD-TIME placement guarantee: every routine spawn AREA resolves to a real Step-3 zone, and every target
+-- (creature/fish) home to this Destination has spawnZones resolving to real zones. `loop` selects creatures
+-- vs fish. Called from Shells.luau on load (a bad map fails the require).
+function M.validatePlacement(config: Config, shell: Shell, loopSpawn: LoopSpawn, loop: Loop?)
+	for zoneId in loopSpawn.areas do
+		assert(shell.zones[zoneId] ~= nil, "Spawner: spawn area zone '" .. zoneId .. "' is not a zone in shell '" .. shell.destinationId .. "'")
 	end
-	for _, c in config.creatures do
-		if c.destinationId == shell.destinationId and not c.ambianceOnly then
-			local zones = assert(c.spawnZones, c.id .. ": a non-ambiance target must carry spawnZones (Step 4 P1)")
-			for _, zoneId in zones do
-				assert(shell.zones[zoneId] ~= nil, c.id .. ": spawnZone '" .. zoneId .. "' is not a real zone in shell '" .. shell.destinationId .. "'")
+	if (loop or Enums.Loop.Hunting) == Enums.Loop.Fishing then
+		for _, f in config.fish do
+			if f.destinationId == shell.destinationId then
+				local zones = assert(f.spawnZones, f.id .. ": a Bayou fish must carry spawnZones (Step 5 prereq)")
+				for _, zoneId in zones do
+					assert(shell.zones[zoneId] ~= nil, f.id .. ": spawnZone '" .. zoneId .. "' is not a real zone in shell '" .. shell.destinationId .. "'")
+				end
+			end
+		end
+	else
+		for _, c in config.creatures do
+			if c.destinationId == shell.destinationId and not c.ambianceOnly then
+				local zones = assert(c.spawnZones, c.id .. ": a non-ambiance target must carry spawnZones (Step 4 P1)")
+				for _, zoneId in zones do
+					assert(shell.zones[zoneId] ~= nil, c.id .. ": spawnZone '" .. zoneId .. "' is not a real zone in shell '" .. shell.destinationId .. "'")
+				end
 			end
 		end
 	end

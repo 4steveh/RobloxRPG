@@ -15,6 +15,7 @@
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Combat = require("@src/logic/Combat")
+local Fishing = require("@src/logic/Fishing")
 local Ledger = require("@src/server/ledger/Ledger")
 local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
 local Types = require("@src/server/persistence/Types")
@@ -91,9 +92,22 @@ local function describe(config: Config, event: KillEvent): Descriptor
 			ledgerType = "kill",
 		}
 	end
-	-- TODO(step-5): the Fishing descriptor (config.fish + Angler Rank XP weighting + ledgerType "catch").
-	-- The pipeline below is already loop-agnostic; Step 5 only adds this branch.
-	error("RewardPipeline: Fishing rewards are TODO(step-5) — hunting is wired in Step 4")
+	-- Fishing (Step 5): the ONLY loop-specific addition — config.fish, Angler Rank XP (fish have no
+	-- archetype → Fishing.anglerRankXP, not Combat.rankXP), ledgerType "catch". No MVL fish are ambiance.
+	-- Everything downstream (the Reward XOR / mint / ledger / conquest) is the SHARED path below.
+	local f = assert(config.fish[event.targetId], "RewardPipeline: unknown fish '" .. event.targetId .. "'")
+	return {
+		ambiance = false,
+		rarity = f.rarity,
+		tier = f.tier,
+		isMilestone = f.isMilestoneTarget == true,
+		destinationId = f.destinationId,
+		reward = f.reward,
+		rare = f.rare,
+		rankXP = Fishing.anglerRankXP(config, f),
+		rankField = "anglerRankXP",
+		ledgerType = "catch",
+	}
 end
 
 -- resolve — the ordered pipeline. MUST be called inside a Transaction by the caller (FireHandler does) so

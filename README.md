@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–4)
+# Wild World — Build (Steps 1–5)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -20,6 +20,12 @@ note per step.
   deferred EQUIPMENT_MASTER §1 combat/armor curves are implemented and the min-tier fields are now
   **derived & asserted**. **The combat math/pipeline/caps are headless-proven; game FEEL and the live shot
   are a Studio playtest** — split honestly below.
+- **Step 5 — The Fishing System.** The second half of the dual loop, built by **extending** the Step-4
+  substrate: the shared **reward pipeline** gains one `describe` branch (not forked), the **spawner cap** is
+  *generalized* so one anti-farming line serves both loops, and `Fishing.luau` adds the catchability
+  inequality (`FightTime ≤ LandWindow`) with derived min rod/reel tiers. The **OR-gate** is one shared
+  idempotent conquest flag (gator *or* Blue Catfish). **The catchability math/pipeline/caps are
+  headless-proven; the fight FEEL is a Studio playtest** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -56,18 +62,22 @@ src/
            Creatures (+ Step-4 spawnZones/KillWindow inputs) · Fish · Destinations (gate DAG) · RankPerks ·
            Validation (build-time assertions, incl. Step-4 authored==derived min-tiers) · Catalog (self-validates)
            · Shells (Step 3 — the Bayou shell; self-validates + Step-4 placement check)
-           · Spawning (Step 4 — per-(destination,loop) spawn-area caps + SpawnThroughputCeiling; loop-agnostic)
+           · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
-           · Spawner (Step 4 — caps/engagement rate, ambiance exclusion, rare predicate, placement validation; loop-agnostic)
+           · Fishing (Step 5 — reel/rod curves, FightTime ≤ LandWindow, min rod/reel derivation, Angler XP, drain validators, co-op)
+           · Spawner (Step 4 — caps/engagement rate, exclusions, rare predicate, placement; GENERALIZED for both loops in Step 5)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
-      RewardPipeline.luau   (Step 4) the SHARED ordered atomic reward: ambiance→0 · Reward XOR (stub Payout|mint) · Rank XP · conquest
+      RewardPipeline.luau   (Step 4) the SHARED ordered atomic reward (loop-agnostic): ambiance→0 · Reward XOR · Rank XP · conquest. Step 5 adds ONE describe branch.
       FireHandler.luau      (Step 4) the "fire" intent handler — the gauntlet's step-3 shot resolution + the reward commit (critical)
+    fishing/
+      CatchHandler.luau     (Step 5) the "catch" intent handler — the gauntlet's step-3 fight resolution + the (shared) reward commit (critical)
     world/BayouBlockout.server.luau    ⌂ STUDIO-ONLY — builds the placeholder shell from Shells config + the arrival flow
     world/HuntingService.server.luau   ⌂ STUDIO-ONLY (Step 4) — physical spawner + fire RemoteEvent + raycast LOS + non-lethal clamp + respawn
+    world/FishingService.server.luau   ⌂ STUDIO-ONLY (Step 5) — physical bite spawner + spot-depletion + cast/bite/fight + non-punitive loss
   client/CharacterController.client.luau   ⌂ STUDIO-ONLY — mobile camera/controls (→ StarterPlayerScripts)
   server/
     persistence/
@@ -91,7 +101,7 @@ src/
     RobloxAdapters.luau   thin injection-based Roblox adapters (Studio-only binding; strict-clean headless)
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
          ProfileStore/Ledger/ArtifactStore/Gauntlet/Idle/Integrity; Step 3: Shell/Arrival; Step 4:
-         Combat/Spawner/RewardPipeline/FireHandler) · negative/ (MUST fail analysis)
+         Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -269,16 +279,76 @@ caribou/moose milestone soloable, grizzly apex co-op, RD-A) needs Appalachia + A
 survival-bounded inputs and is therefore **owed at Step 10**, not here. The Bayou is the only Destination
 that exists; only the **T1 floor bands** are validated (no premature cross-tier checks).
 
+## Step 5 — the fishing system (extend, don't fork; the bar is split, honestly)
+
+Fishing is the second half of the dual loop, built by **extending** the Step-4 substrate — the integrity
+model forbids duplicating the Reward XOR / atomic-commit / conquest path or the cap math, so neither was
+copied:
+- **The reward pipeline gained ONE `describe` branch** (`config.fish`, Angler Rank XP, `ledgerType
+  "catch"`). The XOR / mint / ledger / conquest path is the **same code** both loops run.
+- **The spawner cap was GENERALIZED**, not duplicated: the anti-farming `min(3600/TimePerTarget, ceiling)`
+  is one line, parameterized by `loop` (engagement table + target collection + conditions-bearer). The
+  Step-4 hunting callers default to Hunting and are unchanged.
+
+Fishing is **mechanically distinct** (Resolved Decision 1): sustained tension management, **no death, no
+armor, no respawn** — the only failure is *losing the fish* (snap/throw/timeout), and it's non-punitive
+(never costs banked Cash/inventory). The **fight FEEL** (the tension gauge, the push-pull rhythm, the
+runs, weighty haptics, the cast) is fishing's win-or-lose-it bar and is **Studio-only**.
+
+**Prerequisite landed:** `spawnZones` added to the `Fish` schema (the only gap — the fight inputs
+`fightDifficulty`/weights/`minRod/ReelTier` and the `Tuning.fishingFight` constants were already present);
+the 6 Bayou fish are placed in `channel_banks`/`catfish_hole`.
+
+**Headless-proven:**
+- **Catchability math** — reel curve `ReelDrainMax` (weapon-analog) + rod curve `BreakThreshold`
+  (armor-analog), `StaminaToLand`, `NetDrain`, `FightTime` (∞ if NetDrain ≤ 0), `LandWindow`, and the
+  single inequality `FightTime ≤ LandWindow` — from EQUIPMENT_MASTER §1 + `Tuning`.
+- **Min rod/reel tiers are DERIVED, asserted == authored** at load for the **routine Bayou band** (the
+  4 Common/Uncommon fish derive to `1/1`, incl. the Blue Catfish milestone at ft 9.02 ≤ lw 9.6). **Rares
+  are excluded from the band** (RD5 — bonus-on-top finds): the Leviathan's colossal weight intentionally
+  exceeds the T1 fight model ("the difficulty is reaching the condition, not the fight"). Cross-tier is
+  owed at Step 10.
+- **The OR-gate** — catching the **Blue Catfish** sets `conqueredDestinations["bayou"]`, the **same**
+  idempotent flag the American Alligator sets; conquering via either loop (in either order) leaves it set
+  **once** (tested both ways).
+- **The bite-density cap** — fishing's `BiteThroughputCeiling` (~65/hr) runs through the *same* generalized
+  anti-farming line; an over-geared player's realized catch-rate is bounded by the ceiling near
+  `Income(1)`, not catch speed. Rares (and any ambiance) are excluded from the routine population.
+- **Anti-exploit** — drain-spoof (drain not derivable from the equipped reel × a legal tension `E ∈ [0,1]`)
+  and illegal tension are rejected; the rare predicate **takes no bait input** (Decision 4 — you cannot
+  buy your way to a rare). The runtime **gear-adequacy** gate (`gear_insufficient`) is the min-tier check
+  in play: a fresh *entry* rig snaps on the milestone until a cheap intra-tier upgrade reaches mid.
+- **Reuse holds:** the Step-4 hunting tests are **unchanged and green** — the shared path did not regress.
+
+**Studio playtest checklist — NOT headless; the fight-feel bar on a phone (all unchecked):**
+- [ ] **The fight feels good** — the tension gauge is tactile/readable one-handed, runs spike with weighty
+      haptics, audio swells with tension and resolves on the land (Decision 1 / 01 risk #4).
+- [ ] The push-pull rhythm (reel-when-calm, ease-on-runs) reads and rewards skill.
+- [ ] The **first Bayou catch** is the punchy ~60 s funnel beat on the free starter rod+reel.
+- [ ] The hook-set window feels fair; snap/throw failures read as the player's error, not arbitrary.
+- [ ] **Clean-catch flourish** fires on a rare (the 1-in-N screenshot beat).
+- [ ] The physical bite spawner + spot-depletion (rotate spots / read fresh water) behaves on a phone.
+
+**Named stubs (owning step):** the real **`Payout`** → Step 6 (reuses `RewardPipeline.stubPayout`); the
+**bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) → Step 6/7 (grant bait manually
+for the Step-5 playtest); **premium bait** (paid `TimeToBite` accelerator) → Step 14 (stub; assert
+rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible, no Boat gating built).
+
+**Owed, NOT faked → Step 10:** Alaska's king-salmon milestone + the coastal Boat gate + the halibut apex,
+and the dual-loop **reconciliation/drift** check (fishing Cash/hr vs hunting Cash/hr) — they need the
+higher-tier rosters and live data. Step 5 provides fishing's *rate*; it does **not** prove balance.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
 |---|---|
 | Finished art (cypress models, water shader, textures, sound) — the shell is placeholder blockout | Phase-3 art pass |
-| The **fishing** target spawner + species→zone mapping (reuses the Step-4 loop-agnostic `Spawner`/`RewardPipeline`); rod/reel fight curves; Angler Rank XP + fishing milestone wiring | Step 5 |
-| The funnel first-spawn guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
+| **Boats** + water-type→Boat-access enforcement (Bayou is shore-accessible — none built); the coastal sub-area gate | Step 11 |
+| **Premium bait** (paid `TimeToBite` accelerator — stub here, asserts rare-spawn takes no bait); the **bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) | Steps 14 / 6-7 |
+| The funnel first-spawn / first-bite guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
 | The real **`Payout`** formula + all Cash magnitudes (swaps `RewardPipeline.stubPayout`); the **Cash revive-in-place price**; shop UI | Step 6 |
 | The **rewarded-ad revive** | Step 14 |
-| **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D); the MVL **T2→T4 difficulty check** (needs Appalachia/Alaska survival-bounded inputs) | post-MVL / Step 10 |
+| **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D); the MVL **T2→T4 difficulty check** + the **dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters + king-salmon/halibut) | post-MVL / Step 10 |
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
 | Faucet/sink **operations** (gear-buy debits — call `attemptDebit`); applying boost multipliers; **the idle amount formula + "current tier for idle" definition** | Step 6 |
 | Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive) | Step 8 |
@@ -291,8 +361,9 @@ that exists; only the **T1 floor bands** are validated (no premature cross-tier 
 
 1. **Gate fields.** `prerequisiteDestinations ⊆ conqueredDestinations` is the re-threadable DAG edge;
    `milestoneTargets` supply the loop-aware actionable nouns. The **hunting** conquest is now recorded on
-   a server-validated kill (Step 4 reward pipeline sets `conqueredDestinations[home]` idempotently);
-   fishing conquest is Step 5. The gate *consumes* the flag — that enforcement is Step 9.
+   a server-validated kill (Step 4 reward pipeline sets `conqueredDestinations[home]` idempotently); the
+   **fishing** conquest (Step 5) sets the **same** flag (the OR-gate — gator *or* Blue Catfish). The gate
+   *consumes* the flag — that enforcement is Step 9.
 2. **`monetizationRoles` = the four-value Template-B set** (`power-progression` restored as a legitimate
    descriptor; modeled as a set; retagged per EQUIPMENT_MASTER §4). *(Corrects Step 1's narrowing.)*
 3. **`destinationId` on Creature/Fish** — the home Destination (catalog keying + milestone home lookup).
@@ -331,7 +402,17 @@ on save failure); the anti-exploit validators (damage-spoof / fire-rate / range 
 game feel — the most important bar of this system** — plus the live shot/raycast and the physical spawner.
 Owed at Step 10: the T2→T4 difficulty check (flagged, not faked).
 
-**376 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+**Step 5:** ✅ (headless) the `spawnZones` prerequisite (Bayou fish → water zones); the catchability math
+(`FightTime ≤ LandWindow`, reel/rod curves); **min rod/reel-tier derivation asserted == authored** for the
+routine Bayou band (rares excluded, RD5); the shared pipeline **extended** (one Fishing `describe` branch —
+routine catch → `catch` ledger + Angler XP; rare → mint + no Cash; atomic, no orphan); the **OR-gate** (one
+shared idempotent Bayou conquest flag, both loops, both orders); the bite cap via the **generalized**
+single anti-farming line (over-geared bounded near `Income(1)`); drain-spoof / illegal-tension / no-bait /
+gear-insufficient rejections; the `catch` handler end-to-end; **the Step-4 hunting tests unchanged**. ⌂
+(Studio playtest, unchecked above) **the fight feel — the most important bar** — the tension gauge, the
+push-pull rhythm, the physical bite spawner. Owed at Step 10: Alaska milestone + reconciliation/drift.
+
+**446 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
 place.** The Studio playtest checklists above are the honest bar for the world/feel — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓

@@ -127,6 +127,9 @@ export type Fish = {
 	minReelTier: number,
 	baitRequired: string?,
 	waterType: WaterType,
+	-- Step-5 placement: the structured Step-3 water zones the live bite spawner places this fish into
+	-- (the Fish equivalent of Creature.spawnZones; fish carry no prose location).
+	spawnZones: { string }?,
 	reward: Reward,
 	spawn: FishSpawn,
 	rare: RareFields?, -- present iff rarity ≥ Rare

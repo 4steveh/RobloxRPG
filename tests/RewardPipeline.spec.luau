@@ -20,6 +20,9 @@ return function(t: Harness.T)
 	local function huntEvent(targetId: string): RewardPipeline.KillEvent
 		return { targetId = targetId, owner = "u1", validatingEventId = "kill:" .. targetId, loop = Enums.Loop.Hunting }
 	end
+	local function fishEvent(targetId: string): RewardPipeline.KillEvent
+		return { targetId = targetId, owner = "u1", validatingEventId = "catch:" .. targetId, loop = Enums.Loop.Fishing }
+	end
 
 	t.section("RewardPipeline — ambiance early-returns ZERO (no entry, XP, mint, or conquest)")
 	do
@@ -91,5 +94,52 @@ return function(t: Harness.T)
 		t.ok("transaction reports failure", txn.ok == false)
 		t.ok("no orphan artifact (mint reverted)", next(p.artifacts) == nil and next(p.inventory.artifactIds) == nil)
 		t.eq("no orphan Rank XP", p.hunterRankXP, 0)
+	end
+
+	-- ── Step 5: the SAME pipeline, extended with the Fishing describe branch (not forked) ──
+	t.section("RewardPipeline (fishing) — routine catch: ONE 'catch' ledger entry + Angler XP, no mint")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		local r = RewardPipeline.resolve(p, Catalog, fishEvent("bayou_bluegill"), newDeps())
+		t.eq("exactly one ledger entry", #p.cash.tail, 1)
+		t.ok("entry amount = stub Payout, tagged a fishing 'catch' faucet", r.cash == RewardPipeline.stubPayout(Catalog, 1, "Common", "Fishing") and p.cash.tail[1].type == "catch" and p.cash.tail[1].loop == "Fishing")
+		t.ok("ANGLER Rank XP awarded (not Hunter)", p.anglerRankXP > 0 and r.rankXP == p.anglerRankXP and p.hunterRankXP == 0)
+		t.ok("no mint for a routine catch", r.mintedArtifactId == nil)
+	end
+
+	t.section("RewardPipeline (fishing) — RARE catch: ONE mint + NO Cash (the shared Reward XOR)")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		local r = RewardPipeline.resolve(p, Catalog, fishEvent("bayou_leviathan"), newDeps())
+		t.ok("exactly one artifact minted (the Mythic Leviathan)", r.mintedArtifactId ~= nil and p.artifacts[r.mintedArtifactId :: string] ~= nil)
+		t.ok("NO Cash at mint, Angler XP awarded, clean-catch moment fires", r.cash == 0 and #p.cash.tail == 0 and r.rankXP > 0 and r.cleanKillMoment ~= nil)
+	end
+
+	t.section("RewardPipeline — the OR-gate: hunting AND fishing share ONE idempotent Bayou conquest flag")
+	do
+		-- conquer via the gator, then catch the Blue Catfish — the SAME flag, not re-triggered
+		local p = Util.mkProfile(Catalog, {})
+		local g = RewardPipeline.resolve(p, Catalog, huntEvent("bayou_american_alligator"), newDeps())
+		t.ok("the gator kill conquers the Bayou (newly set)", g.conquestNewlySet and p.conqueredDestinations.bayou == true)
+		local b = RewardPipeline.resolve(p, Catalog, fishEvent("bayou_blue_catfish"), newDeps())
+		t.ok("then catching the Blue Catfish does NOT re-trigger conquest (one shared flag, idempotent)", b.conquestNewlySet == false and p.conqueredDestinations.bayou == true)
+		-- reverse order: catch first, then hunt — still once-only
+		local p2 = Util.mkProfile(Catalog, {})
+		local b2 = RewardPipeline.resolve(p2, Catalog, fishEvent("bayou_blue_catfish"), newDeps())
+		t.ok("catching the Blue Catfish FIRST conquers the Bayou (the OR-gate's fishing route)", b2.conquestNewlySet and p2.conqueredDestinations.bayou == true)
+		local g2 = RewardPipeline.resolve(p2, Catalog, huntEvent("bayou_american_alligator"), newDeps())
+		t.ok("then the gator kill does NOT re-trigger (conquering via EITHER loop is enough)", g2.conquestNewlySet == false and p2.conqueredDestinations.bayou == true)
+	end
+
+	t.section("RewardPipeline (fishing) — a rare catch is atomic (forced save failure → no orphan)")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		local txn = Transaction.run(p, function()
+			RewardPipeline.resolve(p, Catalog, fishEvent("bayou_leviathan"), newDeps())
+		end, function()
+			return false
+		end)
+		t.ok("transaction reports failure", txn.ok == false)
+		t.ok("no orphan mint / Angler XP", next(p.artifacts) == nil and p.anglerRankXP == 0)
 	end
 end

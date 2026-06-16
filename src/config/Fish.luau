@@ -32,6 +32,7 @@ type FishInput = {
 	minReelTier: number,
 	waterType: Enums.WaterType,
 	baitRequired: string?,
+	spawnZones: { string }?, -- structured Step-3 water zones (Step 5 prerequisite)
 	conditions: Schema.SpawnConditions?,
 	isMilestoneTarget: boolean?,
 	cash: { min: number, max: number }?,
@@ -60,6 +61,7 @@ local function fish(i: FishInput): Fish
 		minReelTier = i.minReelTier,
 		baitRequired = i.baitRequired,
 		waterType = i.waterType,
+		spawnZones = i.spawnZones,
 		reward = reward,
 		spawn = { conditions = i.conditions },
 		rare = i.rare,
@@ -92,6 +94,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.pond,
 		baitRequired = "worms",
+		spawnZones = { "channel_banks" }, -- shore-accessible panfish water
 		cash = { min = 14, max = 20 },
 		conditions = { time = "all day" },
 	}),
@@ -108,6 +111,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "cut bait",
+		spawnZones = { "channel_banks" },
 		cash = { min = 14, max = 20 },
 	}),
 	fish({
@@ -123,6 +127,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "cut bait",
+		spawnZones = { "channel_banks", "catfish_hole" },
 		cash = { min = 24, max = 30 },
 		conditions = { time = "dusk" },
 	}),
@@ -139,6 +144,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "cut bait",
+		spawnZones = { "catfish_hole", "channel_banks" }, -- the deep oxbow is the signature catch's home
 		cash = { min = 24, max = 30 },
 		conditions = { time = "dawn/dusk" },
 		isMilestoneTarget = true, -- Bayou fishing conquest milestone
@@ -156,6 +162,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "cut bait",
+		spawnZones = { "catfish_hole" }, -- rare/legendary catfish condition site
 		conditions = { time = "night" },
 		rare = rareFields(3500, "a huge ghost-pale catfish breaching at night"),
 	}),
@@ -172,6 +179,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "live sucker",
+		spawnZones = { "catfish_hole" }, -- the deepest channel; storm-night condition site
 		conditions = { time = "night", weather = "storm" },
 		rare = rareFields(7500, "the screen-filling leviathan rising in a thunderstorm"),
 	}),

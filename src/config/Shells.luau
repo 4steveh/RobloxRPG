@@ -7,6 +7,7 @@
 
 local Schema = require("@src/types/Schema")
 local Ids = require("@src/types/Ids")
+local Enums = require("@src/types/Enums")
 local Catalog = require("@src/config/Catalog")
 local Shell = require("@src/logic/Shell")
 local Spawner = require("@src/logic/Spawner")
@@ -127,7 +128,11 @@ Shell.validateShell(bayou, Catalog)
 -- a real zone in this shell. (The fishing placement check plugs in here the same way at Step 5.)
 local bayouSpawn = Spawning.byDestination[D.Bayou]
 if bayouSpawn ~= nil and bayouSpawn.hunting ~= nil then
-	Spawner.validatePlacement(Catalog, bayou, bayouSpawn.hunting)
+	Spawner.validatePlacement(Catalog, bayou, bayouSpawn.hunting, Enums.Loop.Hunting)
+end
+-- Step-5: the fishing placement check plugs in the same way (every Bayou fish resolves to a water zone).
+if bayouSpawn ~= nil and bayouSpawn.fishing ~= nil then
+	Spawner.validatePlacement(Catalog, bayou, bayouSpawn.fishing, Enums.Loop.Fishing)
 end
 
 return Shells

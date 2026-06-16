@@ -33,8 +33,19 @@ local bayouHunting: LoopSpawn = {
 	},
 }
 
+-- Bayou FISHING (LOC §8.4): 2 shore-accessible waters; MaxConcurrentBites ~2–3 / BiteRespawnInterval ~30 s;
+-- BiteThroughputCeiling in the ~60–70/hr band (knob; the binding part is "capped near Income(1)"). Local
+-- spot-depletion is a Studio spawner detail; the ceiling is this shared headless cap.
+local bayouFishing: LoopSpawn = {
+	ceilingPerHour = 65,
+	areas = {
+		channel_banks = { maxConcurrentTargets = 3, respawnIntervalSeconds = 30 },
+		catfish_hole = { maxConcurrentTargets = 2, respawnIntervalSeconds = 30 },
+	},
+}
+
 local byDestination: { [Ids.DestinationId]: DestinationSpawn } = {
-	[D.Bayou] = { hunting = bayouHunting }, -- fishing = TODO(step-5): same shape, reuses Spawner.luau
+	[D.Bayou] = { hunting = bayouHunting, fishing = bayouFishing },
 }
 Spawning.byDestination = byDestination
 

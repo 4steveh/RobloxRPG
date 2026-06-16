@@ -12,6 +12,7 @@
 local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 local Combat = require("@src/logic/Combat")
+local Fishing = require("@src/logic/Fishing")
 
 type EquipmentItem = Schema.EquipmentItem
 type Creature = Schema.Creature
@@ -152,6 +153,21 @@ function V.validateConfig(config: Config)
 	end
 	for _, f in config.fish do
 		V.assertFish(f)
+		-- Step-5 (SYS_fishing §3): min rod/reel tiers are DERIVED, asserted == authored for the BAYOU
+		-- ROUTINE band only. Rares are bonus-on-top finds excluded from the band (RD5) — e.g. the
+		-- Leviathan's colossal weight intentionally exceeds the T1 fight model ("the difficulty is reaching
+		-- the condition, not the fight", LOC §5). Appalachia/Alaska + the cross-tier derivation are owed at
+		-- Step 10. Also require structured spawnZones on every Bayou fish (Step 5 prerequisite).
+		if f.destinationId == "bayou" then
+			assert(f.spawnZones ~= nil and #(f.spawnZones :: { string }) > 0, f.id .. ": a Bayou fish must carry structured spawnZones (Step 5 prereq)")
+			if not V.isRareOrAbove(f.rarity) then
+				local derived = Fishing.deriveMinTiers(config, f)
+				assert(derived.minRodTier == f.minRodTier,
+					string.format("%s: authored minRodTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minRodTier, derived.minRodTier))
+				assert(derived.minReelTier == f.minReelTier,
+					string.format("%s: authored minReelTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minReelTier, derived.minReelTier))
+			end
+		end
 	end
 	for _, perk in config.rankPerks do
 		V.assertRankPerkCategory(perk.category)

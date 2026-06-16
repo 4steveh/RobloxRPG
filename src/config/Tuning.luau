@@ -66,6 +66,7 @@ Tuning.fishingFight = table.freeze({
 	r = 0.08, -- FishRecovery coefficient
 	p = 0.6, -- PeakRunForce coefficient
 	E_expected = 0.7, -- tension-efficiency reference (fishing analog of Z_expected)
+	dragSmooth = 1.0, -- §2 LandWindow reel factor; flat at MVL (reel-scaling deferred), a tuning knob (Step 5)
 })
 
 -- §1.6 Skill reference for min-tier derivation. Gates clear for a body-shot (conservative) player;
@@ -114,6 +115,27 @@ Tuning.combat = table.freeze({
 	-- Game-FEEL knobs — Studio/playtest, NOT headless. Captured so they are config, not code, when tuned.
 	settleTimeSecondsByTier = table.freeze({ [1] = 0.6, [2] = 0.55, [3] = 0.5, [4] = 0.45 }), -- TODO(step-4 Studio feel)
 	aimAssist = table.freeze({ strength = 0.5, coneDegrees = 6, capStrength = 0.7 }), -- TODO(Studio + platform-split telemetry)
+})
+
+-- §fishing (Step 5) — the fishing-OWNED knobs (SYS_fishing §5 engagement + §4 Angler XP weighting). The
+-- §1/§2 fishing CURVES live in offensive (R1), defensive (rod Pressure), and fishingFight above; this is
+-- the loop's engagement/XP set. Illustrative defaults; the fight FEEL knobs (gauge geometry) are Studio.
+Tuning.fishing = table.freeze({
+	-- §5 TimePerCatch components per tier (co-owned w/ economy; the drift-prone input). T1 → 60s → ~60/hr.
+	engagement = table.freeze({
+		[1] = table.freeze({ timeToBite = 20, fightTime = 18, overhead = 22 }),
+		[2] = table.freeze({ timeToBite = 32, fightTime = 38, overhead = 25 }),
+		[4] = table.freeze({ timeToBite = 55, fightTime = 80, overhead = 30 }),
+	}),
+	-- SYS_progression §4 Angler Rank XP — tier × rarity × fight-difficulty WEIGHTED (the weighting is the
+	-- design; magnitudes are tuning). Fish have no archetype, so this is NOT Combat.rankXP (a fish-shaped
+	-- weighting via fightDifficulty replaces the archetype factor). Identity/convenience only, never power.
+	rankXP = table.freeze({
+		base = 10,
+		tierStep = 0.5,
+		rarityWeight = table.freeze({ Common = 1, Uncommon = 1.5, Rare = 3, Epic = 6, Legendary = 12, Mythic = 25 } :: { [string]: number }),
+		fightDifficultyDivisor = 100, -- difficulty factor = 1 + FightDifficulty/divisor (the §4 difficulty weighting)
+	}),
 })
 
 -- §1.7 Economy constants (consumed, not owned — from SYS_economy; balanceOf does not need them in Step 1).
