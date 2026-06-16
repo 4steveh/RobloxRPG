@@ -1,0 +1,58 @@
+name: CI
+
+# Runs the Definition-of-Done gate (./run-tests.sh) on every push and PR:
+#   1) luau-analyze --!strict on every headless module   2) unit tests
+#   3) the negative fixtures must FAIL analysis           4) rojo build
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: run-tests.sh (analyze · tests · negative fixtures · rojo build)
+    runs-on: ubuntu-latest
+    env:
+      # Authenticated GitHub API calls avoid the 60/hr unauthenticated rate limit when resolving releases.
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Luau + Rojo (latest releases)
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          # Resolve the linux asset URL from the latest release, then download+unzip into ~/.local/bin.
+          # Robust to asset-name drift: we match by case-insensitive regex rather than a pinned filename.
+          dl() {
+            local repo="$1" regex="$2" out="$3" url
+            url=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$repo/releases/latest" \
+              | jq -r --arg re "$regex" '.assets[] | select(.name | test($re; "i")) | .browser_download_url' \
+              | head -n1)
+            if [ -z "$url" ] || [ "$url" = "null" ]; then
+              echo "::error::no asset matching /$regex/i in $repo's latest release"; exit 1
+            fi
+            echo "Fetching $repo -> $url"
+            curl -fsSL -o "$out" "$url"
+          }
+          # The luau-lang/luau archive ships luau, luau-analyze, and luau-compile together.
+          dl "luau-lang/luau" "(ubuntu|linux).*\.zip$" /tmp/luau.zip
+          unzip -o /tmp/luau.zip -d "$HOME/.local/bin"
+          # Rojo (linux x86_64).
+          dl "rojo-rbx/rojo" "linux-x86_64\.zip$" /tmp/rojo.zip
+          unzip -o /tmp/rojo.zip -d "$HOME/.local/bin"
+          chmod +x "$HOME/.local/bin"/* || true
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Tool versions
+        run: |
+          luau --version || true
+          luau-analyze --help >/dev/null 2>&1 && echo "luau-analyze: ok" || true
+          rojo --version || true
+
+      - name: Run the Definition-of-Done gate
+        run: ./run-tests.sh
