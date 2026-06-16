@@ -55,6 +55,23 @@ return function(t: Harness.T)
 		t.eq("credits only since last save (1h) — not since the stale logout (the safe under-credit)", r.credited, 100)
 	end
 
+	t.section("Idle — the REAL economy amount scales with T_idle = max(EHT, EFT) (Step 6)")
+	do
+		-- EHT 2 (weapon+armor T2), EFT 1 (rod+reel T1) → T_idle = 2 → 0.15 · Income(2) 1700 · 2h = 510
+		local geared = Util.mkProfile(Catalog, { weapon = 2, armor = 2, rod = 1, reel = 1 })
+		t.eq("idle = idleFraction · Income(max(EHT,EFT)) · hours = 510", Idle.economyAmount(geared, Catalog, 2), 510)
+		-- a starter player (EHT = EFT = 1) idles at Tier 1 → 0.15 · 1000 · 1 = 150
+		local starter = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1 })
+		t.eq("a starter idles at Tier 1 (150/hr)", Idle.economyAmount(starter, Catalog, 1), 150)
+		-- idle-proof: it credits Cash only — never a conquest (still can't advance the Passport)
+		local r = Idle.creditOnLogin((function()
+			local p = Util.mkProfile(Catalog, { weapon = 2, armor = 2, rod = 1, reel = 1 })
+			p.logoutTimestamp = 1000
+			return p
+		end)(), Catalog, 1000 + 2 * HOUR, Idle.economyAmount)
+		t.eq("credited via the real fn through creditOnLogin (2h, T2)", r.credited, 510)
+	end
+
 	t.section("Idle — a brand-new profile gets no idle")
 	do
 		local p = Util.mkProfile(Catalog, {}) -- logoutTimestamp 0, sessionOpen false

@@ -155,6 +155,10 @@ Tuning.economy = table.freeze({
 	}),
 	idleFraction = 0.15, -- fraction of current-tier active income accrued idle (Step 2 consumes)
 	idleCapHours = 8, -- daily-return-hook clamp (Step 2 consumes)
+	-- §5 salvage floor (Step 6 — the one economy value not authored in Step 1): a rare's NPC-vendor Cash,
+	-- a DELIBERATELY LOW fraction of its conceptual faucet value, so rare value flows to P2P trade / the
+	-- Trophy Hall, not the Cash supply. The salvage TRANSITION + credit are Step 8; this is just the amount.
+	salvageFloorFraction = 0.15,
 })
 
 -- Big one-time access/convenience sink multipliers (EQUIPMENT_MASTER §4.5–§4.7; coarse defaults, OQ-D).

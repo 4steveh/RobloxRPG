@@ -49,4 +49,17 @@ return function(t: Harness.T)
 	local starterWeapon = assert(starterWeaponItem, "equipped weapon instanceId resolves to an owned commodity")
 	t.ok("equipped starter weapon is Tier 1", starterWeapon.tier == 1)
 	t.ok("equipped starter weapon is from the StarterLoadout (free)", starterWeapon.availableAt == "StarterLoadout")
+
+	t.section("mintCommodity — grants a new gear instance (the Step-6 shop primitive)")
+	do
+		local mp = Profile.freshProfile(Catalog) -- 3 starter commodities; nextCommodityInstanceSeq = 4
+		local c = Profile.mintCommodity(mp, "weapon_lever_action_rifle", 0)
+		t.ok("minted with a fresh stable instanceId (ci4)", c.instanceId == "ci4")
+		t.ok("NOT equipped on mint, entry intra-level", c.equipped == false and c.intraLevel == 0)
+		t.eq("appended to inventory.commodities (now 4)", #mp.inventory.commodities, 4)
+		t.eq("nextCommodityInstanceSeq advanced to 5", mp.nextCommodityInstanceSeq, 5)
+		local c2 = Profile.mintCommodity(mp, "armor_field_jacket", 0)
+		t.ok("a second mint is monotonic (ci5)", c2.instanceId == "ci5")
+		t.ok("buying does NOT equip → EHT unchanged until the player equips it", EHT.effectiveHuntingTier(mp, Catalog) == 1)
+	end
 end

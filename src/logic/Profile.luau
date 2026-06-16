@@ -82,6 +82,19 @@ function M.freshProfile(config: Config): PlayerData
 	}
 end
 
+-- COMMODITY MINT (Step 6) — grant a new gear instance into the inventory with a fresh, stable instanceId
+-- from the monotonic per-player sequence (the same scheme freshProfile seeds). The shop's buy handler calls
+-- this after a successful Cash debit; the starter grant (freshProfile) is the same mint's first, free use.
+-- NOT equipped on mint (equip is the separate EquipHandler) — so buying a slot does not change EHT/EFT until
+-- the player equips it, and never satisfies a Gate by itself.
+function M.mintCommodity(profile: PlayerData, catalogId: string, intraLevel: number): Commodity
+	local instanceId = "ci" .. profile.nextCommodityInstanceSeq
+	profile.nextCommodityInstanceSeq += 1
+	local commodity: Commodity = { instanceId = instanceId, catalogId = catalogId, intraLevel = intraLevel, equipped = false }
+	table.insert(profile.inventory.commodities, commodity)
+	return commodity
+end
+
 -- Artifact constructor — rejects an illegal disposition for the kind (DISPLAYED/SALVAGED are Trophy-only).
 -- The single safe path to create an Artifact value; the negative test passes a non-trophy DISPLAYED here.
 function M.newArtifact(args: {

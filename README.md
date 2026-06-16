@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–5)
+# Wild World — Build (Steps 1–6)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -26,6 +26,12 @@ note per step.
   inequality (`FightTime ≤ LandWindow`) with derived min rod/reel tiers. The **OR-gate** is one shared
   idempotent conquest flag (gator *or* Blue Catfish). **The catchability math/pipeline/caps are
   headless-proven; the fight FEEL is a Studio playtest** — split honestly below.
+- **Step 6 — Economy & Shops.** The convergence point: the real economy **formulas** (`Income`/`GearCost`/
+  `IntraTierClimb`/`Payout`) replace the **three `Payout`/idle stubs** (idle, hunting, fishing); the
+  Outfitter/Tackle-Shop **gear sinks** (buy + intra-tier upgrade) are server-authoritative gauntlet
+  handlers minting commodities; and the **dual-loop reconciliation** (01 risk #3) + the MVL gear-Cash jump
+  are proven headless. **The formulas/sinks/reconciliation are headless-proven; the shop UI, felt pacing,
+  and the *live* (measured) reconciliation are Studio/telemetry** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -67,7 +73,9 @@ src/
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
            · Fishing (Step 5 — reel/rod curves, FightTime ≤ LandWindow, min rod/reel derivation, Angler XP, drain validators, co-op)
-           · Spawner (Step 4 — caps/engagement rate, exclusions, rare predicate, placement; GENERALIZED for both loops in Step 5)
+           · Economy (Step 6 — Income/GearCost/IntraTierClimb/Payout/salvageFloor + the per-loop routine-band normalization + reconciliation)
+           · Spawner (Step 4 — caps/engagement rate, exclusions, rare predicate, placement; GENERALIZED Step 5; +modeledRatePerHour Step 6)
+           · Profile (+ Step-6 mintCommodity: the gear-grant primitive the shops + the starter loadout use)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -75,6 +83,9 @@ src/
       FireHandler.luau      (Step 4) the "fire" intent handler — the gauntlet's step-3 shot resolution + the reward commit (critical)
     fishing/
       CatchHandler.luau     (Step 5) the "catch" intent handler — the gauntlet's step-3 fight resolution + the (shared) reward commit (critical)
+    shop/
+      ShopHandler.luau      (Step 6) the Outfitter/Tackle-Shop gear sinks — buy + intra-tier upgrade gauntlet handlers (critical, atomic Cash debit + commodity mint)
+    idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
     world/BayouBlockout.server.luau    ⌂ STUDIO-ONLY — builds the placeholder shell from Shells config + the arrival flow
     world/HuntingService.server.luau   ⌂ STUDIO-ONLY (Step 4) — physical spawner + fire RemoteEvent + raycast LOS + non-lethal clamp + respawn
     world/FishingService.server.luau   ⌂ STUDIO-ONLY (Step 5) — physical bite spawner + spot-depletion + cast/bite/fight + non-punitive loss
@@ -101,7 +112,7 @@ src/
     RobloxAdapters.luau   thin injection-based Roblox adapters (Studio-only binding; strict-clean headless)
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
          ProfileStore/Ledger/ArtifactStore/Gauntlet/Idle/Integrity; Step 3: Shell/Arrival; Step 4:
-         Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler) · negative/ (MUST fail analysis)
+         Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -338,6 +349,55 @@ rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible, no 
 and the dual-loop **reconciliation/drift** check (fishing Cash/hr vs hunting Cash/hr) — they need the
 higher-tier rosters and live data. Step 5 provides fishing's *rate*; it does **not** prove balance.
 
+## Step 6 — economy & shops (the convergence; the bar is split, honestly)
+
+Step 6 is where the three pipelines running on a **stub `Payout`** since they were built (idle from Step 2,
+hunting from Step 4, fishing from Step 5) get the **real economy formulas**, and where the dual-loop
+balance (01 risk #3, the most fragile thing in the game) becomes *provable*.
+
+**The constants already existed** (`Tuning.economy`: `B/g/c/m`, the rarity ladder, idle fraction/cap) —
+Step 6 implements the **functions** that read them and adds the one missing value (the salvage floor).
+
+**Headless-proven:**
+- **Formulas** — `Income(T)=B·g^(T−1)` (1000/1700/2890/4913), `GearCostSlot(T)=c·Income(T−1)` (3000/5100/
+  8670), `IntraTierClimb(T)=m·Income(T)` (2500 at T1), the rarity ladder, and the salvage floor. Every
+  gating item's catalog price is asserted == the formula (drift check).
+- **The three stubs are gone.** Hunting + fishing pay the **real `Payout`**, with the **routine band
+  normalized per loop** by `AvgRoutineMultiplier(dest, loop)` so each loop's routine hour sums to *exactly*
+  `Income(T)` — the denominator is the **modeled** engagement rate (80/60 at Bayou T1), never the
+  ceiling-clamped one. Rares still **mint** (the XOR holds — Cash is realized only at the low salvage
+  floor, Step 8). Idle pays the **real amount** at **`T_idle = max(EHT, EFT)`** (this is Step 6's
+  resolution of the Step-2/economy open "current tier" question — **flagged to ratify**; floors to
+  under-credit, idle-only, never milestone).
+- **Dual-loop reconciliation (01 risk #3)** — a test asserts **each loop's normalized routine hour sums to
+  `Income(T)`** for Bayou/Appalachia/Alaska (parity *by construction*, not a raw hunting≈fishing compare),
+  plus **ceiling slackness** (modeled ≤ ceiling at each dest-tier — the at-tier complement to the
+  over-geared anti-farming bound).
+- **The MVL gear-Cash jump** — Appalachia→Alaska costs `2c·g ≈ 10.2` hrs (≈1.7×); a normal step is `2c=6`.
+  (Pure formula; the combat *difficulty* T2→T4 check stays Step 10.)
+- **Shops** — the **commodity-mint** primitive (`Profile.mintCommodity`); buy debits `GearCostSlot(T)` +
+  mints an `entry` commodity (not equipped → **EHT unchanged until equipped**, never gates by purchase);
+  upgrade increments `intraLevel` + debits the `IntraTierClimb` step (**EHT/EFT unchanged** — intra-tier
+  never gates); insufficient funds rejects with **no partial state**; both commit atomically (forced save
+  failure → no orphan Cash or gear); non-gating items (bait) and the free starter are rejected.
+- **Finding:** the **starter-loadout grant already exists** in production (`Profile.freshProfile` →
+  `SessionService.login`) — the prompt's "appears absent" was incorrect; not rebuilt (the mint is built
+  regardless, for the shops).
+
+**Studio / telemetry — NOT headless (all unchecked):**
+- [ ] The **Outfitter / Tackle Shop UI** reads and transacts on a phone (the buy/upgrade screens; the
+      handlers are built and headless-tested — only the UI is Studio).
+- [ ] A gear upgrade **feels earned** — the first-five-minutes intra-tier purchase lands as the soft-
+      monetization beat; "money → gear → access → bigger prey" reads.
+- [ ] **Live reconciliation** — realized fishing Cash/hr ≈ hunting Cash/hr at comparable progress (the
+      drift alarm needs real play data; the modeled per-loop-sum proof above is *not* the live proof).
+- [ ] The faucet/sink ledger shows ≈ flat per-capita Cash supply in a played/simulated population.
+
+**Named stubs (owning step):** real-money **currency packs / 2×-VIP multipliers / auto-sell** → Step 14;
+the **salvage TRANSITION + choose-disposition UI** → Step 8 (Step 6 supplies the floor amount); **cosmetics
+/ Lodge decor** (the evergreen inflation ballast) → Step 8/14; **Boats/Mounts/Dogs** (priced by this curve)
+→ Step 11; **trade tax** → Step 12; **dailies / cross-loop daily bonus delivery** → Step 7/13.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -346,11 +406,11 @@ higher-tier rosters and live data. Step 5 provides fishing's *rate*; it does **n
 | **Boats** + water-type→Boat-access enforcement (Bayou is shore-accessible — none built); the coastal sub-area gate | Step 11 |
 | **Premium bait** (paid `TimeToBite` accelerator — stub here, asserts rare-spawn takes no bait); the **bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) | Steps 14 / 6-7 |
 | The funnel first-spawn / first-bite guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
-| The real **`Payout`** formula + all Cash magnitudes (swaps `RewardPipeline.stubPayout`); the **Cash revive-in-place price**; shop UI | Step 6 |
+| ~~The real **`Payout`** formula + the idle amount + gear sinks~~ — **DONE (Step 6)**; remaining: the **shop UI** (Studio) + the **Cash revive-in-place price** (a minor sink, not yet wired) | Studio / later |
 | The **rewarded-ad revive** | Step 14 |
 | **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D); the MVL **T2→T4 difficulty check** + the **dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters + king-salmon/halibut) | post-MVL / Step 10 |
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
-| Faucet/sink **operations** (gear-buy debits — call `attemptDebit`); applying boost multipliers; **the idle amount formula + "current tier for idle" definition** | Step 6 |
+| Real-money **currency packs / 2×-VIP multipliers (multiplicative stacking + max-stack ceiling) / auto-sell**; cosmetics & Lodge decor (the evergreen inflation ballast) | Steps 14 / 8 |
 | Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive) | Step 8 |
 | World Map UI, **gated teleport execution + enforcement** | Step 9 |
 | Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback (call CAS `HELD↔ESCROWED` + Transaction + paired ledger entries) | Step 12 |
@@ -373,6 +433,13 @@ higher-tier rosters and live data. Step 5 provides fishing's *rate*; it does **n
    pluggable Step-6 stub; the corpus leaves "current tier for an offline player" undefined (`TODO(step-6)`).
 7. **`sessionOpen` + `lastSaveTimestamp`** added as the §6 idle hard-crash-fallback / reconnect-race
    idempotency mechanism (extend §1's persisted set).
+8. **Idle "current tier" = `T_idle = max(EHT, EFT)`** (Step 6). SYS_economy left the offline tier
+   undefined; Step 6 resolves it to the player's best effective (gated) tier — idle rewards gear
+   investment, stays idle-proof (capped/fractional/floored, never milestone), and uses the min-rule
+   effective tier so one high item can't inflate it. **Flagged to ratify** (highest-conquered and
+   last-location are viable alternatives). Also (Step 6): routine `Payout` is **normalized per loop** by
+   `AvgRoutineMultiplier(dest, loop)` (RD5) so each loop's routine hour sums to `Income(T)` by construction
+   — the robust fix vs the flat `Income(T)/rate` baseline, which made dual-loop parity fragile.
 
 ## Definition of Done — status
 
@@ -412,8 +479,17 @@ gear-insufficient rejections; the `catch` handler end-to-end; **the Step-4 hunti
 (Studio playtest, unchecked above) **the fight feel — the most important bar** — the tension gauge, the
 push-pull rhythm, the physical bite spawner. Owed at Step 10: Alaska milestone + reconciliation/drift.
 
-**446 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
-place.** The Studio playtest checklists above are the honest bar for the world/feel — not headless-green.
+**Step 6:** ✅ (headless) the economy formulas reading the existing `Tuning.economy` (+ the new salvage
+floor); the **three `Payout`/idle stubs replaced** (real `Payout` normalized per loop; idle at
+`T_idle=max(EHT,EFT)`); the **dual-loop reconciliation** (each loop's routine hour = `Income(T)`,
+Bayou/Appalachia/Alaska) + ceiling slackness + the MVL `2c·g` gear-Cash jump; the **commodity-mint** + the
+Outfitter/Tackle-Shop **buy/upgrade** sinks (atomic Cash debit + grant; insufficient-funds reject; intra-
+tier never changes EHT/EFT); the gating-price drift check; the starter grant confirmed (already existed).
+⌂ (Studio/telemetry, unchecked above) **the shop UI, the felt pacing, and the *live* (measured)
+reconciliation** — the modeled per-loop proof is not the live proof.
+
+**493 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
 ```

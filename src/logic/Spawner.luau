@@ -55,6 +55,14 @@ function M.expectedTargetsPerHour(config: Config, tier: number, ceilingPerHour: 
 	return ratePerHour(e.find + e.active + e.overhead, ceilingPerHour)
 end
 
+-- The UNCAPPED modeled engagement rate = 3600 / TimePerTarget. This is the **economy Payout denominator**
+-- (Step 6) — NOT ceiling-clamped: the ceiling is the anti-farming bound (slack at-tier, 80<85 / 60<65), so
+-- dividing Income(T) by the ceiling would underpay the at-tier player. Reconciliation asserts the slackness.
+function M.modeledRatePerHour(config: Config, tier: number, loop: Loop?): number
+	local e = engagementFor(config, tier, loop or Enums.Loop.Hunting)
+	return 3600 / (e.find + e.active + e.overhead)
+end
+
 local function zonesContain(zones: { string }?, zoneId: string): boolean
 	if zones == nil then
 		return false

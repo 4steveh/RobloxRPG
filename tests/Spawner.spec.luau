@@ -130,4 +130,11 @@ return function(t: Harness.T)
 			Spawner.validatePlacement(Catalog, bayouShell, bayouFishing, F)
 		end)
 	end
+
+	t.section("Spawner — modeledRatePerHour is the UNCAPPED rate (Step-6 Payout denominator)")
+	do
+		-- the modeled rate, NOT clamped by the ceiling (80 < 85 hunting, 60 < 65 fishing) — Payout divides by this
+		t.ok("Bayou T1 hunting modeled rate = 80 (uncapped)", approx(Spawner.modeledRatePerHour(Catalog, 1), 80))
+		t.ok("Bayou T1 fishing modeled rate = 60 (uncapped)", approx(Spawner.modeledRatePerHour(Catalog, 1, F), 60))
+	end
 end

@@ -20,7 +20,7 @@ export type Deps = {
 	clock: Types.Clock,
 	config: Config,
 	serverId: string,
-	idleAmountFn: Idle.IdleAmountFn?, -- defaults to Idle.stubAmount (Step 6 supplies the real one)
+	idleAmountFn: Idle.IdleAmountFn?, -- defaults to Idle.economyAmount (the Step-6 real amount, T_idle = max(EHT,EFT))
 	telemetry: Types.Telemetry?,
 	sleep: ((seconds: number) -> ())?, -- runtime retry backoff; nil headless
 }
@@ -57,7 +57,7 @@ function M.login(self: SessionService, playerId: number): LoginResult
 	end
 
 	local profile = acq.data or Profile.freshProfile(deps.config)
-	local idleFn = deps.idleAmountFn or Idle.stubAmount
+	local idleFn = deps.idleAmountFn or Idle.economyAmount
 	Idle.creditOnLogin(profile, deps.config, now, idleFn) -- sets sessionOpen=true (+ maybe an idle entry)
 	profile.lastSaveTimestamp = now
 

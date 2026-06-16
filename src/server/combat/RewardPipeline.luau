@@ -16,6 +16,7 @@ local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Combat = require("@src/logic/Combat")
 local Fishing = require("@src/logic/Fishing")
+local Economy = require("@src/logic/Economy")
 local Ledger = require("@src/server/ledger/Ledger")
 local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
 local Types = require("@src/server/persistence/Types")
@@ -25,14 +26,10 @@ type Config = Schema.Config
 
 local M = {}
 
-export type PayoutFn = (config: Config, tier: number, rarity: string, loop: string) -> number
-
--- STUB economy Payout — a positive amount so the atomic commit is exercised; Step 6 swaps in the real
--- Payout(T, rarity, loop) = Income(T)/ExpectedTargetsPerHour × RarityMultiplier. Modeled on Idle.stubAmount.
-function M.stubPayout(config: Config, _tier: number, rarity: string, _loop: string): number
-	local rarityMult = (config.tuning.economy.rarityMultiplier :: { [string]: number })[rarity] or 1
-	return math.floor(12.5 * rarityMult + 0.5) -- illustrative baseline ≈ Income(1)/ETPH(1); TODO(step-6)
-end
+-- The economy Payout (Step 6): the real, server-authoritative Cash a routine kill/catch pays. Takes the
+-- target's destinationId (the routine-band normalization needs it) + tier + rarity + loop. Defaults to
+-- Economy.payout; injectable for tests. (Rares mint — they never call this; the XOR holds.)
+export type PayoutFn = (config: Config, tier: number, rarity: string, destinationId: string, loop: Enums.Loop) -> number
 
 export type PipelineDeps = {
 	idGen: Types.IdGenerator,
@@ -141,8 +138,8 @@ function M.resolve(profile: PlayerData, config: Config, event: KillEvent, deps: 
 			incr(deps, "combat.clean_kill_moment")
 		end
 	else
-		local payoutFn = deps.payoutFn or M.stubPayout
-		local amount = payoutFn(config, d.tier, d.rarity, event.loop)
+		local payoutFn = deps.payoutFn or Economy.payout
+		local amount = payoutFn(config, d.tier, d.rarity, d.destinationId, event.loop)
 		Ledger.applyEntry(profile.cash, {
 			type = d.ledgerType,
 			amount = amount,

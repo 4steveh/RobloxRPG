@@ -6,19 +6,33 @@
 
 local Schema = require("@src/types/Schema")
 local Ledger = require("@src/server/ledger/Ledger")
+local Economy = require("@src/logic/Economy")
+local EffectiveTier = require("@src/logic/EffectiveTier")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
 
 local M = {}
 
--- The amount is economy's formula (idleFraction × current-tier income × hours). STUB for Step 2 so the
--- mechanism's clamping/idempotency/idle-proof guarantees are testable without the formula.
--- TODO(step-6 / economy open question): the corpus does NOT define a player's "current tier" while
--- offline (EHT? EFT? highest tier reached? last location?) — it is an economy decision, not ours.
 export type IdleAmountFn = (profile: PlayerData, config: Config, hours: number) -> number
+
+-- The REAL idle amount (Step 6): idleFraction · Income(T_idle) · hours, with **T_idle = max(EHT, EFT)** —
+-- the player's best effective (gated) tier. Rationale: idle is "a fraction of active income" (§6), and
+-- active income scales with the tier you can actually play; tying idle to max(EHT, EFT) rewards gear
+-- investment, stays idle-PROOF (capped + fractional + still can't conquer), and uses the effective (min-rule)
+-- tier so one high item can't inflate it. The hours are already clamped to idleCapHours by creditOnLogin.
+--   [Step 6's resolution of the Step-2 / SYS_economy open "current tier" question — flagged to ratify;
+--    the alternatives (highest-conquered, last-location) are viable, this is the simplest principled default.]
+function M.economyAmount(profile: PlayerData, config: Config, hours: number): number
+	local tIdle = math.max(EffectiveTier.effectiveHuntingTier(profile, config), EffectiveTier.effectiveFishingTier(profile, config))
+	-- FLOOR (not round): idle under-credits by design — over-crediting mints Cash; the safe direction (§6).
+	return math.floor(config.tuning.economy.idleFraction * Economy.income(config, tIdle) * hours)
+end
+
+-- A simple linear amount-fn retained for the mechanism tests (clamp / idempotency / crash-fallback are
+-- amount-agnostic; this keeps those tests independent of the economy curve). NOT used in production.
 function M.stubAmount(_profile: PlayerData, _config: Config, hours: number): number
-	return math.floor(hours * 100) -- placeholder fixed rate; real formula lands in Step 6
+	return math.floor(hours * 100)
 end
 
 export type CreditResult = { credited: number, hours: number, basis: string }
