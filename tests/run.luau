@@ -3,7 +3,7 @@
 -- non-zero if any assertion failed (so CI / run-tests.sh can gate on it).
 
 local Harness = require("@tests/harness")
-local t = Harness.new("Wild World — Step 1")
+local t = Harness.new("Wild World — Steps 1–4")
 
 local specs: { (Harness.T) -> () } = {
 	-- Step 1 (data model + pure logic)
@@ -23,6 +23,11 @@ local specs: { (Harness.T) -> () } = {
 	-- Step 3 (movement + Bayou shell — the data/logic seams)
 	require("@tests/Shell.spec"),
 	require("@tests/Arrival.spec"),
+	-- Step 4 (hunting — combat math, spawner, reward pipeline, fire handler)
+	require("@tests/Combat.spec"),
+	require("@tests/Spawner.spec"),
+	require("@tests/RewardPipeline.spec"),
+	require("@tests/FireHandler.spec"),
 }
 
 for _, spec in specs do

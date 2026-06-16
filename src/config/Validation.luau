@@ -11,6 +11,7 @@
 
 local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
+local Combat = require("@src/logic/Combat")
 
 type EquipmentItem = Schema.EquipmentItem
 type Creature = Schema.Creature
@@ -135,6 +136,18 @@ function V.validateConfig(config: Config)
 			-- ("rabbits in Alaska, but bigger"): a re-skin populates a HIGHER-or-equal tier than its origin,
 			-- never below (progression §6 — reskins populate a tier's floor/low-mid, never carry origin balance).
 			assert(c.tier >= source.tier, c.id .. ": a re-skin's displayed tier (" .. c.tier .. ") must be ≥ its origin's (" .. source.tier .. ")")
+		end
+		-- Step-4 (SYS_combat §3): the min-weapon/min-armor-tier fields are DERIVED, not authored truth.
+		-- Assert the catalog matches the derivation for the BAYOU — the only Destination that exists; the
+		-- T2→T4 (Appalachia/Alaska) survival-bounded derivation is owed at Step 10 (no premature cross-tier
+		-- checks). Also require structured spawnZones on every non-ambiance Bayou target (Step 4 P1).
+		if c.destinationId == "bayou" and not c.ambianceOnly then
+			assert(c.spawnZones ~= nil and #(c.spawnZones :: { string }) > 0, c.id .. ": a Bayou hunting target must carry structured spawnZones (Step 4 P1)")
+			local derived = Combat.deriveMinTiers(config, c)
+			assert(derived.minWeaponTier == c.minWeaponTierToKill,
+				string.format("%s: authored minWeaponTierToKill %d ≠ derived %d (§3 kill inequality)", c.id, c.minWeaponTierToKill, derived.minWeaponTier))
+			assert(derived.minArmorTier == c.minArmorTierToSurvive,
+				string.format("%s: authored minArmorTierToSurvive %d ≠ derived %d (Bayou non-lethal → n/a=0)", c.id, c.minArmorTierToSurvive, derived.minArmorTier))
 		end
 	end
 	for _, f in config.fish do

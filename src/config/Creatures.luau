@@ -36,6 +36,9 @@ type CreatureInput = {
 	minArmorTierToSurvive: number,
 	coop: Enums.Coop,
 	spawnLocation: string,
+	spawnZones: { string }?, -- structured Step-3 zone ids (target species; Step 4)
+	escapeWindowSeconds: number?, -- TimeToFlee (escape-bounded KillWindow, Step 4)
+	attackIntervalSeconds: number?, -- survival-bounded DPS interval (Step 4)
 	conditions: Schema.SpawnConditions?,
 	ambianceOnly: boolean?,
 	packSize: number?,
@@ -72,6 +75,9 @@ local function creature(i: CreatureInput): Creature
 		minWeaponTierToKill = i.minWeaponTierToKill,
 		minArmorTierToSurvive = i.minArmorTierToSurvive,
 		coop = i.coop,
+		spawnZones = i.spawnZones,
+		escapeWindowSeconds = i.escapeWindowSeconds,
+		attackIntervalSeconds = i.attackIntervalSeconds,
 		reward = reward,
 		reskinOf = i.reskinOf,
 		spawn = { location = i.spawnLocation, conditions = i.conditions },
@@ -159,6 +165,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 10, max = 15 },
 		spawnLocation = "reed-edge of the Sunny Levee",
+		spawnZones = { "sunny_levee" },
+		escapeWindowSeconds = 4, -- TimeToFlee after flush (LOC §3); ceil(15/18)=1 shot ≤ 4/1.5
 	}),
 	creature({
 		id = "bayou_swamp_rabbit",
@@ -175,6 +183,26 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 10, max = 15 },
 		spawnLocation = "Sunny Levee dry ground",
+		spawnZones = { "sunny_levee", "reed_edges" },
+		escapeWindowSeconds = 5, -- TimeToFlee on the break (LOC §3); ceil(22/18)=2 shots ≤ 5/1.5
+	}),
+	creature({
+		id = "bayou_nutria",
+		destinationId = D.Bayou,
+		name = "Nutria",
+		tier = 1,
+		rarity = Ra.Common,
+		behavior = B.flees, -- iconic Louisiana swamp rodent; slow, the easiest floor target
+		health = 30, -- ceil(30/18)=2 shots on the starter (floor band)
+		damageToPlayer = 0, -- non-lethal
+		speed = 35,
+		minWeaponTierToKill = 1,
+		minArmorTierToSurvive = 0,
+		coop = Co.soloTopGear,
+		cash = { min = 10, max = 15 },
+		spawnLocation = "water's-edge reeds, daylight",
+		spawnZones = { "reed_edges" },
+		escapeWindowSeconds = 6, -- the slowest fleer (LOC §3)
 	}),
 	creature({
 		id = "bayou_american_alligator",
@@ -191,6 +219,10 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 18, max = 24 },
 		spawnLocation = "channel banks and Cottonmouth Slough",
+		spawnZones = { "channel_banks", "cottonmouth_slough" },
+		-- survival-bounded IN FORM but Bayou-wide non-lethal → KillWindow effectively unbounded; the
+		-- encounter is a 3-shot placement check under a lunge telegraph (LOC §3). attackInterval = stagger anim.
+		attackIntervalSeconds = 3,
 		isMilestoneTarget = true, -- Bayou hunting conquest milestone
 	}),
 	creature({
@@ -210,6 +242,8 @@ local rows: { Creature } = {
 		conditions = { time = "dawn" },
 		rare = rareFields(900, "one ghost-white duck in a flock of brown — the first rarity moment"),
 		spawnLocation = "Sunny Levee reed-edge dawn flocks",
+		spawnZones = { "sunny_levee" },
+		escapeWindowSeconds = 4, -- shares the wood-duck escape profile (a find, not a harder fight, LOC §5)
 	}),
 	creature({
 		id = "bayou_white_alligator",
@@ -228,6 +262,8 @@ local rows: { Creature } = {
 		conditions = { time = "dawn or dusk", weather = "fog" },
 		rare = rareFields(2500, "the pale gator surfacing silently out of the fog — the Bayou's signature clip"),
 		spawnLocation = "Cottonmouth Slough",
+		spawnZones = { "cottonmouth_slough" },
+		attackIntervalSeconds = 3, -- shares the gator's 3-shot, non-lethal profile (a find, not a wall, LOC §5)
 	}),
 
 	-- ───────────────────────── APPALACHIA (Tier 2) ─────────────────────────

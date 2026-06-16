@@ -9,6 +9,8 @@ local Schema = require("@src/types/Schema")
 local Ids = require("@src/types/Ids")
 local Catalog = require("@src/config/Catalog")
 local Shell = require("@src/logic/Shell")
+local Spawner = require("@src/logic/Spawner")
+local Spawning = require("@src/config/Spawning")
 
 type Vec3 = Schema.Vec3
 local D = Ids.Destination
@@ -120,5 +122,12 @@ Shells.byDestination = byDestination
 
 -- Build-time guarantee: a malformed shell fails the require.
 Shell.validateShell(bayou, Catalog)
+
+-- Step-4 build-time guarantee (P1): every Bayou hunting spawn area + every target's spawnZones resolve to
+-- a real zone in this shell. (The fishing placement check plugs in here the same way at Step 5.)
+local bayouSpawn = Spawning.byDestination[D.Bayou]
+if bayouSpawn ~= nil and bayouSpawn.hunting ~= nil then
+	Spawner.validatePlacement(Catalog, bayou, bayouSpawn.hunting)
+end
 
 return Shells

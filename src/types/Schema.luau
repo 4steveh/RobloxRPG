@@ -95,6 +95,15 @@ export type Creature = {
 	minWeaponTierToKill: number,
 	minArmorTierToSurvive: number,
 	coop: Coop,
+	-- ── Step-4 combat fields ──
+	-- spawnZones: structured Step-3 zone ids the live spawner places this TARGET species into (the prose
+	-- `spawn.location` stays a human description). nil for ambiance (placed via Shells.ambiancePlacements).
+	spawnZones: { string }?,
+	-- KillWindow inputs (SYS_combat §3, LOC-owned): escapeWindowSeconds = TimeToFlee for escape-bounded
+	-- (passive/flees); attackIntervalSeconds = the survival-bounded DPS interval (aggressive/pack). In the
+	-- non-lethal Bayou only the escape-bounded branch is load-bearing; survival-bounded is owed at Step 10.
+	escapeWindowSeconds: number?,
+	attackIntervalSeconds: number?,
 	reward: Reward?, -- nil iff ambianceOnly
 	reskinOf: TargetId?, -- art/behavior link only; this row's own `tier` is authoritative
 	spawn: CreatureSpawn,

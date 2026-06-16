@@ -75,6 +75,47 @@ Tuning.skill = table.freeze({
 	Z_vital = 2.5,
 })
 
+-- §combat (Step 4) — the combat-OWNED knobs (SYS_combat §1/§4/§5/§6 + build notes). The §1 weapon/armor
+-- CURVES live above (offensive/defensive/weapon/skill); this table is the resolution/feel/economy-seam set.
+-- Every magnitude is an illustrative default. The game-FEEL knobs (settle/recoil/aim-assist) are Studio.
+Tuning.combat = table.freeze({
+	-- §1/§2 hit zones (the skill term). vital mirrors skill.Z_vital; body == skill.Z_expected reference.
+	zone = table.freeze({ vital = 2.5, body = 1.0, limb = 0.5 }),
+	-- §4 survival. Player base HP is a fixed, server-owned 100.
+	playerBaseHP = 100,
+	-- §4 Tier-1 non-lethal floor (this doc owns it). A hard server clamp: a non-lethal creature can never
+	-- reduce the player below this HP. Per LOC_01 §3 the clamp is BAYOU-WIDE (every huntable, incl. the
+	-- aggressive gator), so an armorless EHT-1 player is mechanically safe — onboarding never stalls on death.
+	nonLethalMinHP = 1,
+	nonLethalDestinations = table.freeze({ bayou = true } :: { [string]: boolean }), -- whole T1 roster non-lethal (LOC §3)
+	-- §6 co-op: sublinear Health vs linear DPS. partyCap bounds the scaling.
+	coop = table.freeze({ hCoop = 0.5, partyCap = 4 }),
+	-- §2 range falloff: in-band → 1.0; beyond optimal up to optimal·falloffExtension → linear to floor;
+	-- past that → out of range (damage 0, the shot is rejected). (rangeBase/rangePerTier/floor in §1.3.)
+	range = table.freeze({ falloffExtension = 1.5 }),
+	-- §build-notes anti-exploit tolerances (rounding/latency slack; the server is still authoritative).
+	fireRateToleranceSeconds = 0.05,
+	damageToleranceAbs = 1,
+	-- §5 engagement-rate components per tier (co-owned with SYS_economy; the drift-prone input). Bayou T1
+	-- → TimePerTarget ~45 s → ~80/hr, matching the combat §5 table.
+	engagement = table.freeze({
+		[1] = table.freeze({ timeToFind = 25, timeToKill = 10, overhead = 10 }),
+		[2] = table.freeze({ timeToFind = 45, timeToKill = 20, overhead = 15 }),
+		[4] = table.freeze({ timeToFind = 75, timeToKill = 35, overhead = 20 }),
+	}),
+	-- SYS_progression §4 Rank XP — difficulty/rarity-WEIGHTED (a Mythic ≫ a Common; apex > floor). The
+	-- WEIGHTING is the design; the magnitudes are tuning. Rank grants identity/convenience only (never power).
+	rankXP = table.freeze({
+		base = 10,
+		tierStep = 0.5, -- +tierStep per tier above 1 (apex tiers are worth more)
+		rarityWeight = table.freeze({ Common = 1, Uncommon = 1.5, Rare = 3, Epic = 6, Legendary = 12, Mythic = 25 } :: { [string]: number }),
+		archetypeWeight = table.freeze({ passive = 1, flees = 1, aggressive = 1.5, pack = 1.75, ambush = 2 } :: { [string]: number }),
+	}),
+	-- Game-FEEL knobs — Studio/playtest, NOT headless. Captured so they are config, not code, when tuned.
+	settleTimeSecondsByTier = table.freeze({ [1] = 0.6, [2] = 0.55, [3] = 0.5, [4] = 0.45 }), -- TODO(step-4 Studio feel)
+	aimAssist = table.freeze({ strength = 0.5, coneDegrees = 6, capStrength = 0.7 }), -- TODO(Studio + platform-split telemetry)
+})
+
 -- §1.7 Economy constants (consumed, not owned — from SYS_economy; balanceOf does not need them in Step 1).
 --   Income(T) = B·g^(T−1);  GearCost_slot(T) = c·Income(T−1) (T≥2);  IntraTierClimb(T) ≈ m·Income(T)
 Tuning.economy = table.freeze({
