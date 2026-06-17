@@ -32,10 +32,21 @@ function M.canTravel(profile: PlayerData, id: DestinationId): Gate.GateResult
 	return Gate.evaluateGate(profile, dst, Catalog)
 end
 
--- STUB — Step 9 owns gate ENFORCEMENT (re-check at the boundary), the unlock write-through, and the
--- actual TeleportService place/spawn execution. Step 1 ships the interface + registry only.
-function M.travelTo(_profile: PlayerData, _destinationId: DestinationId): ()
-	error("TODO(step-9): gated teleport flow + World Map UI + TeleportService execution. Step 1 = registry + interface only.")
+export type TravelResult = { ok: boolean, reason: string?, teleportTarget: string? }
+
+-- The GATED fast-travel flow (Step 9). Server-authoritative ENFORCEMENT: the target must be REGISTERED and
+-- in the player's PERSISTED unlockedDestinations set (the gate-bypass guard — NOT a live evaluateGate, so a
+-- gear sale never re-locks travel and a not-yet-committed unlock can't be bypassed). On success it resolves
+-- the teleportTarget; the actual TeleportService place/spawn execution is Studio (WorldServer consumes this).
+function M.travelTo(profile: PlayerData, destinationId: DestinationId): TravelResult
+	local dst = Catalog.destinations[destinationId]
+	if dst == nil then
+		return { ok = false, reason = "unknown_destination" }
+	end
+	if profile.unlockedDestinations[destinationId] ~= true then
+		return { ok = false, reason = "locked" } -- the integrity line: travel reads the persisted set
+	end
+	return { ok = true, teleportTarget = dst.teleportTarget }
 end
 
 return M
