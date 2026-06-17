@@ -223,6 +223,149 @@ local appalachia: Schema.Shell = {
 	render = { fogStart = 90, fogEnd = 340, drawDistance = 340 }, -- LOC_02 §2.5 dawn-fog budget
 }
 
+-- Alaska (LOC_04 §2): the sub-Arctic frontier world. Harbor Camp is the vendor outpost + arrival zone.
+-- Vendor outpost and travel signpost are co-located at Harbor Camp (§2.6.3). The coastal sub-area
+-- (coastal_inlet, open_gulf) is walled until Step 11 (Boat unlock); Boat-gating lives on fish waterType.
+-- Snow-glare fog budget: fogStart=100, fogEnd=380, drawDistance=380 (LOC_04 §2.5).
+local akOutpostAnchor = v(0, 0, 180)
+
+local alaska: Schema.Shell = {
+	destinationId = D.Alaska,
+	arrivalZoneId = "harbor_camp",
+	zones = {
+		harbor_camp = {
+			id = "harbor_camp",
+			name = "Harbor Camp",
+			kind = "vendor",
+			center = akOutpostAnchor,
+			size = v(50, 1, 50),
+			description = "The dockside base camp: vendor outpost (Outfitter + Tackle Shop) and travel signpost. Arrival zone.",
+		},
+		tundra_flats = {
+			id = "tundra_flats",
+			name = "Tundra Flats",
+			kind = "hunting",
+			center = v(0, 0, 50),
+			size = v(120, 1, 80),
+			description = "Open tundra interior — hare, caribou, and moose grounds. The broad floor-game flat.",
+		},
+		spruce_riverbottom = {
+			id = "spruce_riverbottom",
+			name = "Spruce Riverbottom",
+			kind = "hunting",
+			center = v(-110, 0, 30),
+			size = v(80, 1, 70),
+			description = "Dense spruce-edge draws along the river bottom — Sitka deer, moose, and grizzly approach corridor.",
+		},
+		the_crags = {
+			id = "the_crags",
+			name = "The Crags",
+			kind = "hunting",
+			center = v(90, 0, -70),
+			size = v(70, 1, 60),
+			description = "High broken-rock terrain — Dall sheep range. Kept for Studio/completeness; no catalog target at MVP.",
+		},
+		salmon_falls = {
+			id = "salmon_falls",
+			name = "Salmon Falls",
+			kind = "rareSite",
+			center = v(-60, 0, -90),
+			size = v(70, 1, 60),
+			description = "The grizzly co-op apex zone. Glacier Grizzly (Legendary) condition site. The marquee Alaska hunt.",
+		},
+		interior_river = {
+			id = "interior_river",
+			name = "Interior River",
+			kind = "fishing",
+			center = v(60, 0, -50),
+			size = v(70, 1, 50),
+			description = "Shore-accessible river fishing — grayling, Dolly Varden, sockeye salmon (seasonal run).",
+		},
+		coastal_inlet = {
+			id = "coastal_inlet",
+			name = "Coastal Inlet",
+			kind = "fishing",
+			center = v(140, 0, -120),
+			size = v(80, 1, 60),
+			description = "Boat-gated coastal cell (walled until Step 11) — rockfish/lingcod/king salmon. waterType=coastal.",
+		},
+		open_gulf = {
+			id = "open_gulf",
+			name = "Open Gulf",
+			kind = "fishing",
+			center = v(200, 0, -200),
+			size = v(90, 1, 90),
+			description = "Deep Boat-gated water — Giant Halibut (Uncommon apex, co-op) + Ghost of the Gulf (Mythic). waterType=coastal.",
+		},
+		frozen_lake = {
+			id = "frozen_lake",
+			name = "Frozen Lake",
+			kind = "fishing",
+			center = v(-150, 0, -160),
+			size = v(80, 1, 80),
+			description = "Seasonal ice-fishing lake (§9). No MVL catalog target; zone present for future content.",
+		},
+	},
+	landmarks = {
+		the_glacier = {
+			id = "the_glacier",
+			name = "The Glacier",
+			anchor = v(0, 0, -250),
+			isBeacon = true,
+			description = "The towering glacier terminus — the primary wayfinding beacon visible across the entire map (LOC_04 §2.2).",
+		},
+		harbor_camp = {
+			id = "harbor_camp",
+			name = "Harbor Camp",
+			anchor = akOutpostAnchor,
+			isBeacon = false,
+			description = "The social hub + vendor outpost + travel signpost at the dockside base.",
+		},
+		tundra_flats = {
+			id = "tundra_flats",
+			name = "Tundra Flats",
+			anchor = v(0, 0, 50),
+			isBeacon = false,
+			description = "The open hunting flat — navigate by the open sky above the treeline.",
+		},
+		salmon_falls = {
+			id = "salmon_falls",
+			name = "Salmon Falls",
+			anchor = v(-60, 0, -90),
+			isBeacon = false,
+			description = "The falls landmark — the sound of rushing water and grizzly apex ground.",
+		},
+		the_crags = {
+			id = "the_crags",
+			name = "The Crags",
+			anchor = v(90, 0, -70),
+			isBeacon = false,
+			description = "The high broken-rock bluff — Dall sheep country and a distant sight-line marker.",
+		},
+		open_gulf = {
+			id = "open_gulf",
+			name = "Open Gulf",
+			anchor = v(200, 0, -200),
+			isBeacon = false,
+			description = "The distant coastal expanse — the Boat-gated horizon landmark.",
+		},
+		frozen_lake = {
+			id = "frozen_lake",
+			name = "Frozen Lake",
+			anchor = v(-150, 0, -160),
+			isBeacon = false,
+			description = "The ice-fishing lake — a still white mirror in the tundra winter.",
+		},
+	},
+	vendorOutpostAnchor = akOutpostAnchor,
+	travelSignpostAnchor = akOutpostAnchor, -- co-located with the vendor outpost (§2.6.3)
+	ambiancePlacements = {
+		-- The catalog has NO ambianceOnly Alaska creatures (ptarmigan/fox/eagle/otter in LOC_04 §3 ambiance
+		-- list are NOT in the representative catalog). Coverage loop finds none → passes. Empty is correct.
+	},
+	render = { fogStart = 100, fogEnd = 380, drawDistance = 380 }, -- LOC_04 §2.5 snow-glare budget
+}
+
 local Shells = {}
 
 -- Character-controller tunables (Tier 1 = on-foot only). walkSpeed is applied server-side; the camera
@@ -236,7 +379,7 @@ Shells.movement = movement
 -- the headless arrival DATA the router needs. (Positions are plain {x,y,z}; the world converts to Vector3.)
 Shells.lodge = { zoneId = "lodge_hub", anchor = v(0, 0, 600) }
 
-local byDestination: { [Ids.DestinationId]: Schema.Shell } = { [D.Bayou] = bayou, [D.Appalachia] = appalachia }
+local byDestination: { [Ids.DestinationId]: Schema.Shell } = { [D.Bayou] = bayou, [D.Appalachia] = appalachia, [D.Alaska] = alaska }
 Shells.byDestination = byDestination
 
 -- Build-time guarantee: a malformed shell fails the require.
@@ -265,6 +408,20 @@ if apSpawn ~= nil and apSpawn.hunting ~= nil then
 end
 if apSpawn ~= nil and apSpawn.fishing ~= nil then
 	Spawner.validatePlacement(Catalog, appalachia, apSpawn.fishing, Enums.Loop.Fishing)
+end
+
+-- Step-10 (Task 2.4): Alaska shell build-time guarantee.
+Shell.validateShell(alaska, Catalog)
+
+-- Step-10 (Task 2.5 wiring point): guarded validatePlacement — akSpawn is nil until Task 2.5 adds the
+-- Alaska spawn config to Spawning.luau. The guards keep Task 2.4 green; validatePlacement goes live
+-- at Task 2.5 when Spawning.byDestination[D.Alaska] is populated.
+local akSpawn = Spawning.byDestination[D.Alaska]
+if akSpawn ~= nil and akSpawn.hunting ~= nil then
+	Spawner.validatePlacement(Catalog, alaska, akSpawn.hunting, Enums.Loop.Hunting)
+end
+if akSpawn ~= nil and akSpawn.fishing ~= nil then
+	Spawner.validatePlacement(Catalog, alaska, akSpawn.fishing, Enums.Loop.Fishing)
 end
 
 return Shells

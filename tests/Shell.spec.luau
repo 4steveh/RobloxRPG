@@ -110,4 +110,55 @@ return function(t: Harness.T)
 		t.section("Appalachia Shell — ambiance coverage (gray squirrel → old_field)")
 		t.ok("appalachia_gray_squirrel placed in old_field", ap.ambiancePlacements["appalachia_gray_squirrel"] == "old_field")
 	end
+
+	-- ── Alaska shell (Task 2.4) ──────────────────────────────────────────
+	t.section("Alaska Shell — registered + structural invariants")
+	local ak = Shells.byDestination[Ids.Destination.Alaska]
+	t.ok("Alaska shell is registered", ak ~= nil)
+	if ak ~= nil then
+		t.ok("Alaska arrivalZoneId resolves to a zone", ak.zones[ak.arrivalZoneId] ~= nil)
+		t.ok("Alaska arrivalZoneId is harbor_camp", ak.arrivalZoneId == "harbor_camp")
+		t.ok("Alaska §2.6.3 signpost co-located with vendor outpost", ak.travelSignpostAnchor.x == ak.vendorOutpostAnchor.x and ak.travelSignpostAnchor.z == ak.vendorOutpostAnchor.z)
+
+		t.section("Alaska Shell — all canonical zone ids present")
+		for _, zid in { "harbor_camp", "tundra_flats", "spruce_riverbottom", "the_crags", "salmon_falls", "interior_river", "coastal_inlet", "open_gulf", "frozen_lake" } do
+			t.ok("zone present + id stable: " .. zid, ak.zones[zid] ~= nil and ak.zones[zid].id == zid)
+		end
+
+		t.section("Alaska Shell — landmarks present (the_glacier beacon)")
+		t.ok("the_glacier landmark present + is beacon", ak.landmarks.the_glacier ~= nil and ak.landmarks.the_glacier.isBeacon == true)
+		for _, lid in { "the_glacier", "harbor_camp", "tundra_flats", "salmon_falls", "the_crags", "open_gulf", "frozen_lake" } do
+			t.ok("landmark present + id stable: " .. lid, ak.landmarks[lid] ~= nil and ak.landmarks[lid].id == lid)
+		end
+
+		t.section("Alaska Shell — every creature/fish spawnZone resolves to a shell zone")
+		for cid, c in Catalog.creatures do
+			if c.destinationId == Ids.Destination.Alaska and not c.ambianceOnly then
+				local zones = c.spawnZones
+				if zones ~= nil then
+					for _, zid in zones do
+						t.ok("creature " .. cid .. " spawnZone resolves: " .. zid, ak.zones[zid] ~= nil)
+					end
+				end
+			end
+		end
+		for fid, f in Catalog.fish do
+			if f.destinationId == Ids.Destination.Alaska then
+				local zones = f.spawnZones
+				if zones ~= nil then
+					for _, zid in zones do
+						t.ok("fish " .. fid .. " spawnZone resolves: " .. zid, ak.zones[zid] ~= nil)
+					end
+				end
+			end
+		end
+
+		t.section("Alaska Shell — ambiancePlacements is empty (no ambianceOnly Alaska creatures in catalog)")
+		t.ok("ambiancePlacements is empty", (function()
+			for _ in ak.ambiancePlacements do
+				return false
+			end
+			return true
+		end)())
+	end
 end
