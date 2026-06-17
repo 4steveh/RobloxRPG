@@ -41,6 +41,7 @@ local specs: { (Harness.T) -> () } = {
 	-- Step 8 (Lodge & Trophy Hall)
 	require("@tests/Lodge.spec"),
 	require("@tests/TrophyHall.spec"),
+	require("@tests/SalvageHandler.spec"),
 }
 
 for _, spec in specs do
