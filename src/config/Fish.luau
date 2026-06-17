@@ -313,6 +313,7 @@ local rows: { Fish } = {
 		minReelTier = 3,
 		waterType = W.river, -- interior, shore-accessible (no Boat)
 		baitRequired = "dry fly",
+		spawnZones = { "interior_river" },
 		cash = { min = 200, max = 250 },
 	}),
 	fish({
@@ -327,6 +328,7 @@ local rows: { Fish } = {
 		minRodTier = 3,
 		minReelTier = 3,
 		waterType = W.river,
+		spawnZones = { "interior_river" },
 		cash = { min = 200, max = 250 },
 	}),
 	fish({
@@ -341,6 +343,7 @@ local rows: { Fish } = {
 		minRodTier = 4,
 		minReelTier = 4,
 		waterType = W.river, -- interior river mouths (the shore-accessible face of the run)
+		spawnZones = { "interior_river" },
 		cash = { min = 330, max = 390 },
 		conditions = { season = "Salmon Run", event = "Salmon Run" },
 	}),
@@ -356,6 +359,7 @@ local rows: { Fish } = {
 		minRodTier = 4,
 		minReelTier = 4,
 		waterType = W.coastal, -- Boat-gated (Coastal Skiff)
+		spawnZones = { "coastal_inlet" },
 		cash = { min = 200, max = 250 },
 	}),
 	fish({
@@ -370,6 +374,7 @@ local rows: { Fish } = {
 		minRodTier = 4,
 		minReelTier = 4,
 		waterType = W.coastal,
+		spawnZones = { "coastal_inlet" },
 		cash = { min = 330, max = 390 },
 	}),
 	fish({
@@ -385,6 +390,7 @@ local rows: { Fish } = {
 		minReelTier = 4,
 		waterType = W.coastal, -- Boat-gated: a pure fisher needs the Coastal Skiff to conquer via fishing
 		baitRequired = "herring",
+		spawnZones = { "coastal_inlet" },
 		cash = { min = 330, max = 390 },
 		conditions = { season = "Salmon Run", event = "Salmon Run" },
 		isMilestoneTarget = true, -- Alaska fishing conquest milestone (T4-soloable, Decision 7)
@@ -401,6 +407,7 @@ local rows: { Fish } = {
 		minRodTier = 4,
 		minReelTier = 5, -- does not exist at MVL → co-op-only
 		waterType = W.coastal,
+		spawnZones = { "open_gulf" },
 		cash = { min = 330, max = 390 },
 	}),
 	fish({
@@ -416,6 +423,7 @@ local rows: { Fish } = {
 		minReelTier = 4,
 		waterType = W.coastal,
 		baitRequired = "herring",
+		spawnZones = { "coastal_inlet" },
 		conditions = { season = "Salmon Run", event = "Salmon Run" },
 		rare = rareFields(1500, "the chrome-bright giant king breaching in the run"),
 	}),
@@ -432,6 +440,7 @@ local rows: { Fish } = {
 		minReelTier = 5,
 		waterType = W.coastal,
 		baitRequired = "large cut bait",
+		spawnZones = { "open_gulf" },
 		conditions = { weather = "storm" },
 		rare = rareFields(9000, "the colossal halibut surfacing in a storm-tossed Gulf as a party hauls together"),
 	}),

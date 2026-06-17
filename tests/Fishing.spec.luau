@@ -115,6 +115,15 @@ return function(t: Harness.T)
 		return true
 	end)())
 
+	-- ── Task 2.2 (Step 10): Alaska fish carry spawnZones ──
+	t.section("Fishing — every Alaska fish carries spawnZones")
+	t.ok("Alaska fish all carry spawnZones resolving later to the shell", (function()
+		for _, f in Catalog.fish do
+			if f.destinationId == "alaska" and (f.spawnZones == nil or #(f.spawnZones :: any) == 0) then return false end
+		end
+		return true
+	end)())
+
 	-- ── Task 0.2 (Step 10): landableAt + coopLandableAt helpers ──
 	t.section("Fishing — landableAt + co-op-landable helper")
 	do
