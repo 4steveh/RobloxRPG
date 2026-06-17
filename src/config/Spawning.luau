@@ -44,8 +44,28 @@ local bayouFishing: LoopSpawn = {
 	},
 }
 
+-- Appalachia hunting (LOC_02 §8.4): modeled ~45/hr at T2; ceiling 48 (slack — the anti-farming bound).
+local appalachiaHunting: LoopSpawn = {
+	ceilingPerHour = 48,
+	areas = {
+		old_field = { maxConcurrentTargets = 6, respawnIntervalSeconds = 45 },     -- deer/turkey/cottontail
+		oak_ridges = { maxConcurrentTargets = 3, respawnIntervalSeconds = 90 },     -- boar
+		creek_bottoms = { maxConcurrentTargets = 2, respawnIntervalSeconds = 180 }, -- coyote packs (crowd cap)
+		lookout_ridge = { maxConcurrentTargets = 1, respawnIntervalSeconds = 300 }, -- mountain lion (apex)
+	},
+}
+-- Appalachia fishing (LOC_02 §8.4): modeled ~38/hr at T2; ceiling 40 (slack). Shore-accessible, no Boat.
+local appalachiaFishing: LoopSpawn = {
+	ceilingPerHour = 40,
+	areas = {
+		hollow_creek = { maxConcurrentTargets = 4, respawnIntervalSeconds = 40 }, -- trout (fly water)
+		mill_pond = { maxConcurrentTargets = 5, respawnIntervalSeconds = 40 },    -- panfish/bass/pike/muskie
+	},
+}
+
 local byDestination: { [Ids.DestinationId]: DestinationSpawn } = {
 	[D.Bayou] = { hunting = bayouHunting, fishing = bayouFishing },
+	[D.Appalachia] = { hunting = appalachiaHunting, fishing = appalachiaFishing },
 }
 Spawning.byDestination = byDestination
 

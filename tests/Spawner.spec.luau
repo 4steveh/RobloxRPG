@@ -137,4 +137,14 @@ return function(t: Harness.T)
 		t.ok("Bayou T1 hunting modeled rate = 80 (uncapped)", approx(Spawner.modeledRatePerHour(Catalog, 1), 80))
 		t.ok("Bayou T1 fishing modeled rate = 60 (uncapped)", approx(Spawner.modeledRatePerHour(Catalog, 1, F), 60))
 	end
+
+	t.section("Spawner — Appalachia spawn config (LOC_02 §8.4)")
+	do
+		local ap = Spawning.byDestination.appalachia
+		t.ok("Appalachia hunting + fishing LoopSpawn present", ap ~= nil and ap.hunting ~= nil and ap.fishing ~= nil)
+		local apHunting = ap and ap.hunting
+		local apFishing = ap and ap.fishing
+		t.ok("hunting ceiling is slack over the modeled ~45/hr (anti-farming)", apHunting ~= nil and apHunting.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 2, Enums.Loop.Hunting))
+		t.ok("fishing ceiling is slack over the modeled ~38/hr", apFishing ~= nil and apFishing.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 2, Enums.Loop.Fishing))
+	end
 end
