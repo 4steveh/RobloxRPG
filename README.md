@@ -619,7 +619,12 @@ qualifying gear is sold (`evaluateGate` gates *entry into the set*, never contin
 **Placement note (codebase-grounded, flagged):** the prompt says hook the gear-change unlock into
 `ShopHandler`, but in this codebase **buy mints an *unequipped* commodity and upgrade is intra-tier** —
 neither changes EHT — so the gear-half-newly-met trigger is in **`EquipHandler`** (the action that changes
-EHT/EFT), plus the login/Travel-Desk catch-all. A `ShopHandler` hook would be dead code.
+EHT/EFT), plus the login/Travel-Desk catch-all. A `ShopHandler` hook would be dead code. *Atomicity
+nuance:* the conquest hook (Fire/Catch) is write-through-atomic (inside the `critical` Transaction — a
+failed save reverts conquest + unlock together); the **equip** hook rides equip's non-critical dirty-flag
+(equip + unlock commit together in-memory and persist on the same autosave) — safe here because
+`commitUnlocks` is idempotent and the login/`openWorldMap` catch-alls re-converge it. If a future EHT-gated
+unlock ever became crash-window-exploitable, revisit whether `equip` should be `critical`.
 
 **`Gate` prerequisite-model note:** the code checks `prerequisiteDestinations ⊆ conquered` (collapsing the
 spec's `milestone_prerequisite` (conquered) and `prerequisite_destinations` (unlocked) into one) — fine for
