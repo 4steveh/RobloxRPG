@@ -11,6 +11,7 @@ local Schema = require("@src/types/Schema")
 
 type Config = Schema.Config
 type Fish = Schema.Fish
+type PlayerData = Schema.PlayerData
 
 local M = {}
 
@@ -186,6 +187,20 @@ end
 local BOAT_GATED_WATER: { [string]: boolean } = { coastal = true, deepSea = true }
 function M.requiresBoat(fish: Fish): boolean
 	return BOAT_GATED_WATER[fish.waterType] == true
+end
+
+-- ── Step 11: the shared Boat-OWNERSHIP check behind BOTH the zone-access gate (Spawner.canAccessZone) and
+-- the catch-level backstop (CatchHandler). A Boat is a commodity; its accessGrant lives on the catalog item,
+-- never on the profile. This answers OWNERSHIP only — the fight math (netDrain/fightTime/landWindow/landable)
+-- takes no vehicle, so the Boat opens the cell and grants no in-cell power (SYS_fishing §7). ──
+function M.ownsBoatForWater(profile: PlayerData, config: Config, waterType: string): boolean
+	for _, c in profile.inventory.commodities do
+		local item = config.equipment[c.catalogId]
+		if item ~= nil and item.accessGrant == waterType then
+			return true
+		end
+	end
+	return false
 end
 
 -- ── §9 co-op assist (generic; the Bayou has no apex → first does real work at Step 10). A second angler

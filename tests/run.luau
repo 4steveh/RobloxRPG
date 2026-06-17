@@ -51,6 +51,8 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/WorldMapHandler.spec"),
 	-- Step 10 (Appalachia cross-tier difficulty rigor)
 	require("@tests/CrossTier.spec"),
+	-- Step 11 (Boats, Mounts & Tracking Dogs — the vendor sinks)
+	require("@tests/VendorHandler.spec"),
 }
 
 for _, spec in specs do

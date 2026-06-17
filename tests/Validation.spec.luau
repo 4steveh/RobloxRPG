@@ -110,4 +110,29 @@ return function(t: Harness.T)
 		bad.behavior = "aggressive" -- origin (whitetail) is `flees`
 		Validation.assertCreatureReskin(bad, Catalog)
 	end)
+
+	t.section("Validation — Step 11 never-power guardrail: only tier gear may carry the power-progression role")
+	do
+		t.errs("a dog with the power-progression monetization role is rejected (convenience is never power)", function()
+			local bad: Schema.EquipmentItem = {
+				id = "bad_power_dog", name = "Bad Power Dog", category = "dog", tier = 2, availableAt = "KennelAndStable",
+				cost = { cash = 1 }, tradeable = false, tierInput = false, cosmeticOnly = false,
+				monetizationRoles = { "power-progression" }, accessGrant = nil, notes = "",
+			}
+			Validation.assertEquipmentItem(bad)
+		end)
+		t.errs("a mount with the power-progression monetization role is rejected", function()
+			local bad: Schema.EquipmentItem = {
+				id = "bad_power_mount", name = "Bad Power Mount", category = "mount", tier = 3, availableAt = "KennelAndStable",
+				cost = { cash = 1 }, tradeable = false, tierInput = false, cosmeticOnly = false,
+				monetizationRoles = { "power-progression" }, accessGrant = nil, notes = "",
+			}
+			Validation.assertEquipmentItem(bad)
+		end)
+		t.test("the authored Horse + Coastal Skiff + Coonhound validate cleanly (no false positive)", function()
+			Validation.assertEquipmentItem(Catalog.equipment["mount_horse"])
+			Validation.assertEquipmentItem(Catalog.equipment["vehicle_coastal_skiff"])
+			Validation.assertEquipmentItem(Catalog.equipment["dog_coonhound"])
+		end)
+	end
 end

@@ -58,6 +58,33 @@ return function(t: Harness.T)
 		}
 	end
 
+	-- a T4 coastal angler at MAXED tackle (so the T4 fish is landable — the CrossTier sufficiency proof),
+	-- holding king salmon's basic required bait. `withSkiff` mints the access commodity (NOT equipped — buy ≠ equip).
+	local function coastalAngler(withSkiff: boolean): any
+		local p = Util.mkProfile(Catalog, { rod = 4, reel = 4 })
+		for _, c in p.inventory.commodities do
+			c.intraLevel = 2 -- maxed tackle
+		end
+		p.inventory.fungible["herring"] = 5 -- king salmon's §4 yes/no bait gate
+		if withSkiff then
+			table.insert(p.inventory.commodities, { instanceId = "ci_skiff", catalogId = "vehicle_coastal_skiff", intraLevel = 0, equipped = false })
+		end
+		return p
+	end
+	-- a server-enriched LANDING shot for a T4 fish at maxed tackle (mirrors `shot`, but T4 reel drain).
+	local function coastalShot(targetId: string, E: number): any
+		local reelDrain = Fishing.reelDrainMax(Catalog, 4, "maxed")
+		local stamina = Fishing.staminaToLand(Catalog, Catalog.fish[targetId])
+		return {
+			targetId = targetId,
+			biteActive = true,
+			E = E,
+			claimedDrain = reelDrain * E,
+			accumulatedStaminaBefore = stamina - reelDrain * E,
+			owner = "u1",
+		}
+	end
+
 	t.section("CatchHandler — a valid landed fish drives the reward pipeline end-to-end")
 	do
 		local p = angler()
@@ -126,5 +153,41 @@ return function(t: Harness.T)
 		t.ok("a failed persist returns persist_failed", r.ok == false and r.reason == "persist_failed")
 		t.eq("the reward was REVERTED — no orphan ledger entry", #p.cash.tail, 0)
 		t.ok("no orphan conquest / Angler XP", p.conqueredDestinations.bayou == nil and p.anglerRankXP == 0)
+	end
+
+	t.section("CatchHandler — the coastal sub-area BACKSTOP: a Boat-gated catch needs the matching vehicle (Step 11)")
+	do
+		local function fire(p: any, payload: any): Gauntlet.HandleResult
+			local session: Gauntlet.Session = { playerId = 1, profile = p, live = true }
+			return Gauntlet.handle(newReg(), { intent = "catch", playerId = 1, payload = payload }, session, deps(true))
+		end
+
+		-- A spoofing client (claims to be in the coastal cell) without the Skiff is rejected by the server.
+		local noBoat = coastalAngler(false)
+		local rNoBoat = fire(noBoat, coastalShot("alaska_king_salmon", 0.7))
+		t.ok("a King Salmon catch without the Coastal Skiff is REJECTED (requires_boat)", rNoBoat.ok == false and rNoBoat.reason == "requires_boat")
+		t.eq("the rejected coastal catch produced no reward", #noBoat.cash.tail, 0)
+
+		-- access-not-power: a T1 angler WITH the Skiff + bait still cannot land the T4 fish — the Boat cleared
+		-- the access gate but granted ZERO fight power (same gear_insufficient a shore angler of T1 would hit).
+		-- (Base it on `angler()` — T1 at MID gear — so the level-sensitive drain check passes and gear-adequacy
+		-- is what bites, isolating "the Boat adds no power" from the drain-spoof guard.)
+		local t1Skiff = angler()
+		t1Skiff.inventory.fungible["herring"] = 5
+		table.insert(t1Skiff.inventory.commodities, { instanceId = "ci_skiff", catalogId = "vehicle_coastal_skiff", intraLevel = 0, equipped = false })
+		local rUnderGeared = fire(t1Skiff, shot("alaska_king_salmon", 0.7, landingAccum("alaska_king_salmon")))
+		t.ok("with the Skiff the access gate clears (reason is no longer requires_boat)", rUnderGeared.reason ~= "requires_boat")
+		t.ok("but the Boat grants NO fight power: a T1 rig still can't land the T4 fish (gear_insufficient)", rUnderGeared.ok == false and rUnderGeared.reason == "gear_insufficient")
+
+		-- the happy path: a T4 angler WITH the Skiff lands the coastal milestone (and the conquest sets).
+		local geared = coastalAngler(true)
+		local rGeared = fire(geared, coastalShot("alaska_king_salmon", 0.7))
+		t.ok("a T4 angler with the Skiff lands the King Salmon", rGeared.ok)
+		t.ok("the Alaska fishing conquest sets (the Boat-gated milestone route)", geared.conqueredDestinations.alaska == true)
+
+		-- an interior fish is UNAFFECTED by the backstop (a Boat-less angler catches a shore fish normally).
+		local interior = angler()
+		local rInterior = fire(interior, shot("bayou_bluegill", 0.7, landingAccum("bayou_bluegill")))
+		t.ok("a shore (interior) catch is unaffected by the Boat backstop", rInterior.ok)
 	end
 end

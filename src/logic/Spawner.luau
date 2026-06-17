@@ -13,11 +13,13 @@
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Spawning = require("@src/config/Spawning")
+local Fishing = require("@src/logic/Fishing")
 
 type Config = Schema.Config
 type Shell = Schema.Shell
 type Loop = Enums.Loop
 type LoopSpawn = Spawning.LoopSpawn
+type PlayerData = Schema.PlayerData
 
 local M = {}
 
@@ -94,6 +96,37 @@ function M.routineTargetsInZone(config: Config, destinationId: string, zoneId: s
 		end
 	end
 	return ids
+end
+
+-- ── Step 11: the PRIMARY Boat sub-area gate (SYS_fishing §7 / SYS_progression §2). A fishing zone is
+-- Boat-gated iff it homes a Boat-gated fish (coastal/deep-sea water); the required vehicle is one whose
+-- accessGrant matches that water. A player WITHOUT it can never be in the cell, so they are never offered its
+-- spawns. Shore zones (pond/river/lake) are always accessible. Access, never power — the Boat opens the cell
+-- and grants nothing inside it (the catch math reads no vehicle; CatchHandler is the independent backstop). ──
+function M.canAccessZone(profile: PlayerData, config: Config, destinationId: string, zoneId: string): boolean
+	local gatedWater: string? = nil
+	for _, f in config.fish do
+		if f.destinationId == destinationId and zonesContain(f.spawnZones, zoneId) and Fishing.requiresBoat(f) then
+			gatedWater = f.waterType
+			break
+		end
+	end
+	if gatedWater == nil then
+		return true -- shore-accessible: no Boat required
+	end
+	return Fishing.ownsBoatForWater(profile, config, gatedWater)
+end
+
+-- The PLAYER-FACING offered population = the routine population GATED by Boat access. A Boat-less player is
+-- offered NOTHING from a Boat-gated fishing zone (the primary gate). routineTargetsInZone stays pure (the
+-- content query, unchanged for Steps 1-10); this is the per-player projection. Hunting + shore zones are
+-- unaffected (canAccessZone is vacuously true there).
+function M.offeredTargetsInZone(profile: PlayerData, config: Config, destinationId: string, zoneId: string, loop: Loop?): { string }
+	local lp = loop or Enums.Loop.Hunting
+	if lp == Enums.Loop.Fishing and not M.canAccessZone(profile, config, destinationId, zoneId) then
+		return {}
+	end
+	return M.routineTargetsInZone(config, destinationId, zoneId, lp)
 end
 
 -- Condition-gated RARE spawn predicate (§5 / RD-E, Decision 3/4) — works for a creature OR a fish (both

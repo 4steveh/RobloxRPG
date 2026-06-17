@@ -67,6 +67,14 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 			if fish == nil then
 				return false, "unknown_target"
 			end
+			-- Step 11: the server-authoritative coastal sub-area BACKSTOP (SYS_fishing §7). The PRIMARY gate is
+			-- zone-access (Spawner.canAccessZone never offers a Boat-gated fish to a Boat-less player); this
+			-- independently rejects a Boat-gated catch from a player lacking the matching vehicle — defense
+			-- against a client that spoofs coastal-zone presence. The Boat is ACCESS, not power: the fight
+			-- resolution (simulate, below) reads no vehicle, so a Boat can never out-fish a shore angler.
+			if Fishing.requiresBoat(fish) and not Fishing.ownsBoatForWater(ctx.profile, ctx.config, fish.waterType) then
+				return false, "requires_boat" -- the client maps this to the actionable noun ("Requires the Coastal Skiff")
+			end
 			if ctx.payload.biteActive ~= true then
 				return false, "no_bite" -- server spawn state owns the bite; not a client claim
 			end
@@ -124,6 +132,12 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 			if not result.ambiance then
 				Onboarding.advance(ctx.profile, "catch", ctx.now)
 				Daily.recordAction(ctx.profile.daily, Enums.Loop.Fishing, ctx.now)
+			end
+			-- Step 11: coastal-fishing participation canary (is the 18,000-Cash Skiff translating into coastal
+			-- catches?). A Boat-gated catch that reaches commit is a coastal land (the gate passed in authority).
+			local caught = ctx.config.fish[ctx.payload.targetId]
+			if deps.telemetry ~= nil and caught ~= nil and Fishing.requiresBoat(caught) then
+				deps.telemetry.incr("fishing.coastalCatch", 1)
 			end
 			-- Step 9: a new conquest may newly satisfy a downstream gate's milestone half (atomic with the catch).
 			if result.conquestNewlySet then

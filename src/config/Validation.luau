@@ -94,11 +94,25 @@ function V.assertEquipmentItem(it: EquipmentItem)
 	if it.accessGrant ~= nil then
 		assert(it.category == Enums.Category.vehicle, it.id .. ": only vehicles may carry an accessGrant")
 	end
+	-- Step 11 never-gate guardrail (SYS_progression §2 — "Mounts and Tracking Dogs never appear in a Gate,
+	-- ever, for entry or sub-area"): a mount/dog can never gate (no accessGrant) and is never a tier input.
+	-- accessGrant-on-non-vehicle is already rejected above and tierInput is derived; this states the mount/dog
+	-- invariant explicitly with the spec citation and guards LiveOps-added convenience SKUs.
+	if it.category == Enums.Category.mount or it.category == Enums.Category.dog then
+		assert(it.accessGrant == nil, it.id .. ": a mount/dog can never gate (no accessGrant — convenience never gates shared content)")
+		assert(it.tierInput == false, it.id .. ": a mount/dog is never a tier input (convenience, never power)")
+	end
 	-- monetizationRoles must be a set of legal Template-B values; cosmetics are identity-only (balance-free).
 	for _, role in it.monetizationRoles do
 		assert(Enums.MonetizationRoleSet[role] == true, it.id .. ": illegal monetization role '" .. tostring(role) .. "'")
 		if it.category == Enums.Category.cosmetic then
 			assert(role == Enums.MonetizationRole.identity, it.id .. ": a cosmetic's monetization is identity-only")
+		end
+		-- Step 11 never-power guardrail (EQUIPMENT_MASTER §4.5–4.7): only tier gear (weapon/armor/rod/reel) may
+		-- carry the power-progression role; a vehicle/mount/dog/bait/tackle that claims it is a build-time error
+		-- (access/convenience monetization can never be a combat/catch power input).
+		if role == Enums.MonetizationRole.powerProgression then
+			assert(it.tierInput, it.id .. ": only tier gear may carry the power-progression role (access/convenience items are never a power input)")
 		end
 	end
 end
@@ -246,6 +260,15 @@ function V.validateConfig(config: Config)
 		assert(dst.teleportTarget ~= "", dst.id .. ": teleportTarget must be set (the framework hook)")
 		for _, prereq in dst.gate.prerequisiteDestinations do
 			assert(config.destinations[prereq] ~= nil, dst.id .. ": prerequisite '" .. prereq .. "' must resolve")
+		end
+		-- Step 11 never-gate guardrail (SYS_progression §2): an ENTRY-gate access item must be a VEHICLE — a
+		-- mount/dog can never gate. MVL Destinations carry none (requiredAccessItems nil); this is the forward
+		-- guard for any future water-locked entry gate, and proves evaluateGate's access half can only ever read
+		-- a Boat (never a convenience item).
+		local accessItems: { string } = dst.gate.requiredAccessItems or {}
+		for _, itemId in accessItems do
+			local accessItem = assert(config.equipment[itemId], dst.id .. ": gate access item '" .. itemId .. "' must resolve")
+			assert(accessItem.category == Enums.Category.vehicle, dst.id .. ": a gate access item must be a vehicle — convenience (mount/dog) can never gate (SYS_progression §2)")
 		end
 		for _, targetId in dst.gate.milestoneTargets do
 			local entry = assert(config.targetIndex[targetId], dst.id .. ": milestone target '" .. targetId .. "' must resolve")

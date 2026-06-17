@@ -33,6 +33,7 @@ local FireHandler = require("@src/server/combat/FireHandler")
 local CatchHandler = require("@src/server/fishing/CatchHandler")
 local EquipHandler = require("@src/server/authority/handlers/EquipHandler")
 local ShopHandler = require("@src/server/shop/ShopHandler")
+local VendorHandler = require("@src/server/shop/VendorHandler")
 local ClaimDailyHandler = require("@src/server/daily/ClaimDailyHandler")
 local SalvageHandler = require("@src/server/lodge/SalvageHandler")
 local DisplayHandler = require("@src/server/lodge/DisplayHandler")
@@ -99,6 +100,7 @@ Gauntlet.register(registry, CatchHandler.new({ idGen = idGen, telemetry = teleme
 Gauntlet.register(registry, EquipHandler)
 Gauntlet.register(registry, ShopHandler.buyHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, ShopHandler.upgradeHandler({ idGen = idGen, telemetry = telemetry }))
+Gauntlet.register(registry, VendorHandler.buyHandler({ idGen = idGen, telemetry = telemetry })) -- Step 11: BoatDealer + Kennel & Stable
 Gauntlet.register(registry, ClaimDailyHandler.new({ telemetry = telemetry }))
 Gauntlet.register(registry, SalvageHandler.new({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, DisplayHandler.mountHandler({ telemetry = telemetry }))
@@ -299,7 +301,7 @@ buildWorldGeometry("alaska",     worldOffsets.alaska)
 -- is the Phase-3 pass. PLACED service points (this doc owns the Trophy Hall; it only PLACES the others):
 --   • Outfitter + Tackle Shop  → BUILT (Step 6 handlers) — look-navigable gun rack / tackle bench
 --   • Trophy Hall              → BUILT (this step) — the display room (a VIEW over DISPLAYED artifacts)
---   • World Map (Travel Desk)  → Step 9 STUB · Trading Post → Step 12 STUB · Boat Dealer/Kennel → Step 11 STUB
+--   • World Map (Travel Desk)  → Step 9 BUILT · Boat Dealer/Kennel → Step 11 BUILT · Trading Post → Step 12 STUB
 -- The Trophy Hall renders the player's DISPLAYED artifacts (Replication.projection.trophyHall) — rendering
 -- the rarity-distinct mounts + provenance plaques is the Studio checklist. Visit/social topology is FLAGGED
 -- (own-Lodge only at MVL; Tuning.lodge.visitInstancingMode).
@@ -330,8 +332,8 @@ fixture("TackleShop", Vector3.new(-30, 4, 0), Color3.fromRGB(90, 120, 150), "bui
 fixture("TrophyHall", Vector3.new(0, 4, -30), Color3.fromRGB(180, 150, 70), "built")
 fixture("TravelDesk_WorldMap", Vector3.new(30, 4, -20), Color3.fromRGB(120, 110, 80), "built") -- Step 9
 fixture("TradingPost", Vector3.new(30, 4, 0), Color3.fromRGB(110, 130, 110), "stub") -- Step 12
-fixture("BoatDealer", Vector3.new(30, 4, 20), Color3.fromRGB(90, 110, 140), "stub") -- Step 11
-fixture("KennelAndStable", Vector3.new(-30, 4, 20), Color3.fromRGB(130, 110, 90), "stub") -- Step 11
+fixture("BoatDealer", Vector3.new(30, 4, 20), Color3.fromRGB(90, 110, 140), "built") -- Step 11: Coastal Skiff + boats (Cash sink)
+fixture("KennelAndStable", Vector3.new(-30, 4, 20), Color3.fromRGB(130, 110, 90), "built") -- Step 11: mounts + dogs (Cash sinks)
 
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
 -- THE HUNTING SPAWNER + FIRE FLOW (the proven HuntingService glue, on the SHARED registry)

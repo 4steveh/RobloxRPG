@@ -69,6 +69,15 @@ note per step.
   spec-faithful floor/ceiling semantics (sufficiency + role band + co-op-only wall + co-op-soluble), with
   two derivation defects fixed. Two genuine stat defects were caught and corrected. **The world geometry,
   fast-travel execution, and co-op feel are Studio** — split honestly below.
+- **Step 11 — Boats, Mounts & Tracking Dogs.** The items were **already authored** (`Equipment.luau`) —
+  Step 11 **enforces, vends, and wires** them. The Coastal-Skiff sub-area gate is real in two layers:
+  `Spawner.canAccessZone`/`offeredTargetsInZone` never offer coastal spawns to a Boat-less angler (primary),
+  and `CatchHandler` independently rejects a Boat-gated catch (`requires_boat`, the server backstop). The
+  Boat is **access, never power** — structural: the item has no power field and the fishing resolution takes
+  no vehicle (a T1 angler *with* the Skiff still hits `gear_insufficient`). The BoatDealer + Kennel & Stable
+  Cash vendors (`VendorHandler`) reuse the Step-6 atomic buy (the rare Redbone is trade-routed → Step 12);
+  a build-time guardrail proves no mount/dog gates or carries power. **The traversal/tracking *effects* and
+  the coastal-water feel are Studio** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -774,12 +783,28 @@ registry + thresholds + cap/prestige) → **deferred** (rank XP already accrues;
 must be category-validated identity|convenience — power is a schema error); the `TeleportService` execution
 beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → **Step 10**.
 
+## Step 11 — Boats, Mounts & Tracking Dogs (the access sink + the convenience sinks; the bar is split, honestly)
+
+**The items were already authored** (`Equipment.luau`) — Step 11 *enforces, vends, and wires* them; it re-authored nothing.
+
+- **The Boat sub-area gate (two layers).** Coastal/deep-sea water is Boat-gated (`Fishing.requiresBoat`).
+  - *Primary (zone-access):* `Spawner.canAccessZone(profile, config, destinationId, zoneId)` is false in `coastal_inlet`/`open_gulf` without a `coastal`-`accessGrant` vehicle (the Coastal Skiff), true with it; `Spawner.offeredTargetsInZone` returns `{}` for a Boat-less angler, so they are **never offered** coastal spawns. `routineTargetsInZone` (the pure content query) is unchanged — Steps 1–10 stay green.
+  - *Backstop (server-authoritative):* `CatchHandler` independently rejects a `requiresBoat` catch (King Salmon / Halibut) from a player without the matching vehicle (`requires_boat`) — defense against a client spoofing coastal-zone presence. An interior (shore) fish is unaffected by either layer.
+- **Access, never power (structural).** The vehicle item carries **no** combat/catch power field (only `accessGrant` + cosmetic), and the fishing resolution (`netDrain`/`fightTime`/`landWindow`/`landable`) takes **no vehicle argument** — so a Boat cannot branch the catch math. Proven by the guardrail + the access-not-power test: a **T1 angler *with* the Skiff** still hits `gear_insufficient` on the T4 King Salmon — the Boat opened the cell, granted zero fight power. Asserted structurally, **not** via a vacuous runtime equivalence test.
+- **The vendors (`VendorHandler`, intent `buyVendorItem`).** The Step-6 atomic buy: debit the catalog's authored Cash price + mint the typed-owned commodity in one `Transaction`; insufficient-funds rejects with no partial state; buy ≠ equip (ownership, not equip, grants access). The Coastal Skiff (18,000) is the marquee Alaska access sink; mounts (10,200) and basic dogs (8,000) are convenience sinks. Gear is `not_sold_here`; a real-money pack is `real_money_not_here` (Step 14); the tradeable rare dog (`dog_redbone_rare`) is `rare_trade_routed` (Trading Post, Step 12). Wired into `WorldServer`; the BoatDealer + Kennel & Stable fixtures are now `built`.
+- **The never-gate / never-power guardrail (build-time, `Validation`).** A mount/dog can never carry an `accessGrant` or `tierInput`; **only** tier gear may carry the `power-progression` monetization role; a gate's `requiredAccessItems` may reference **only** a vehicle. `evaluateGate` reads no mount/dog/boat — proven behaviorally (owning the Skiff/mount/dog never changes a gate result). Like the cosmetic/decor balance-free checks, this is a load-time assertion (no `tests/negative/*` fixture — `EquipmentItem` has no power field to make type-unrepresentable).
+- **Telemetry wired:** `economy.buy:coastalSkiff` (the marquee save-up), `economy.buy:vehicle|mount|dog` (adoption), `fishing.coastalCatch` (coastal participation); the Cash sinks are ledger-tagged by category.
+
+**Studio / telemetry (NOT headless — playtest-pending):** the physical coastal-water traversal (can't boat into the cell without the Skiff); the mount traversal/chase *feel* (no data stat); the dog detection/tracking *effect* (finds, never wins — never changes spawn rates, never makes an un-takeable target takeable); the live time-to-Skiff / access-not-power dashboards.
+
+**Deferrals (named with their owning step):** rare-breed *trading* → **Step 12** (Trading Post); the Winter Freeze event + the Ice-Fishing Kit's Frozen-Lake gate → **Step 13** (LiveOps); premium bait (entirely) + real-money Boat tiers → **Step 14** (monetization); the coastal geometry / mount-traversal feel / dog-tracking UI → Studio; the Ocean Trawler (T7) → post-launch.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
 |---|---|
 | Finished art (cypress models, water shader, textures, sound) — the shell is placeholder blockout | Phase-3 art pass |
-| **Boats** + water-type→Boat-access enforcement (Bayou is shore-accessible — none built); the coastal sub-area gate | Step 11 |
+| ~~**Boats** + water-type→Boat-access enforcement; the coastal sub-area gate~~ — **DONE (Step 11)**: zone-access gate (`Spawner.canAccessZone`/`offeredTargetsInZone`) + server backstop (`CatchHandler` `requires_boat`) + the BoatDealer Cash vendor; access-not-power is structural | ✅ Step 11 |
 | **Premium bait** (paid `TimeToBite` accelerator — stub here, asserts rare-spawn takes no bait); the **bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) | Steps 14 / 6-7 |
 | The funnel first-spawn / first-bite guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
 | ~~The real **`Payout`** formula + the idle amount + gear sinks~~ — **DONE (Step 6)**; remaining: the **shop UI** (Studio) + the **Cash revive-in-place price** (a minor sink, not yet wired) | Studio / later |
@@ -791,8 +816,8 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
 | ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; remaining: trading's escrow/swap | Step 12 |
 | ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
 | ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; ~~the `TeleportService` execution beyond Lodge/Bayou~~ — the headless arrival-resolver seam (`ArrivalService.resolveDestinationArrival`) is **DONE + headless-tested**; the Studio fast-travel **EXECUTION** (within-place `PivotTo`) is written but **playtest-pending / not headless-verified** (see Step 10 Studio checklist); remaining: the map UI | Studio / later |
-| **Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones — data marker `requiresBoat` done in Step 10; runtime enforcement not built) | Step 11 |
-| **Dogs** (Pointer for Appalachia, Husky for Alaska — LOC §6.2; Kennel fixture placed in Lodge) | Step 11 |
+| ~~**Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones)~~ — **DONE (Step 11)**: enforced (zone-access + catch backstop), vended, guardrailed; the fishing resolution takes no vehicle (access-not-power, structural) | ✅ Step 11 |
+| ~~**Dogs / Mounts** (Pointer/Husky; Horse/Snowmobile; Kennel & Stable + Boat Dealer fixtures built)~~ — **DONE (Step 11)**: vended as Cash sinks (the rare Redbone is trade-routed → Step 12); the never-gate/never-power guardrail holds; the detection/tracking + traversal *effects* are Studio | ✅ Step 11 |
 | **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content | post-launch |
 | Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
 | Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |

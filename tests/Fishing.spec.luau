@@ -5,6 +5,7 @@
 
 local Harness = require("@tests/harness")
 local Catalog = require("@src/config/Catalog")
+local Util = require("@tests/util")
 local Fishing = require("@src/logic/Fishing")
 
 local function approx(a: number, b: number): boolean
@@ -159,5 +160,17 @@ return function(t: Harness.T)
 		reelBound.typicalWeightKg = { min = 80, max = 100 }
 		t.ok("synthetic T4 reel-bound fish NOT landable solo (ft≈44.54 > lw=44.4)", Fishing.landableAt(Catalog, reelBound, 4, 4) == false)
 		t.ok("synthetic T4 reel-bound fish co-op-landable at full party (ft≈17.82 ≤ lw=44.4)", Fishing.coopLandableAt(Catalog, reelBound, 4, Catalog.tuning.combat.coop.partyCap))
+	end
+
+	t.section("Fishing — ownsBoatForWater: a Coastal Skiff opens 'coastal'; a Boat-less / wrong-water angler does not (Step 11)")
+	do
+		local none = Util.mkProfile(Catalog, { rod = 1, reel = 1 })
+		t.ok("a Boat-less angler does NOT own coastal access", Fishing.ownsBoatForWater(none, Catalog, "coastal") == false)
+		local skiff = Util.mkProfile(Catalog, { rod = 1, reel = 1 })
+		table.insert(skiff.inventory.commodities, { instanceId = "ci_skiff", catalogId = "vehicle_coastal_skiff", intraLevel = 0, equipped = false })
+		t.ok("a Coastal-Skiff owner DOES own coastal access", Fishing.ownsBoatForWater(skiff, Catalog, "coastal"))
+		local lake = Util.mkProfile(Catalog, { rod = 1, reel = 1 })
+		table.insert(lake.inventory.commodities, { instanceId = "ci_jon", catalogId = "vehicle_jon_boat", intraLevel = 0, equipped = false })
+		t.ok("a lake Jon Boat does NOT open coastal water (wrong accessGrant)", Fishing.ownsBoatForWater(lake, Catalog, "coastal") == false)
 	end
 end

@@ -6,6 +6,7 @@
 
 local Harness = require("@tests/harness")
 local Catalog = require("@src/config/Catalog")
+local Util = require("@tests/util")
 local Spawner = require("@src/logic/Spawner")
 local Spawning = require("@src/config/Spawning")
 local Shells = require("@src/config/Shells")
@@ -156,5 +157,34 @@ return function(t: Harness.T)
 		local akFishing = ak and ak.fishing
 		t.ok("hunting ceiling is slack over the modeled ~28/hr (anti-farming)", akHunting ~= nil and akHunting.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 4, Enums.Loop.Hunting))
 		t.ok("fishing ceiling is slack over the modeled ~22/hr", akFishing ~= nil and akFishing.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 4, Enums.Loop.Fishing))
+	end
+
+	t.section("Spawner — the Boat sub-area gate: a Coastal Skiff is required to be OFFERED coastal-zone fish (Step 11)")
+	do
+		local noBoat = Util.mkProfile(Catalog, { rod = 4, reel = 4 })
+		local withBoat = Util.mkProfile(Catalog, { rod = 4, reel = 4 })
+		table.insert(withBoat.inventory.commodities, { instanceId = "ci_skiff", catalogId = "vehicle_coastal_skiff", intraLevel = 0, equipped = false })
+
+		-- canAccessZone: the coastal cell is gated, the interior river is not
+		t.ok("coastal_inlet is LOCKED without the Skiff", Spawner.canAccessZone(noBoat, Catalog, "alaska", "coastal_inlet") == false)
+		t.ok("open_gulf is LOCKED without the Skiff", Spawner.canAccessZone(noBoat, Catalog, "alaska", "open_gulf") == false)
+		t.ok("coastal_inlet is OPEN with the Skiff", Spawner.canAccessZone(withBoat, Catalog, "alaska", "coastal_inlet"))
+		t.ok("the interior river is shore-accessible (no Boat) for everyone", Spawner.canAccessZone(noBoat, Catalog, "alaska", "interior_river"))
+
+		-- offeredTargetsInZone: a Boat-less angler is offered NOTHING in the coastal cell; with the Skiff, the
+		-- coastal routine population (king salmon) appears. routineTargetsInZone (the content query) is unchanged.
+		local function has(list: { string }, id: string): boolean
+			for _, v in list do
+				if v == id then
+					return true
+				end
+			end
+			return false
+		end
+		local offeredNone = Spawner.offeredTargetsInZone(noBoat, Catalog, "alaska", "coastal_inlet", Enums.Loop.Fishing)
+		local offeredBoat = Spawner.offeredTargetsInZone(withBoat, Catalog, "alaska", "coastal_inlet", Enums.Loop.Fishing)
+		t.eq("a Boat-less angler is offered NO coastal spawns", #offeredNone, 0)
+		t.ok("a Skiff owner IS offered the coastal routine population (king salmon)", has(offeredBoat, "alaska_king_salmon"))
+		t.ok("routineTargetsInZone (the pure content query) still lists the coastal fish regardless of ownership", has(Spawner.routineTargetsInZone(Catalog, "alaska", "coastal_inlet", Enums.Loop.Fishing), "alaska_king_salmon"))
 	end
 end

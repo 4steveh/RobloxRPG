@@ -143,4 +143,19 @@ return function(t: Harness.T)
 	t.ok("conquest reason names the Bayou", Util.anyContains(reasons, "Bayou"))
 	t.ok("conquest reason names a milestone target (Alligator or Blue Catfish)",
 		Util.anyContains(reasons, "Alligator") or Util.anyContains(reasons, "Blue Catfish"))
+
+	t.section("Gate — convenience never gates: owning a Boat/mount/dog does NOT change a gate result (Step 11)")
+	do
+		-- under-geared, nothing conquered: Alaska is locked. Granting every convenience item changes nothing.
+		local plain = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1 })
+		local lockedPlain = Gate.evaluateGate(plain, alaska, Catalog)
+		local loaded = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1 })
+		table.insert(loaded.inventory.commodities, { instanceId = "ci_skiff", catalogId = "vehicle_coastal_skiff", intraLevel = 0, equipped = false })
+		table.insert(loaded.inventory.commodities, { instanceId = "ci_horse", catalogId = "mount_horse", intraLevel = 0, equipped = false })
+		table.insert(loaded.inventory.commodities, { instanceId = "ci_dog", catalogId = "dog_coonhound", intraLevel = 0, equipped = false })
+		local lockedLoaded = Gate.evaluateGate(loaded, alaska, Catalog)
+		t.ok("Alaska is locked for the plain under-geared player", lockedPlain.unlocked == false)
+		t.ok("owning the Skiff + mount + dog does NOT unlock Alaska (gear/conquest only)", lockedLoaded.unlocked == false)
+		t.eq("the unmet-reason count is identical with vs. without the convenience items", #lockedLoaded.unmetReasons, #lockedPlain.unmetReasons)
+	end
 end
