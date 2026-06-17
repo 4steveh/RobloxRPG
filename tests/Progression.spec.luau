@@ -8,6 +8,7 @@ local Harness = require("@tests/harness")
 local Util = require("@tests/util")
 local Catalog = require("@src/config/Catalog")
 local Progression = require("@src/logic/Progression")
+local Replication = require("@src/server/authority/Replication")
 local Ids = require("@src/types/Ids")
 local Fakes = require("@src/server/persistence/Fakes")
 local Gauntlet = require("@src/server/authority/Gauntlet")
@@ -125,6 +126,47 @@ return function(t: Harness.T)
 		t.ok("persist_failed", r.ok == false and r.reason == "persist_failed")
 		t.ok("conquest reverted", p.conqueredDestinations["bayou"] == nil)
 		t.ok("the unlock reverted with it (no orphan unlock)", p.unlockedDestinations[D.Appalachia] == nil)
+	end
+
+	t.section("Progression.worldMapPins — pin.unlocked is PERSISTED truth (stays unlocked after a gear sale)")
+	do
+		local p = Util.mkProfile(Catalog, { weapon = 2, armor = 2, conquered = { D.Bayou } })
+		Progression.commitUnlocks(p, Catalog)
+		p.equipped.weapon = nil -- sell/unequip: evaluateGate would now re-lock Appalachia
+		local pins = Progression.worldMapPins(p, Catalog)
+		t.ok("the Appalachia pin reads UNLOCKED from the set (not the live gate eval)", pins[D.Appalachia].unlocked == true)
+		t.eq("an unlocked pin carries no unmet reasons", #pins[D.Appalachia].unmetReasons, 0)
+	end
+
+	t.section("Progression.worldMapPins — a locked pin carries the actionable-noun unmetReasons")
+	do
+		local p = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1 }) -- Appalachia locked, both halves unmet
+		local pins = Progression.worldMapPins(p, Catalog)
+		t.ok("the Bayou pin is unlocked (the requiredTier-0 root, committed via login/freshProfile-equivalent)", pins[D.Bayou] ~= nil)
+		t.ok("the Appalachia pin is locked", pins[D.Appalachia].unlocked == false)
+		t.ok("…and states a gear reason (Tier-2) and a conquest reason (Bayou)",
+			Util.anyContains(pins[D.Appalachia].unmetReasons, "Tier-2") and Util.anyContains(pins[D.Appalachia].unmetReasons, "Bayou"))
+	end
+
+	t.section("Progression.passportCounts — counts derive from the persisted sets")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		p.unlockedDestinations[D.Bayou] = true
+		p.unlockedDestinations[D.Appalachia] = true
+		p.conqueredDestinations[D.Bayou] = true
+		local c = Progression.passportCounts(p, Catalog)
+		t.eq("2 unlocked", c.unlocked, 2)
+		t.eq("1 conquered", c.conquered, 1)
+		t.ok("total is the Destination count", c.total >= 2)
+	end
+
+	t.section("Progression — the projection exposes worldMap + passport (the client renders from this shadow)")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		p.unlockedDestinations[D.Bayou] = true
+		local proj = Replication.buildProjection(p, Catalog)
+		t.ok("the projection carries the worldMap pins", proj.worldMap ~= nil and proj.worldMap[D.Bayou].unlocked == true)
+		t.ok("the projection carries the passport counts", proj.passport ~= nil and proj.passport.unlocked >= 1)
 	end
 
 	t.section("Progression wiring — equipping T2 gear after conquering the Bayou unlocks Appalachia (the gear-change path)")

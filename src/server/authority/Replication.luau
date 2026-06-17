@@ -11,6 +11,7 @@ local EffectiveTier = require("@src/logic/EffectiveTier")
 local Gate = require("@src/logic/Gate")
 local Copy = require("@src/server/persistence/Copy")
 local TrophyHall = require("@src/logic/TrophyHall")
+local Progression = require("@src/logic/Progression")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -27,6 +28,10 @@ export type Projection = {
 	anglerRankXP: number,
 	gates: { [string]: Gate.GateResult },
 	trophyHall: { displayed: { Schema.Artifact }, slotsUsed: number, slotsTotal: number },
+	-- Step 9: the World-Map pins (unlocked from the PERSISTED set, unmetReasons for locked pins) + the
+	-- Passport counts — the server-authoritative progression surface the client renders (never re-derives).
+	worldMap: { [string]: Progression.Pin },
+	passport: Progression.PassportCounts,
 }
 
 function M.buildProjection(profile: PlayerData, config: Config): Projection
@@ -47,6 +52,8 @@ function M.buildProjection(profile: PlayerData, config: Config): Projection
 		-- the Trophy Hall is a VIEW (filter artifacts, DISPLAYED) — the client renders it from this read-only
 		-- shadow; deep-copied so a client edit changes nothing server-side. No parallel structure is persisted.
 		trophyHall = { displayed = Copy.deep(TrophyHall.displayed(profile)), slotsUsed = usage.used, slotsTotal = usage.total },
+		worldMap = Progression.worldMapPins(profile, config),
+		passport = Progression.passportCounts(profile, config),
 	}
 end
 

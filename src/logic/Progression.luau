@@ -34,4 +34,37 @@ function M.commitUnlocks(profile: PlayerData, config: Config): CommitResult
 	return { newlyUnlocked = newlyUnlocked }
 end
 
+-- The World-Map pin per Destination: unlocked + conquered from the PERSISTED sets (NOT a live gate eval —
+-- a sold-gear Destination must read unlocked); unmetReasons from evaluateGate ONLY for a still-locked pin
+-- (the legibility-contract strings). One source of truth: the UI renders this, never re-deriving gate logic.
+export type Pin = { unlocked: boolean, conquered: boolean, unmetReasons: { string } }
+function M.worldMapPins(profile: PlayerData, config: Config): { [DestinationId]: Pin }
+	local pins: { [DestinationId]: Pin } = {}
+	for id, destination in config.destinations do
+		local unlocked = profile.unlockedDestinations[id] == true
+		pins[id] = {
+			unlocked = unlocked,
+			conquered = profile.conqueredDestinations[id] == true,
+			unmetReasons = if unlocked then {} else Gate.evaluateGate(profile, destination, config).unmetReasons,
+		}
+	end
+	return pins
+end
+
+-- The Passport readout: counts derived from the persisted sets (the Lodge "N of M unlocked / K conquered").
+export type PassportCounts = { unlocked: number, conquered: number, total: number }
+function M.passportCounts(profile: PlayerData, config: Config): PassportCounts
+	local unlocked, conquered, total = 0, 0, 0
+	for id in config.destinations do
+		total += 1
+		if profile.unlockedDestinations[id] == true then
+			unlocked += 1
+		end
+		if profile.conqueredDestinations[id] == true then
+			conquered += 1
+		end
+	end
+	return { unlocked = unlocked, conquered = conquered, total = total }
+end
+
 return M
