@@ -124,6 +124,19 @@ return function(t: Harness.T)
 		return true
 	end)())
 
+	-- ── Task 2.3 (Step 10): Boat sub-area marker ──
+	t.section("Fishing — Boat sub-area marker (coastal = Boat-gated; interior = no Boat). Data only (Step 11 enforces)")
+	do
+		t.ok("the King Salmon MILESTONE is coastal/Boat-gated (LOC_04 §4/§7 — spec, not the build prompt)", Fishing.requiresBoat(Catalog.fish.alaska_king_salmon))
+		t.ok("the Giant Halibut apex is Boat-gated", Fishing.requiresBoat(Catalog.fish.alaska_giant_halibut))
+		t.ok("interior grayling/dolly/sockeye are NOT Boat-gated (shore-accessible)", (function()
+			return not Fishing.requiresBoat(Catalog.fish.alaska_arctic_grayling)
+				and not Fishing.requiresBoat(Catalog.fish.alaska_dolly_varden)
+				and not Fishing.requiresBoat(Catalog.fish.alaska_sockeye_salmon)
+		end)())
+		t.ok("Bayou/Appalachia fish are shore-accessible (no Boat at the MVL's first two)", Fishing.requiresBoat(Catalog.fish.bayou_blue_catfish) == false and Fishing.requiresBoat(Catalog.fish.appalachia_trophy_largemouth_bass) == false)
+	end
+
 	-- ── Task 0.2 (Step 10): landableAt + coopLandableAt helpers ──
 	t.section("Fishing — landableAt + co-op-landable helper")
 	do

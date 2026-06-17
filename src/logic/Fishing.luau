@@ -180,6 +180,14 @@ function M.anglerRankXP(config: Config, fish: Fish): number
 	return round(r.base * tierFactor * rarityWeight * difficultyFactor)
 end
 
+-- ── Boat sub-area marker (SYS_fishing §7): coastal / deep-sea water is Boat-gated (a vehicle with the
+-- matching accessGrant opens the cell). pond/river/lake are shore-accessible. This is the DATA marker
+-- Step 11's coastal sub-area enforcement reads; Step 10 builds NO Boat and NO enforcement. ──
+local BOAT_GATED_WATER: { [string]: boolean } = { coastal = true, deepSea = true }
+function M.requiresBoat(fish: Fish): boolean
+	return BOAT_GATED_WATER[fish.waterType] == true
+end
+
 -- ── §9 co-op assist (generic; the Bayou has no apex → first does real work at Step 10). A second angler
 -- adds NetDrain sublinearly, capped — the fishing analog of combat's co-op EffectiveHealth, using the
 -- SHARED co-op constants (Tuning.combat.coop), not a fork. ──

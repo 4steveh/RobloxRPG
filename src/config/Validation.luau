@@ -212,6 +212,11 @@ function V.validateConfig(config: Config)
 			end
 		end
 	end
+	-- Boat sub-area data integrity (LOC_04 §4/§7): the King Salmon MILESTONE is coastal/Boat-gated (per
+	-- spec — the pure-fisher conquest waits for the Boat, Step 11); the interior run species are not.
+	assert(Fishing.requiresBoat(config.fish.alaska_king_salmon), "king salmon must be coastal/Boat-gated (LOC_04 §4/§7)")
+	assert(not Fishing.requiresBoat(config.fish.alaska_sockeye_salmon), "interior sockeye must be shore-accessible (no Boat)")
+
 	for _, perk in config.rankPerks do
 		V.assertRankPerkCategory(perk.category)
 	end
