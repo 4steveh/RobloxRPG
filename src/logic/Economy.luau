@@ -103,6 +103,14 @@ function M.salvageFloor(config: Config, tier: number, rarity: string, loop: Loop
 	return round(config.tuning.economy.salvageFloorFraction * baseline * M.rarityMultiplier(config, rarity))
 end
 
+-- §9 evergreen sink (Step 8): the Cash cost of the (boughtSlots+1)-th Trophy-Hall display slot. ESCALATING
+-- and UNCAPPED (the unbounded inflation-ballast property) — base · growth^boughtSlots. Integer Cash (no
+-- float drift). The absolute numbers are economy's to ratify; the escalating-uncapped shape is fixed.
+function M.slotExpansionPrice(config: Config, boughtSlots: number): number
+	local l = config.tuning.lodge
+	return round(l.slotExpansionBase * l.slotExpansionGrowth ^ boughtSlots)
+end
+
 -- §1/§6 daily-quest amounts (Step 7). Both scale off the player's current tier (the caller passes
 -- T_current = max(EHT, EFT), the idle resolution): the daily faucet is a fraction of Income(T); the
 -- cross-loop bonus is ≈ half an hour of current-tier income (the breadth kicker for one hunt + one catch).

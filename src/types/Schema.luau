@@ -19,6 +19,7 @@ type Disposition = Enums.Disposition
 type ArtifactKind = Enums.ArtifactKind
 type FunnelBeat = Enums.FunnelBeat
 type RealMoneyKind = Enums.RealMoneyKind
+type DecorKind = Enums.DecorKind
 type DestinationId = Ids.DestinationId
 type TargetId = Ids.TargetId
 type ItemId = Ids.ItemId
@@ -51,6 +52,23 @@ export type EquipmentItem = {
 	accessGrant: WaterType?, -- vehicles that gate a water type (e.g. Coastal Skiff → coastal). Access, never a stat.
 	notes: string,
 }
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- DecorItem (SYS_lodge_trophy §3 — the evergreen inflation ballast). A typed-owned cosmetic commodity:
+-- Cash-priced, balance-free (NO stats field → balance-free by construction; identity-only monetization),
+-- tradeable=false (a tradeable decor would be the rare-cosmetic ARTIFACT path — out of scope here / Step 11+).
+-- A decor SKU with an artifactId is a build-time schema error (the type carries none).
+-- ─────────────────────────────────────────────────────────────────────────────
+export type DecorItem = {
+	id: ItemId,
+	name: string,
+	kind: DecorKind,
+	cost: Cost, -- the Cash leg (the sink); real-money decor is Step 14, rejected at load by assertDecorItem
+	tradeable: boolean, -- MUST be false (typed-owned); asserted at load
+	monetizationRoles: { MonetizationRole }, -- identity-only (balance-free); asserted at load
+	notes: string,
+}
+export type DecorCatalog = { [ItemId]: DecorItem }
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Reward (XOR — binding). Common/Uncommon pay Cash at resolution; Rare-and-above mint EXACTLY ONE
@@ -200,6 +218,19 @@ export type Artifact = {
 	tombstoned: boolean, -- SALVAGED or traded-away artifacts are MARKED, never erased (audit/rollback)
 	provenance: Provenance,
 }
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Lodge state (Step 8) — the player's count-based typed-owned slots/decor + decor layout. DISTINCT from
+-- the instance-based `inventory.commodities` (gear): no instanceId, no equipped, no artifactId. Persisted
+-- as part of the whole-profile atomic write (§1 — never split across desyncable keys). The Trophy Hall is
+-- NOT here — it is a VIEW over `artifacts` where disposition==DISPLAYED (TrophyHall.luau), never stored.
+-- ─────────────────────────────────────────────────────────────────────────────
+export type DecorPlacement = { itemId: ItemId, slotKey: string } -- where an owned decor sits (cosmetic-only)
+export type LodgeState = {
+	boughtSlots: number, -- escalating-price slot expansions purchased; total slots = baseTrophySlots + boughtSlots
+	ownedDecor: { [ItemId]: number }, -- count-based typed-owned decor/theme/framing (tradeable=false, no artifactId)
+	placements: { DecorPlacement }, -- per-player decor layout (cosmetic; no economy/anti-dupe weight)
+}
+
 export type LedgerLoop = "Hunting" | "Fishing" | "none"
 export type LedgerEntry = {
 	entryId: number, -- server-minted unique, monotonic per player (data-integrity §3)
@@ -235,6 +266,8 @@ export type PlayerData = {
 	-- ── Step-7 onboarding funnel + daily-quest state (server-owned, in the session-locked profile) ──
 	onboarding: OnboardingState,
 	daily: DailyState,
+	-- ── Step-8 Lodge state (count-based slots/decor + decor layout; the Trophy Hall is a VIEW, not here) ──
+	lodge: LodgeState,
 }
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -317,6 +350,7 @@ export type Config = {
 	fish: FishCatalog,
 	destinations: DestinationCatalog,
 	rankPerks: { RankPerk },
+	decor: DecorCatalog,
 	targetIndex: { [TargetId]: TargetIndexEntry },
 }
 

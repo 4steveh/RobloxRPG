@@ -176,4 +176,12 @@ Enums.RealMoneyKind = table.freeze({
 	devproduct = "devproduct" :: RealMoneyKind,
 })
 
+-- Lodge decor SKU kind (SYS_lodge_trophy §3). A closed set; decor is identity-only, balance-free.
+export type DecorKind = "decor" | "theme" | "framing"
+Enums.DecorKind = table.freeze({
+	decor = "decor" :: DecorKind, -- furniture/wall/lighting/rugs/fixture skins
+	theme = "theme" :: DecorKind, -- cohesive room re-skin set (the high-value identity unit)
+	framing = "framing" :: DecorKind, -- per-trophy plaque/frame/mount-quality upgrade
+})
+
 return table.freeze(Enums)

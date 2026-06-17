@@ -166,6 +166,20 @@ Tuning.economy = table.freeze({
 	crossLoopBonusHours = 0.5,
 })
 
+-- §lodge (Step 8 — SYS_lodge_trophy §2/§3 + economy §9). The Trophy-Hall slot economy + the instancing
+-- mode. baseTrophySlots is SYS_lodge_trophy's free baseline (~6–10); the slot price is ESCALATING and
+-- UNCAPPED (the unbounded evergreen sink economy §9 requires — no maxTrophySlots). The ABSOLUTE Cash
+-- numbers are economy's to ratify post-soft-launch (same deferral as Step 7's daily amounts); the MODEL
+-- (escalating, uncapped) is fixed here. visitInstancingMode is the FLAGGED open decision (own-instance vs
+-- shared-lobby vs visit-on-invite) — MVL builds own-Lodge only; the visit topology is deferred to the
+-- server-model + moderation pass (README), never silently baked.
+Tuning.lodge = table.freeze({
+	baseTrophySlots = 8, -- free baseline display slots at Lodge start (tune vs first-expansion timing)
+	slotExpansionBase = 5000, -- Cash cost of the 1st bought slot (illustrative; economy ratifies)
+	slotExpansionGrowth = 1.5, -- each expansion costs growth× the previous — escalating, uncapped
+	visitInstancingMode = "ownInstance", -- FLAGGED: own-Lodge MVL; shared-lobby/visit-on-invite deferred
+})
+
 -- Big one-time access/convenience sink multipliers (EQUIPMENT_MASTER §4.5–§4.7; coarse defaults, OQ-D).
 --   BoatCost = b·Income(T_water);  MountCost ≈ mountMultiplier·GearCost_slot(T);  DogCost ≈ dogMultiplier·GearCost_slot(T)
 Tuning.vehicles = table.freeze({

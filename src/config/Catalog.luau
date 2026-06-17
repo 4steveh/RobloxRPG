@@ -46,6 +46,7 @@ local Catalog: Config = {
 	fish = Fish,
 	destinations = Destinations,
 	rankPerks = RankPerks,
+	decor = {}, -- TEMP (Task 1): replaced by the real Decor catalog in Task 2; keeps Config complete meanwhile
 	targetIndex = targetIndex,
 }
 
