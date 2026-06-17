@@ -40,12 +40,13 @@ return function(t: Harness.T)
 		local idGen = Fakes.newIdGenerator()
 		local a = mintTrophy(p, idGen, "bayou_leviathan", 4242) -- Mythic fishing
 		assert(ArtifactStore.transition(p, a.artifactId, "HELD", "DISPLAYED").ok)
-		local pl = TrophyHall.plaque(Catalog, a)
+		local pl = TrophyHall.plaque(Catalog, p.artifacts[a.artifactId])
 		t.eq("what: the source species name (from the catalog, via provenance.sourceId)", pl.what, Catalog.fish["bayou_leviathan"].name)
 		t.eq("where: the source's home Destination (derived, not stored on the wall)", pl.where, "bayou")
 		t.eq("when: the artifact's mintedAt (provenance, not re-entered)", pl.when, 4242)
 		t.eq("loop derived from the target index", pl.loop, "Fishing")
 		t.eq("rarity derived from the target index", pl.rarity, "Mythic")
+		t.eq("tier derived from the target index", pl.tier, Catalog.targetIndex["bayou_leviathan"].tier)
 	end
 
 	t.section("TrophyHall — slot usage is derived (base + bought); the wall is NOT a persisted list")
