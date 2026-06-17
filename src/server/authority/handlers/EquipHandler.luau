@@ -7,6 +7,7 @@
 
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
+local Progression = require("@src/logic/Progression")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 
 type Ctx = Gauntlet.Ctx
@@ -64,6 +65,11 @@ local EquipHandler: Gauntlet.IntentHandler = {
 		end
 		equipped[slot] = commodity.instanceId
 		commodity.equipped = true
+		-- Step 9: equipping changes EHT/EFT, which may newly meet a gate's gear half → re-evaluate unlocks.
+		-- (Buy/upgrade do NOT change EHT — buy mints unequipped, upgrade is intra-tier — so the gear-change
+		-- unlock hook is here, not in ShopHandler. Rides equip's dirty-flag; the login/Travel-Desk catch-all
+		-- + the critical conquest path provide the write-through guarantee.)
+		Progression.commitUnlocks(ctx.profile, ctx.config)
 	end,
 }
 

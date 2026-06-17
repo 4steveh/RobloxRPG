@@ -20,6 +20,7 @@ local Fishing = require("@src/logic/Fishing")
 local EffectiveTier = require("@src/logic/EffectiveTier")
 local Onboarding = require("@src/logic/Onboarding")
 local Daily = require("@src/logic/Daily")
+local Progression = require("@src/logic/Progression")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local RewardPipeline = require("@src/server/combat/RewardPipeline")
 local Types = require("@src/server/persistence/Types")
@@ -123,6 +124,10 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 			if not result.ambiance then
 				Onboarding.advance(ctx.profile, "catch", ctx.now)
 				Daily.recordAction(ctx.profile.daily, Enums.Loop.Fishing, ctx.now)
+			end
+			-- Step 9: a new conquest may newly satisfy a downstream gate's milestone half (atomic with the catch).
+			if result.conquestNewlySet then
+				Progression.commitUnlocks(ctx.profile, ctx.config)
 			end
 		end,
 	}
