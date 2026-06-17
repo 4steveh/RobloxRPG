@@ -67,5 +67,12 @@ return function(t: Harness.T)
 				monetizationRoles = { Enums.MonetizationRole.identity }, notes = "illegal here",
 			})
 		end)
+		t.errs("a decor with an EMPTY monetizationRoles set is rejected (an empty set would skip the identity-only rule)", function()
+			Validation.assertDecorItem({
+				id = "decor_empty", name = "Empty", kind = Enums.DecorKind.decor,
+				cost = { cash = 100 }, tradeable = false,
+				monetizationRoles = {}, notes = "illegal — bypasses the balance-free guarantee",
+			})
+		end)
 	end
 end

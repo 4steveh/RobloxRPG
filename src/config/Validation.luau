@@ -67,6 +67,9 @@ end
 function V.assertDecorItem(d: DecorItem)
 	assert((d.cost :: any).cash ~= nil, d.id .. ": decor must be Cash-priced (real-money decor is Step 14)")
 	assert(d.tradeable == false, d.id .. ": Step-8 decor is the typed-owned path (tradeable=false; a tradeable cosmetic is the artifact path)")
+	-- identity-only is enforced in the loop below; an EMPTY role set would skip it and silently bypass the
+	-- balance-free guarantee — so a decor SKU MUST carry the identity role (guards LiveOps-added SKUs).
+	assert(#d.monetizationRoles > 0, d.id .. ": decor must carry the identity monetization role (balance-free)")
 	for _, role in d.monetizationRoles do
 		assert(Enums.MonetizationRoleSet[role] == true, d.id .. ": illegal monetization role '" .. tostring(role) .. "'")
 		assert(role == Enums.MonetizationRole.identity, d.id .. ": decor is identity-only / balance-free (the zero-stat guarantee)")
