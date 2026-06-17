@@ -37,6 +37,9 @@ local ClaimDailyHandler = require("@src/server/daily/ClaimDailyHandler")
 local SalvageHandler = require("@src/server/lodge/SalvageHandler")
 local DisplayHandler = require("@src/server/lodge/DisplayHandler")
 local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
+local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
+local Progression = require("@src/logic/Progression")
+local DestinationService = require("@src/server/DestinationService")
 local SessionService = require("@src/server/SessionService")
 local ArrivalService = require("@src/server/ArrivalService")
 local Adapters = require("@src/server/RobloxAdapters")
@@ -81,6 +84,7 @@ Gauntlet.register(registry, DisplayHandler.takeDownHandler({ telemetry = telemet
 Gauntlet.register(registry, LodgeShopHandler.buySlotHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, LodgeShopHandler.buyDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, LodgeShopHandler.placeDecorHandler({ idGen = idGen, telemetry = telemetry }))
+Gauntlet.register(registry, WorldMapHandler.new({ telemetry = telemetry }))
 
 -- shared gauntlet deps for a given player (the write-through + dirty-flag wiring used by every handler)
 local function gauntletDeps(plr)
@@ -198,7 +202,7 @@ end
 fixture("Outfitter", Vector3.new(-30, 4, -20), Color3.fromRGB(150, 120, 90), "built")
 fixture("TackleShop", Vector3.new(-30, 4, 0), Color3.fromRGB(90, 120, 150), "built")
 fixture("TrophyHall", Vector3.new(0, 4, -30), Color3.fromRGB(180, 150, 70), "built")
-fixture("TravelDesk_WorldMap", Vector3.new(30, 4, -20), Color3.fromRGB(120, 110, 80), "stub") -- Step 9
+fixture("TravelDesk_WorldMap", Vector3.new(30, 4, -20), Color3.fromRGB(120, 110, 80), "built") -- Step 9
 fixture("TradingPost", Vector3.new(30, 4, 0), Color3.fromRGB(110, 130, 110), "stub") -- Step 12
 fixture("BoatDealer", Vector3.new(30, 4, 20), Color3.fromRGB(90, 110, 140), "stub") -- Step 11
 fixture("KennelAndStable", Vector3.new(-30, 4, 20), Color3.fromRGB(130, 110, 90), "stub") -- Step 11
@@ -481,6 +485,39 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 end)
 
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- THE TRAVEL DESK → WORLD MAP + FAST-TRAVEL (Step 9 wiring)
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- Step 9: the Travel Desk → World Map + fast-travel. Opening the map fires the openWorldMap intent (completes
+-- the funnel reveal beat + the unlock catch-all); a travel request is enforced by DestinationService.travelTo
+-- (the gate-bypass guard — target must be in the persisted unlocked set) and, on ok, executes the teleport.
+local travelRequest = Instance.new("RemoteEvent")
+travelRequest.Name = "TravelRequest"
+travelRequest.Parent = ReplicatedStorage
+
+travelRequest.OnServerEvent:Connect(function(plr, action, destinationId)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil then
+		return
+	end
+	if action == "openMap" then
+		Gauntlet.handle(registry, { intent = "openWorldMap", playerId = plr.UserId, payload = {} }, session, gauntletDeps(plr))
+		travelRequest:FireClient(plr, "map", Progression.worldMapPins(session.profile, Catalog), Progression.passportCounts(session.profile, Catalog))
+		return
+	end
+	if action == "travel" then
+		local result = DestinationService.travelTo(session.profile, destinationId)
+		if result.ok then
+			-- TODO(step-10): TeleportService place/spawn to result.teleportTarget for the real Destinations;
+			-- the only unlocked travel target at MVL is the Bayou (Lodge → Bayou). Return-to-Lodge is the
+			-- existing leave flow (ArrivalService), not fast-travel.
+			travelRequest:FireClient(plr, "traveling", destinationId, result.teleportTarget)
+		else
+			travelRequest:FireClient(plr, "denied", destinationId, result.reason)
+		end
+	end
+end)
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
 -- LOGIN → ARRIVAL PLACEMENT (kind-aware) + the non-lethal clamp + the funnel first-spawn guarantees
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
 local FIRST_HUNT_AREA = "sunny_levee"
@@ -530,6 +567,12 @@ Players.PlayerAdded:Connect(function(plr)
 	pcall(function()
 		SessionService.login(sessionService, plr.UserId) -- THE single login lock (lock + load via Step 2)
 	end)
+	-- Step 9: re-evaluate gate unlocks at login (the catch-all — cheap, idempotent, eventually consistent).
+	local session = sessionService.sessions[plr.UserId]
+	if session ~= nil then
+		Progression.commitUnlocks(session.profile, Catalog)
+		SessionService.markDirty(sessionService, plr.UserId)
+	end
 	plr.CharacterAdded:Connect(function(char)
 		local hum = char:WaitForChild("Humanoid")
 		hum.WalkSpeed = movement.walkSpeed

@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–8)
+# Wild World — Build (Steps 1–9)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -49,6 +49,15 @@ note per step.
   bootstrap** consolidates the per-step `.server` slices into a single login owner. **The flows are
   headless-proven; the bootstrap, the Lodge interior, trophy rendering, the "Mount it" prompt, decor
   placement, and the visit/social path are Studio** — split honestly below.
+- **Step 9 — World Map, Fast-Travel & Destination Gating.** A thin progression-integrity-adjacent core +
+  a Studio map UI. The **unlocked set is persisted truth, not a live derivation** (`commitUnlocks` only ever
+  *adds* the one-time threshold crossing — selling gear never re-locks), and **fast-travel cannot bypass a
+  gate** (`travelTo` validates the target against the persisted set). Step 9 *calls* `Gate.evaluateGate` /
+  `EffectiveTier` / the teleport scaffold / the persisted Passport sets — it rebuilds none of them. It wires
+  the unlock-commit into conquest (Fire/Catch, gated on `conquestNewlySet`) + equip + the login/Travel-Desk
+  catch-all; builds the World-Map pin + Passport surface; and flips the onboarding `WORLD_MAP` beat from
+  pass-through to a real reveal. **The map UI, the `TeleportService` execution, and the Passport-readout feel
+  are Studio** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -98,6 +107,7 @@ src/
            · Daily (Step 7 — the daily cross-loop pair objective state + the server-time reset; the board-claim skeleton)
            · TrophyHall (Step 8 — the VIEW: filter(artifacts, DISPLAYED); plaque from provenance; slot usage; NO parallel store)
            · Economy (+ Step-8 slotExpansionPrice: the escalating/uncapped evergreen-sink slot price)
+           · Progression (Step 9 — commitUnlocks: the persisted-truth unlock set; worldMapPins/passportCounts: the Passport surface; CALLS evaluateGate, never re-derives)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -113,6 +123,8 @@ src/
       SalvageHandler.luau     (Step 8) the "salvage" intent — §4 CAS →SALVAGED + salvageFloor credit, one Transaction (critical, atomic, idempotent, terminal)
       DisplayHandler.luau     (Step 8) "mountTrophy"/"takeDownTrophy" — HELD↔DISPLAYED CAS + slot-capacity gate (critical; no Cash)
       LodgeShopHandler.luau   (Step 8) "buySlot"/"buyDecor" (the evergreen Cash sink, evergreen-tagged) + "placeDecor" (cosmetic layout)
+    progression/
+      WorldMapHandler.luau    (Step 9) the "openWorldMap" intent — completes the WORLD_MAP reveal beat + the commitUnlocks catch-all (critical)
     idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
     world/WorldServer.server.luau   ⌂ STUDIO-ONLY (Step 8) — THE ONE login owner: one SessionService + one shared gauntlet registry (every handler), Bayou + Lodge build, both spawners + flows, kind-aware arrival
   client/CharacterController.client.luau   ⌂ STUDIO-ONLY — mobile camera/controls (→ StarterPlayerScripts)
@@ -134,13 +146,14 @@ src/
       handlers/EquipHandler.luau   the ONE reference intent handler (equip Y)
     idle/Idle.luau        idle integrity mechanism (clamp, single entry, idempotent, hard-crash fallback, idle-proof); amount stub
     SessionService.luau   orchestration: login (lock+load/fresh+idle+write-through) / logout (flush+logoutTimestamp+release) / autosave
-    DestinationService.luau  teleport registry + canTravel preview; travelTo is a Step-9 stub
+    DestinationService.luau  teleport registry + canTravel preview + travelTo (Step 9: gated fast-travel ENFORCEMENT — validates the persisted unlocked set, resolves teleportTarget)
     RobloxAdapters.luau   thin injection-based Roblox adapters (Studio-only binding; strict-clean headless)
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
          ProfileStore/Ledger/ArtifactStore/Gauntlet/Idle/Integrity; Step 3: Shell/Arrival; Step 4:
          Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler;
          Step 7: Onboarding/Daily/ClaimDailyHandler;
-         Step 8: Lodge/TrophyHall/SalvageHandler/DisplayHandler/LodgeShopHandler) · negative/ (MUST fail analysis)
+         Step 8: Lodge/TrophyHall/SalvageHandler/DisplayHandler/LodgeShopHandler;
+         Step 9: Progression/Travel/WorldMapHandler) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -558,6 +571,68 @@ auto-sell is built) → **Step 14** (decor here is Cash-priced); the ongoing dec
 companions" surface (rare dogs/mounts beyond the Trophy Hall) → deferred (LiveOps / a future Kennel
 deep-dive — do **not** overload the Trophy Hall). **Displayed trophies grant no non-cosmetic benefit, ever.**
 
+## Step 9 — World Map, fast-travel & gating (the bar is split, honestly)
+
+Two properties a wrong build violates: **the unlocked set is persisted truth (not a live derivation)** —
+`commitUnlocks` only ever *adds* (the one-time threshold crossing); a Destination stays unlocked after the
+qualifying gear is sold (`evaluateGate` gates *entry into the set*, never continued membership) — and
+**fast-travel cannot bypass the gate** — `DestinationService.travelTo` validates the target against the
+**persisted** `unlockedDestinations` set, not a live gate eval. Step 9 **calls** `Gate.evaluateGate`,
+`EffectiveTier`, the teleport scaffold, and the persisted sets — it rebuilds none of them.
+
+**Headless-proven:**
+- **`commitUnlocks`** (`src/logic/Progression.luau`) re-evaluates every gate in **one pass** and adds each
+  newly-unlocked Destination to the persisted set: idempotent (a second pass adds nothing); **survives a gear
+  sale** (unlock, then unequip → still unlocked); requires **both halves** (conquest alone or gear alone does
+  not unlock); one pass unlocks the whole conquered chain (no cascade — the gate checks `prerequisite
+  Destinations ⊆ conquered`, a stable player action).
+- **Wired into its real triggers, atomically**: `FireHandler`/`CatchHandler` commits gated on
+  `result.conquestNewlySet` (a forced save failure reverts the conquest **and** the unlock — no orphan); the
+  **equip** handler (the action that actually changes EHT/EFT — see the placement note); and the
+  login/Travel-Desk `openWorldMap` catch-all.
+- **Gated fast-travel enforcement**: `travelTo` returns `{ ok, reason?, teleportTarget? }` — an unlocked
+  target resolves its `teleportTarget`; a locked target is rejected server-side; the guard reads the
+  **set** (a gate-qualified-but-uncommitted player still can't travel; an in-set-but-now-under-geared player
+  still can — persisted truth).
+- **Surface data**: `worldMapPins` returns `{ unlocked, conquered, unmetReasons }` per Destination — `unlocked`
+  from the **persisted set** (a sold-gear Destination reads unlocked), `unmetReasons` the actionable-noun
+  strings for locked pins; `passportCounts` derives the readout from the sets. Both are exposed in the
+  read-only projection (`worldMap` / `passport`).
+- **The Rockies re-thread** is data-driven: `Gate.spec` proves it at the `evaluateGate` level; `Progression.spec`
+  proves the **`commitUnlocks`** re-evaluates a synthetic re-pointed DAG with **no code change**.
+- **The onboarding `WORLD_MAP` beat is now real** — opening the map (`openWorldMap`) completes it (was a
+  pass-through); the funnel-to-COMPLETE chain gained a `worldMapOpen` step (the affected specs updated).
+- `requiredAccessItems` added to the `Gate` (optional; the entry-gate half of `evaluateGate`) for the future
+  water-locked Destination; the MVL omits it.
+- Steps 1–8 tests stay green (the conquest/equip commits now carry the unlock-commit through their existing
+  atomic/dirty-flag paths).
+
+**Studio / telemetry — NOT headless (all unchecked):**
+- [ ] The **World Map** renders at the Travel Desk: lit pins for unlocked, glowing-locked pins showing their
+      `unmetReasons`, higher-tier pins visible from session one — no tier number shown.
+- [ ] **Fast-travel** executes (`TeleportService` place/spawn) for the real targets (Lodge ⇄ Bayou) on mobile.
+- [ ] The **Passport readout** in the Lodge reads as the felt progression number ("N of M unlocked").
+- [ ] The onboarding `WORLD_MAP` reveal lands as the aspiration beat in the funnel.
+- [ ] Telemetry populates: per-tier time-to-unlock, **gate drop-off split gear-vs-milestone** (the single
+      most useful progression chart), EHT/EFT distribution, dual-loop split, fast-travel usage.
+
+**Placement note (codebase-grounded, flagged):** the prompt says hook the gear-change unlock into
+`ShopHandler`, but in this codebase **buy mints an *unequipped* commodity and upgrade is intra-tier** —
+neither changes EHT — so the gear-half-newly-met trigger is in **`EquipHandler`** (the action that changes
+EHT/EFT), plus the login/Travel-Desk catch-all. A `ShopHandler` hook would be dead code.
+
+**`Gate` prerequisite-model note:** the code checks `prerequisiteDestinations ⊆ conquered` (collapsing the
+spec's `milestone_prerequisite` (conquered) and `prerequisite_destinations` (unlocked) into one) — fine for
+the MVL + Rockies (a conquered milestone chain); the **unlocked-but-not-conquered** prerequisite is
+unimplemented, flagged for a future Destination that needs it.
+
+**Deferrals (named with their owning step):** the Appalachia/Alaska worlds behind the gates → **Step 10**;
+Boats + the sub-area Boat-gate enforcement (Alaska coastal fishing) → **Step 11** (Boats) / **Step 10**
+(sub-areas) — `requiredAccessItems` here is the *entry-gate* half only; **Hunter/Angler Rank perks** (the
+registry + thresholds + cap/prestige) → **deferred** (rank XP already accrues; if ever surfaced, the registry
+must be category-validated identity|convenience — power is a schema error); the `TeleportService` execution
+beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → **Step 10**.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -572,7 +647,7 @@ deep-dive — do **not** overload the Trophy Hall). **Displayed trophies grant n
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
 | ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; remaining: trading's escrow/swap | Step 12 |
 | ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
-| World Map UI, **gated teleport execution + enforcement** | Step 9 |
+| ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; remaining: the map UI + the `TeleportService` execution beyond Lodge/Bayou | Step 10 |
 | Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback (call CAS `HELD↔ESCROWED` + Transaction + paired ledger entries) | Step 12 |
 | Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`) | Step 14 |
 | `TODO(open)`: MemoryStore cross-server lock brokering · `TODO(ops)`: `auditLogDestination` choice, point-in-time rollback operation | ops/later |
@@ -670,7 +745,17 @@ insufficient-funds no partial); the **Lodge arrival branch** (`isOnboardingCompl
 trophy rendering, the "Mount it" prompt, decor placement, and the **flagged** visit/social topology
 (own-Lodge MVL only). Step 8 **calls** the §4 CAS / `salvageFloor` / `artifacts` — it rebuilds none of them.
 
-**659 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+**Step 9:** ✅ (headless) `commitUnlocks` (persisted-truth unlock set — adds-only, idempotent, survives gear
+sale, both-halves, one pass) wired into conquest (Fire/Catch on `conquestNewlySet`, atomic no-orphan) + equip
++ the `openWorldMap` catch-all; gated `travelTo` enforcement (validates the persisted set — the gate-bypass
+guard, both directions); `worldMapPins`/`passportCounts` surface (persisted-truth pin `unlocked`,
+actionable-noun `unmetReasons`) exposed in the projection; the optional `requiredAccessItems` entry-gate half;
+the `WORLD_MAP` beat made real (`openWorldMap` completes it; funnel specs updated); the `commitUnlocks`-level
+Rockies re-thread (data-only DAG re-point, no code change). ⌂ (Studio, unchecked above) the World-Map UI, the
+`TeleportService` execution, the Passport readout, the onboarding reveal feel, and the progression telemetry.
+Step 9 **calls** `evaluateGate`/`EffectiveTier`/the teleport scaffold — it rebuilds none of them.
+
+**706 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
 place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓

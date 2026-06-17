@@ -3,7 +3,7 @@
 -- non-zero if any assertion failed (so CI / run-tests.sh can gate on it).
 
 local Harness = require("@tests/harness")
-local t = Harness.new("Wild World — Steps 1–8")
+local t = Harness.new("Wild World — Steps 1–9")
 
 local specs: { (Harness.T) -> () } = {
 	-- Step 1 (data model + pure logic)
