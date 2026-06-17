@@ -42,6 +42,7 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/Lodge.spec"),
 	require("@tests/TrophyHall.spec"),
 	require("@tests/SalvageHandler.spec"),
+	require("@tests/DisplayHandler.spec"),
 }
 
 for _, spec in specs do
