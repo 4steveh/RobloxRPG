@@ -38,6 +38,14 @@ return function(t: Harness.T)
 		t.ok("the 2nd slot buy succeeds", r2.ok)
 		t.eq("debited the ESCALATING price(1) = 7500 (15000 → 7500)", Ledger.balanceOf(p.cash), 7500)
 		t.eq("boughtSlots is now 2", p.lodge.boughtSlots, 2)
+		-- the sink is tagged: the ledger tail carries a "slotExpansion" entry
+		local tagged = false
+		for _, e in p.cash.tail do
+			if e.type == "slotExpansion" then
+				tagged = true
+			end
+		end
+		t.ok("the ledger entry is tagged 'slotExpansion' for the evergreen-sink telemetry", tagged)
 	end
 
 	t.section("Sink — buySlot insufficient funds rejects with NO partial state")
@@ -73,6 +81,15 @@ return function(t: Harness.T)
 			end
 		end
 		t.ok("the ledger entry is tagged 'decor' for the evergreen-sink telemetry", tagged)
+	end
+
+	t.section("Sink — buyDecor is atomic: a failed write reverts the debit + the grant (no orphan)")
+	do
+		local p = Util.mkProfile(Catalog, { ledger = { 1000 } })
+		local r = handle(p, "buyDecor", { itemId = "decor_rustic_rug" }, false)
+		t.ok("persist_failed", r.ok == false and r.reason == "persist_failed")
+		t.eq("Cash reverted", Ledger.balanceOf(p.cash), 1000)
+		t.ok("no orphan decor was granted", p.lodge.ownedDecor["decor_rustic_rug"] == nil)
 	end
 
 	t.section("Sink — buyDecor: unknown SKU + insufficient funds reject cleanly")
