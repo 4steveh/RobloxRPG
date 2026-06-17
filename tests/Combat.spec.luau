@@ -208,6 +208,26 @@ return function(t: Harness.T)
 		t.ok("grizzly soloable at T5 (window 5.0 s, 2 shots·1.21 = 2.42 ≤ 5.0)", Combat.soloableAt(Catalog, grizzly, 5, 5))
 	end
 
+	-- ── Task 1.1 (Step 10): Appalachia KillWindow inputs + spawnZones ──
+	t.section("Combat — Appalachia KillWindow inputs + spawnZones (LOC_02 §3)")
+	do
+		local boar = Catalog.creatures.appalachia_wild_boar
+		local coyote = Catalog.creatures.appalachia_coyote
+		local cougar = Catalog.creatures.appalachia_mountain_lion
+		local deer = Catalog.creatures.appalachia_whitetail_deer
+		t.ok("boar attackInterval = 3.0 s (LOC_02 §3)", boar.attackIntervalSeconds == 3.0)
+		t.ok("coyote attackInterval = 2.0 s", coyote.attackIntervalSeconds == 2.0)
+		t.ok("cougar attackInterval = 2.7 s", cougar.attackIntervalSeconds == 2.7)
+		t.ok("whitetail carries an escape window + spawnZones", deer.escapeWindowSeconds ~= nil and deer.spawnZones ~= nil)
+		t.ok("non-threat fleer minArmor is n/a (0), matching the derivation", deer.minArmorTierToSurvive == 0)
+		t.ok("every non-ambiance Appalachia creature carries spawnZones", (function()
+			for _, c in Catalog.creatures do
+				if c.destinationId == "appalachia" and not c.ambianceOnly and (c.spawnZones == nil or #(c.spawnZones :: any) == 0) then return false end
+			end
+			return true
+		end)())
+	end
+
 	-- ── Task 0.2 (Step 10): co-op-soloable helper (§6 party clears co-op-scaled Health; tank survives) ──
 	t.section("Combat — co-op-soloable: party clears the apex that is a solo wall at T4")
 	do

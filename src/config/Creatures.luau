@@ -295,10 +295,12 @@ local rows: { Creature } = {
 		damageToPlayer = 0,
 		speed = 70,
 		minWeaponTierToKill = 1,
-		minArmorTierToSurvive = 1,
+		minArmorTierToSurvive = 0, -- non-threat fleer: armor is n/a (LOC_02 §3)
 		coop = Co.soloTopGear,
 		cash = { min = 34, max = 42 },
 		spawnLocation = "old fields",
+		spawnZones = { "old_field" }, -- Appalachia shell zone (Task 1.3)
+		escapeWindowSeconds = 4, -- TimeToFlee, warier re-skin of the Bayou rabbit (LOC_02 §3)
 	}),
 	creature({
 		id = "appalachia_whitetail_deer",
@@ -311,10 +313,12 @@ local rows: { Creature } = {
 		damageToPlayer = 0,
 		speed = 78,
 		minWeaponTierToKill = 1,
-		minArmorTierToSurvive = 1,
+		minArmorTierToSurvive = 0, -- non-threat fleer: armor is n/a (LOC_02 §3)
 		coop = Co.soloTopGear,
 		cash = { min = 34, max = 42 },
 		spawnLocation = "the Old Field and woodlot edges",
+		spawnZones = { "old_field" }, -- Appalachia shell zone (Task 1.3)
+		escapeWindowSeconds = 4.5, -- TimeToFlee (LOC_02 §3, worked H50 floor): ceil(50/18)=3 shots ≤ 4.5/1.5
 		conditions = { time = "dawn/dusk" },
 	}),
 	creature({
@@ -333,6 +337,8 @@ local rows: { Creature } = {
 		coop = Co.duo,
 		cash = { min = 34, max = 42 },
 		spawnLocation = "draws and creek-bottoms",
+		spawnZones = { "creek_bottoms" }, -- Appalachia shell zone (Task 1.3)
+		attackIntervalSeconds = 2.0, -- survival-bounded DPS interval (LOC_02 §3)
 		conditions = { time = "dusk/night" },
 	}),
 	creature({
@@ -350,6 +356,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 55, max = 66 },
 		spawnLocation = "brushy mid-slopes and oak ridges",
+		spawnZones = { "oak_ridges" }, -- Appalachia shell zone (Task 1.3)
+		attackIntervalSeconds = 3.0, -- survival-bounded DPS interval (LOC_02 §3)
 		isMilestoneTarget = true, -- Appalachia hunting conquest milestone
 	}),
 	creature({
@@ -367,6 +375,8 @@ local rows: { Creature } = {
 		coop = Co.party,
 		cash = { min = 55, max = 66 },
 		spawnLocation = "Lookout Ridge",
+		spawnZones = { "lookout_ridge" }, -- Appalachia shell zone (Task 1.3)
+		attackIntervalSeconds = 2.7, -- survival-bounded DPS interval (LOC_02 §3)
 	}),
 	creature({
 		id = "appalachia_piebald_whitetail",
@@ -380,11 +390,13 @@ local rows: { Creature } = {
 		damageToPlayer = 0,
 		speed = 78,
 		minWeaponTierToKill = 1,
-		minArmorTierToSurvive = 1,
+		minArmorTierToSurvive = 0, -- non-threat fleer: armor is n/a (LOC_02 §3)
 		coop = Co.soloTopGear,
 		conditions = { time = "dawn/dusk", weather = "clear" },
 		rare = rareFields(250, "the first 'wait — that one's different' double-take; the entry-level trade chip"),
 		spawnLocation = "the Old Field",
+		spawnZones = { "old_field" }, -- Appalachia shell zone (Task 1.3)
+		escapeWindowSeconds = 4.5, -- shares the whitetail escape profile (a find, not a harder fight, LOC_02 §5)
 	}),
 	creature({
 		id = "appalachia_ghost_buck",
@@ -398,11 +410,13 @@ local rows: { Creature } = {
 		damageToPlayer = 0,
 		speed = 78,
 		minWeaponTierToKill = 1,
-		minArmorTierToSurvive = 1,
+		minArmorTierToSurvive = 0, -- non-threat fleer: armor is n/a (LOC_02 §3)
 		coop = Co.soloTopGear,
 		conditions = { time = "dawn", weather = "clear" },
 		rare = rareFields(1500, "white stag in gold dawn fog, the clean-kill flourish in slow-mo"),
 		spawnLocation = "the Old Field",
+		spawnZones = { "old_field" }, -- Appalachia shell zone (Task 1.3)
+		escapeWindowSeconds = 4.5, -- shares the whitetail escape profile (a find, not a harder fight, LOC_02 §5)
 	}),
 	creature({
 		id = "appalachia_black_catamount",
@@ -421,6 +435,8 @@ local rows: { Creature } = {
 		conditions = { time = "night", weather = "heavy fog" },
 		rare = rareFields(6000, "green eyeshine in the fog, then the cat in the beam — the rarest early clip"),
 		spawnLocation = "Lookout Ridge",
+		spawnZones = { "lookout_ridge" }, -- Appalachia shell zone (Task 1.3)
+		attackIntervalSeconds = 2.7, -- shares the catamount's profile (a find, not a harder wall, LOC_02 §5)
 	}),
 
 	-- ───────────────────────── ALASKA (Tier 4) ─────────────────────────
