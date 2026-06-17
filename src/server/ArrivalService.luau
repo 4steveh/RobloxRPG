@@ -1,27 +1,35 @@
 --!strict
--- ARRIVAL routing (Step 3). Resolves where a logging-in player spawns. Pure + server-authoritative: the
--- world blockout calls SessionService.login (lock + load) and then this to place the character. Step 3 is
--- the destination/teleport framework's first real use.
+-- ARRIVAL routing (Step 3 + Step 8). Resolves where a logging-in player spawns. Pure + server-authoritative:
+-- the world bootstrap calls SessionService.login (lock + load) and then this to place the character.
+--   • A FIRST-TIME player (funnel not COMPLETE) → the free, gate-less ROOT Destination (the Bayou, the
+--     onboarding §0 spawn) — UNCONDITIONAL as in Step 3.
+--   • A RETURNING player (funnel COMPLETE) → the LODGE (the hub; SYS_lodge_trophy §1 — spawning in and
+--     returning from a Destination both land in the Lodge). The Lodge is NOT a Destination, so the result
+--     carries kind="lodge" + destinationId=nil; a Destination arrival carries kind="destination".
+-- This is the Step-8 routing branch the Step-3 TODO reserved.
 
 local Schema = require("@src/types/Schema")
 local Ids = require("@src/types/Ids")
 local Shell = require("@src/logic/Shell")
+local Onboarding = require("@src/logic/Onboarding")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
 type Vec3 = Schema.Vec3
-type ShellRegistry = { byDestination: { [Ids.DestinationId]: Schema.Shell } }
+type LodgeArrival = { zoneId: string, anchor: Vec3 }
+type ShellRegistry = { byDestination: { [Ids.DestinationId]: Schema.Shell }, lodge: LodgeArrival }
 
 local M = {}
 
-export type Arrival = { destinationId: Ids.DestinationId, zoneId: string, anchor: Vec3 }
+-- A tagged arrival target: the Lodge hub (kind="lodge", no destinationId) or a Destination (kind="destination").
+export type Arrival = { kind: "lodge" | "destination", destinationId: Ids.DestinationId?, zoneId: string, anchor: Vec3 }
 
--- resolveArrival: ALWAYS the free, gate-less root — the requiredTier-0 Destination (derived from data
--- like freshProfile), i.e. the Bayou. UNCONDITIONAL in Step 3: a fresh player and a returning player both
--- arrive here. `profile` is accepted for the Step-8 branch but unused now.
--- TODO(step-8): a returning player (funnel COMPLETE) lands in the Lodge, not the Bayou
--- (SYS_onboarding_funnel §0 vs SYS_lodge_trophy) — that routing branch is Step 8, not built here.
-function M.resolveArrival(_profile: PlayerData, shells: ShellRegistry, config: Config): Arrival
+function M.resolveArrival(profile: PlayerData, shells: ShellRegistry, config: Config): Arrival
+	-- Step 8: a returning (funnel-COMPLETE) player lands in the Lodge hub, not the Bayou root.
+	if Onboarding.isOnboardingComplete(profile) then
+		return { kind = "lodge", destinationId = nil, zoneId = shells.lodge.zoneId, anchor = shells.lodge.anchor }
+	end
+	-- Otherwise: the free, gate-less root — the requiredTier-0 Destination (derived from data), i.e. the Bayou.
 	local rootId: Ids.DestinationId? = nil
 	for id, dst in config.destinations do
 		if dst.gate.requiredTier == 0 then
@@ -31,7 +39,7 @@ function M.resolveArrival(_profile: PlayerData, shells: ShellRegistry, config: C
 	end
 	local destinationId = assert(rootId, "ArrivalService: no free-starter (requiredTier 0) Destination")
 	local shell = assert(shells.byDestination[destinationId], "ArrivalService: no shell for arrival Destination '" .. destinationId .. "'")
-	return { destinationId = destinationId, zoneId = shell.arrivalZoneId, anchor = Shell.arrivalAnchor(shell) }
+	return { kind = "destination", destinationId = destinationId, zoneId = shell.arrivalZoneId, anchor = Shell.arrivalAnchor(shell) }
 end
 
 return M

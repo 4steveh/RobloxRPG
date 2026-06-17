@@ -4,21 +4,33 @@ local Catalog = require("@src/config/Catalog")
 local Shells = require("@src/config/Shells")
 local ArrivalService = require("@src/server/ArrivalService")
 local Profile = require("@src/logic/Profile")
+local Onboarding = require("@src/logic/Onboarding")
+local Enums = require("@src/types/Enums")
 local Ids = require("@src/types/Ids")
 
 return function(t: Harness.T)
-	t.section("Arrival — login resolves to the Bayou arrival anchor (the gate-less root)")
+	t.section("Arrival — a first-time player lands in the Bayou arrival anchor (the gate-less root)")
 	local p = Profile.freshProfile(Catalog)
 	local a = ArrivalService.resolveArrival(p, Shells, Catalog)
+	t.ok("kind is 'destination'", a.kind == "destination")
 	t.ok("destination is the Bayou (free-starter, requiredTier 0)", a.destinationId == Ids.Destination.Bayou)
 	t.ok("zone is the arrival clearing", a.zoneId == "arrival_clearing")
 	local clearing = Shells.byDestination[Ids.Destination.Bayou].zones.arrival_clearing
 	t.ok("anchor is the arrival clearing center", a.anchor.x == clearing.center.x and a.anchor.z == clearing.center.z)
 
-	t.section("Arrival — unconditional in Step 3 (returning→Lodge is Step 8)")
+	t.section("Arrival — a funnel-COMPLETE player lands in the LODGE (the Step-8 returning-player branch)")
 	local p2 = Profile.freshProfile(Catalog)
-	p2.conqueredDestinations[Ids.Destination.Bayou] = true
-	p2.unlockedDestinations[Ids.Destination.Appalachia] = true
+	-- drive the funnel to COMPLETE the only way it can: authoritative events (no client flag).
+	Onboarding.advance(p2, "kill", 1)
+	Onboarding.advance(p2, "catch", 2)
+	Onboarding.advance(p2, "gearUpgrade", 3)
+	Onboarding.advance(p2, "kill", 4)
+	Onboarding.advance(p2, "kill", 5)
+	Onboarding.advance(p2, "catch", 6)
+	Onboarding.advance(p2, "dailyClaim", 7)
+	t.ok("the funnel reached COMPLETE", Onboarding.isOnboardingComplete(p2))
 	local a2 = ArrivalService.resolveArrival(p2, Shells, Catalog)
-	t.ok("a progressed profile STILL arrives in the Bayou (no returning branch yet)", a2.destinationId == Ids.Destination.Bayou)
+	t.ok("kind is 'lodge'", a2.kind == "lodge")
+	t.ok("a COMPLETE player is NOT routed to a Destination (the Lodge is the hub, not a Destination)", a2.destinationId == nil)
+	t.ok("the Lodge arrival zone + anchor come from Shells.lodge", a2.zoneId == Shells.lodge.zoneId and a2.anchor.z == Shells.lodge.anchor.z)
 end

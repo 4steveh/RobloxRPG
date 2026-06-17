@@ -118,6 +118,12 @@ local Shells = {}
 local movement: Schema.Movement = { walkSpeed = 16, jumpPower = 50, cameraMinZoom = 8, cameraMaxZoom = 14 }
 Shells.movement = movement
 
+-- The Lodge hub arrival (Step 8). The Lodge is the player's home HUB, NOT a requiredTier-0 Destination, so
+-- it does not live in `byDestination`/the gate DAG — it is its own arrival target the routing branch returns
+-- for a funnel-COMPLETE (returning) player. The interior + service fixtures are Studio (WorldServer); this is
+-- the headless arrival DATA the router needs. (Positions are plain {x,y,z}; the world converts to Vector3.)
+Shells.lodge = { zoneId = "lodge_hub", anchor = v(0, 0, 600) }
+
 local byDestination: { [Ids.DestinationId]: Schema.Shell } = { [D.Bayou] = bayou }
 Shells.byDestination = byDestination
 
