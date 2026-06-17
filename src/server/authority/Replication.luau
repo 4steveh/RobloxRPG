@@ -10,6 +10,7 @@ local Balance = require("@src/logic/Balance")
 local EffectiveTier = require("@src/logic/EffectiveTier")
 local Gate = require("@src/logic/Gate")
 local Copy = require("@src/server/persistence/Copy")
+local TrophyHall = require("@src/logic/TrophyHall")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -25,6 +26,7 @@ export type Projection = {
 	hunterRankXP: number,
 	anglerRankXP: number,
 	gates: { [string]: Gate.GateResult },
+	trophyHall: { displayed: { Schema.Artifact }, slotsUsed: number, slotsTotal: number },
 }
 
 function M.buildProjection(profile: PlayerData, config: Config): Projection
@@ -32,6 +34,7 @@ function M.buildProjection(profile: PlayerData, config: Config): Projection
 	for id, destination in config.destinations do
 		gates[id] = Gate.evaluateGate(profile, destination, config)
 	end
+	local usage = TrophyHall.slotUsage(profile, config)
 	return {
 		balance = Balance.balanceOf(profile),
 		eht = EffectiveTier.effectiveHuntingTier(profile, config),
@@ -41,6 +44,9 @@ function M.buildProjection(profile: PlayerData, config: Config): Projection
 		hunterRankXP = profile.hunterRankXP,
 		anglerRankXP = profile.anglerRankXP,
 		gates = gates,
+		-- the Trophy Hall is a VIEW (filter artifacts, DISPLAYED) — the client renders it from this read-only
+		-- shadow; deep-copied so a client edit changes nothing server-side. No parallel structure is persisted.
+		trophyHall = { displayed = Copy.deep(TrophyHall.displayed(profile)), slotsUsed = usage.used, slotsTotal = usage.total },
 	}
 end
 

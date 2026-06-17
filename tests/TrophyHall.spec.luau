@@ -10,6 +10,7 @@ local Catalog = require("@src/config/Catalog")
 local Fakes = require("@src/server/persistence/Fakes")
 local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
 local TrophyHall = require("@src/logic/TrophyHall")
+local Replication = require("@src/server/authority/Replication")
 
 return function(t: Harness.T)
 	local function mintTrophy(p, idGen, sourceId, now)
@@ -61,5 +62,20 @@ return function(t: Harness.T)
 		local usage = TrophyHall.slotUsage(p, Catalog)
 		t.ok("slotUsage reports used/total from authoritative state", usage.used == 1 and usage.total == 10)
 		t.ok("the profile has NO parallel trophyWall structure (the wall is a view, not a store)", (p :: any).trophyWall == nil and (p.lodge :: any).trophyWall == nil)
+	end
+
+	t.section("TrophyHall — the projection exposes the wall as a read-only server-computed shadow")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		local idGen = Fakes.newIdGenerator()
+		local a = mintTrophy(p, idGen, "bayou_white_alligator", 1)
+		assert(ArtifactStore.transition(p, a.artifactId, "HELD", "DISPLAYED").ok)
+		local proj = Replication.buildProjection(p, Catalog)
+		t.ok("the projection carries the trophyHall view", proj.trophyHall ~= nil)
+		t.eq("one trophy on the projected wall", #proj.trophyHall.displayed, 1)
+		t.ok("slot usage is projected (used 1 / total 8)", proj.trophyHall.slotsUsed == 1 and proj.trophyHall.slotsTotal == 8)
+		-- it is a copy, not a handle: mutating the shadow changes nothing server-side
+		proj.trophyHall.displayed[1].disposition = "HELD"
+		t.ok("the projected wall is a deep copy (server state untouched)", p.artifacts[a.artifactId].disposition == "DISPLAYED")
 	end
 end
