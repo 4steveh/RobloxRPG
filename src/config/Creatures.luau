@@ -456,6 +456,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 160, max = 190 },
 		spawnLocation = "tundra and snowfields",
+		spawnZones = { "tundra_flats" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		escapeWindowSeconds = 3.0, -- TimeToFlee (LOC_04 §3)
 	}),
 	creature({
 		id = "alaska_sitka_deer",
@@ -472,6 +474,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 160, max = 190 },
 		spawnLocation = "spruce edges and lower slopes",
+		spawnZones = { "spruce_riverbottom" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		escapeWindowSeconds = 3.5, -- TimeToFlee (LOC_04 §3)
 	}),
 	creature({
 		id = "alaska_caribou",
@@ -489,6 +493,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 260, max = 300 },
 		spawnLocation = "the Tundra Flats",
+		spawnZones = { "tundra_flats" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		escapeWindowSeconds = 4.0, -- TimeToFlee (LOC_04 §3)
 		-- Milestone reachability FALLBACK (RD-A), not the canonical milestone — see Bull Moose.
 	}),
 	creature({
@@ -506,6 +512,8 @@ local rows: { Creature } = {
 		coop = Co.soloTopGear,
 		cash = { min = 260, max = 300 },
 		spawnLocation = "spruce edges and river-bottoms of the Tundra Flats",
+		spawnZones = { "spruce_riverbottom", "tundra_flats" }, -- Alaska shell zones (Task 2.4, LOC_04 §3)
+		attackIntervalSeconds = 3.0, -- survival-bounded DPS interval (LOC_04 §3)
 		isMilestoneTarget = true, -- Alaska hunting conquest milestone (T4-soloable, RD-A)
 	}),
 	creature({
@@ -523,6 +531,8 @@ local rows: { Creature } = {
 		coop = Co.party,
 		cash = { min = 260, max = 300 },
 		spawnLocation = "Salmon Falls",
+		spawnZones = { "salmon_falls" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		attackIntervalSeconds = 2.5, -- survival-bounded DPS interval (LOC_04 §3)
 	}),
 	creature({
 		id = "alaska_cross_fox",
@@ -540,6 +550,8 @@ local rows: { Creature } = {
 		conditions = { weather = "clear cold", season = "winter coat" },
 		rare = rareFields(300, "the silver-black fox against the snow — this tier's first trade chip"),
 		spawnLocation = "tundra edges",
+		spawnZones = { "tundra_flats" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		escapeWindowSeconds = 3.5, -- TimeToFlee (LOC_04 §3)
 	}),
 	creature({
 		id = "alaska_spirit_moose",
@@ -558,6 +570,8 @@ local rows: { Creature } = {
 		conditions = { time = "dawn/dusk", season = "autumn rut" },
 		rare = rareFields(1500, "the ghost-white bull stepping out of dark spruce at first light"),
 		spawnLocation = "Tundra Flats spruce edges",
+		spawnZones = { "spruce_riverbottom" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		escapeWindowSeconds = 4.0, -- TimeToFlee; spirit_moose is flees, NOT aggressive (LOC_04 §3)
 	}),
 	creature({
 		id = "alaska_glacier_grizzly",
@@ -576,6 +590,8 @@ local rows: { Creature } = {
 		conditions = { time = "low light", season = "salmon run", event = "Salmon Run" },
 		rare = rareFields(2500, "the pale-gold giant rearing at the falls in the run — the marquee co-op kill"),
 		spawnLocation = "Salmon Falls",
+		spawnZones = { "salmon_falls" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)
+		attackIntervalSeconds = 2.5, -- shares the grizzly apex profile (LOC_04 §3)
 	}),
 }
 

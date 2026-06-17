@@ -228,6 +228,27 @@ return function(t: Harness.T)
 		end)())
 	end
 
+	-- ── Task 2.1 (Step 10): Alaska KillWindow inputs + spawnZones ──
+	t.section("Combat — Alaska KillWindow inputs + spawnZones (LOC_04 §3)")
+	do
+		local moose    = Catalog.creatures.alaska_bull_moose
+		local grizzly  = Catalog.creatures.alaska_grizzly_bear
+		local glacier  = Catalog.creatures.alaska_glacier_grizzly
+		local hare     = Catalog.creatures.alaska_arctic_hare
+		local spirit   = Catalog.creatures.alaska_spirit_moose
+		t.ok("bull moose attackInterval = 3.0 s (LOC_04 §3)", moose.attackIntervalSeconds == 3.0)
+		t.ok("grizzly attackInterval = 2.5 s", grizzly.attackIntervalSeconds == 2.5)
+		t.ok("glacier_grizzly attackInterval = 2.5 s", glacier.attackIntervalSeconds == 2.5)
+		t.ok("arctic_hare carries an escape window + spawnZones", hare.escapeWindowSeconds ~= nil and hare.spawnZones ~= nil)
+		t.ok("spirit_moose carries an ESCAPE window (it is flees, not aggressive)", spirit.escapeWindowSeconds ~= nil and spirit.attackIntervalSeconds == nil)
+		t.ok("every non-ambiance Alaska creature carries non-empty spawnZones", (function()
+			for _, c in Catalog.creatures do
+				if c.destinationId == "alaska" and not c.ambianceOnly and (c.spawnZones == nil or #(c.spawnZones :: any) == 0) then return false end
+			end
+			return true
+		end)())
+	end
+
 	-- ── Task 0.2 (Step 10): co-op-soloable helper (§6 party clears co-op-scaled Health; tank survives) ──
 	t.section("Combat — co-op-soloable: party clears the apex that is a solo wall at T4")
 	do
