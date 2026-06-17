@@ -171,4 +171,40 @@ return function(t: Harness.T)
 		mis.health = 9999 -- absurd HP: no MVL weapon kills it inside the 5 s escape window
 		t.ok("a 9999-HP 'rabbit' no longer derives min-weapon-tier 1 (so a mis-stat fails the load assertion)", Combat.deriveMinTiers(Catalog, mis).minWeaponTier ~= 1)
 	end
+
+	t.section("Combat — survival window uses (hitsToDown−1)·interval + the apex behaves-as-T+1 offset")
+	do
+		-- Boar (mid, NOT apex): H88 dmg40 interval3.0. At T2 armor (parity, DR 0.50): taken 20,
+		-- hitsToDown ceil(100/20)=5, window (5−1)·3 = 12 s. Killable at T2 (4 shots·1.4 = 5.6 ≤ 12).
+		local boar = table.clone(Catalog.creatures.appalachia_wild_boar)
+		boar.tier = 2
+		boar.health = 88
+		boar.damageToPlayer = 40
+		boar.attackIntervalSeconds = 3.0
+		boar.behavior = "aggressive"
+		boar.coop = "soloTopGear"
+		t.ok("boar is NOT flagged apex (coop != party)", Combat.isApex(boar) == false)
+		t.ok("boar soloable at authored T2 weapon+armor (tense, safe)", Combat.soloableAt(Catalog, boar, 2, 2))
+		-- Cougar (apex, behaves-as-T3): H100 dmg76 interval2.7. NOT soloable at T2, soloable at T3.
+		local cougar = table.clone(Catalog.creatures.appalachia_mountain_lion)
+		cougar.tier = 2
+		cougar.health = 100
+		cougar.damageToPlayer = 76
+		cougar.attackIntervalSeconds = 2.7
+		cougar.behavior = "aggressive"
+		cougar.coop = "party"
+		t.ok("cougar IS flagged apex (coop == party)", Combat.isApex(cougar))
+		t.ok("cougar NOT soloable at T2 (window 5.4 s, 4 shots·1.4 = 5.6 > window)", Combat.soloableAt(Catalog, cougar, 2, 2) == false)
+		t.ok("cougar soloable at T3 (the apex needs T+1 solo)", Combat.soloableAt(Catalog, cougar, 3, 3))
+		-- Grizzly (apex, top tier): T4 H100 dmg85 interval2.5. NOT soloable at T4, soloable at T5.
+		local grizzly = table.clone(Catalog.creatures.appalachia_wild_boar)
+		grizzly.tier = 4
+		grizzly.health = 100
+		grizzly.damageToPlayer = 85
+		grizzly.attackIntervalSeconds = 2.5
+		grizzly.behavior = "aggressive"
+		grizzly.coop = "party"
+		t.ok("grizzly NOT soloable at T4 (apex effTier=5, window 2.5 s, 3 shots·1.25 = 3.75 > 2.5)", Combat.soloableAt(Catalog, grizzly, 4, 4) == false)
+		t.ok("grizzly soloable at T5 (window 5.0 s, 2 shots·1.21 = 2.42 ≤ 5.0)", Combat.soloableAt(Catalog, grizzly, 5, 5))
+	end
 end

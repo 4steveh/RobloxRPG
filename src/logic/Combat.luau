@@ -201,22 +201,48 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 local MAX_DERIVE_TIER = 10 -- iteration bound (MVL is T1–4; headroom for re-statting/later tiers)
 
+-- An apex is tuned to hit AS IF one tier higher (§4). The design marker is the co-op recommendation:
+-- a `party` creature is the tier's apex (cougar/catamount/grizzly/glacier). NOT a hardcoded id list.
+function M.isApex(creature: Creature): boolean
+	return creature.coop == "party"
+end
+
 local function isEscapeBounded(behavior: string): boolean
 	return behavior == "passive" or behavior == "flees"
 end
 
 -- The survival-bounded KillWindow at a given armor tier (lethal, aggressive/pack). Non-lethal / no-damage
--- creatures have no survival clock → unbounded.
+-- creatures have no survival clock → unbounded. DR uses the creature's EFFECTIVE tier (apex = +1).
+-- The window is (hitsToDown − 1) · interval: the player absorbs (hits−1) intervals before the last hit
+-- downs them.
 local function survivalWindow(config: Config, creature: Creature, armorTier: number): number
 	local interval = creature.attackIntervalSeconds
 	if interval == nil or interval <= 0 then
 		return math.huge
 	end
-	local taken = M.damageTaken(creature.damageToPlayer, M.dr(config, armorTier, creature.tier))
+	local effTier = creature.tier + (if M.isApex(creature) then 1 else 0)
+	local taken = M.damageTaken(creature.damageToPlayer, M.dr(config, armorTier, effTier))
 	if taken <= 0 then
 		return math.huge
 	end
-	return config.tuning.combat.playerBaseHP / (taken / interval)
+	local hitsToDown = math.ceil(config.tuning.combat.playerBaseHP / taken)
+	return math.max(hitsToDown - 1, 0) * interval
+end
+
+-- Soloability at a specific (weaponTier, armorTier) — the §3 inequality with the chosen gear. Escape-
+-- bounded creatures use their TimeToFlee; survival-bounded use the (hits−1) window above.
+function M.soloableAt(config: Config, creature: Creature, weaponTier: number, armorTier: number): boolean
+	local escape = creature.behavior == "passive" or creature.behavior == "flees"
+	local window: number
+	if escape then
+		window = creature.escapeWindowSeconds or math.huge
+	elseif M.isNonLethal(config, creature) then
+		window = math.huge
+	else
+		window = survivalWindow(config, creature, armorTier)
+	end
+	local stk = M.shotsToKill(creature.health, M.weaponDamage(config, weaponTier, "mid"), config.tuning.skill.Z_expected, config.tuning.weapon.rangeFalloffInBand)
+	return M.isKillable(stk, window, M.cycleTime(config, weaponTier))
 end
 
 export type MinTiers = { minWeaponTier: number, minArmorTier: number }
