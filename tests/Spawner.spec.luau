@@ -147,4 +147,14 @@ return function(t: Harness.T)
 		t.ok("hunting ceiling is slack over the modeled ~45/hr (anti-farming)", apHunting ~= nil and apHunting.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 2, Enums.Loop.Hunting))
 		t.ok("fishing ceiling is slack over the modeled ~38/hr", apFishing ~= nil and apFishing.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 2, Enums.Loop.Fishing))
 	end
+
+	t.section("Spawner — Alaska spawn config (LOC_04 §8.4)")
+	do
+		local ak = Spawning.byDestination.alaska
+		t.ok("Alaska hunting + fishing LoopSpawn present", ak ~= nil and ak.hunting ~= nil and ak.fishing ~= nil)
+		local akHunting = ak and ak.hunting
+		local akFishing = ak and ak.fishing
+		t.ok("hunting ceiling is slack over the modeled ~28/hr (anti-farming)", akHunting ~= nil and akHunting.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 4, Enums.Loop.Hunting))
+		t.ok("fishing ceiling is slack over the modeled ~22/hr", akFishing ~= nil and akFishing.ceilingPerHour > Spawner.modeledRatePerHour(Catalog, 4, Enums.Loop.Fishing))
+	end
 end

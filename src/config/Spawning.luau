@@ -63,9 +63,30 @@ local appalachiaFishing: LoopSpawn = {
 	},
 }
 
+-- Alaska hunting (LOC_04 §8.4): modeled ~28/hr at T4; ceiling 30 (slack — anti-farming). Interior, Boat-free.
+local alaskaHunting: LoopSpawn = {
+	ceilingPerHour = 30,
+	areas = {
+		tundra_flats = { maxConcurrentTargets = 4, respawnIntervalSeconds = 40 },        -- hare singles + caribou herds
+		spruce_riverbottom = { maxConcurrentTargets = 3, respawnIntervalSeconds = 60 },  -- sitka deer + bull moose
+		the_crags = { maxConcurrentTargets = 2, respawnIntervalSeconds = 120 },          -- Dall sheep
+		salmon_falls = { maxConcurrentTargets = 1, respawnIntervalSeconds = 300 },       -- grizzly (1 per Destination)
+	},
+}
+-- Alaska fishing (LOC_04 §8.4): modeled ~22/hr at T4; ceiling 24 (slack). Interior shore + coastal (Boat).
+local alaskaFishing: LoopSpawn = {
+	ceilingPerHour = 24,
+	areas = {
+		interior_river = { maxConcurrentTargets = 4, respawnIntervalSeconds = 45 }, -- grayling/dolly/sockeye (shore)
+		coastal_inlet = { maxConcurrentTargets = 4, respawnIntervalSeconds = 55 },  -- rockfish/lingcod/king (Boat)
+		open_gulf = { maxConcurrentTargets = 3, respawnIntervalSeconds = 60 },      -- halibut (Boat, apex)
+	},
+}
+
 local byDestination: { [Ids.DestinationId]: DestinationSpawn } = {
 	[D.Bayou] = { hunting = bayouHunting, fishing = bayouFishing },
 	[D.Appalachia] = { hunting = appalachiaHunting, fishing = appalachiaFishing },
+	[D.Alaska] = { hunting = alaskaHunting, fishing = alaskaFishing },
 }
 Spawning.byDestination = byDestination
 
