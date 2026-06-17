@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–9)
+# Wild World — Build (Steps 1–10)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -58,6 +58,17 @@ note per step.
   catch-all; builds the World-Map pin + Passport surface; and flips the onboarding `WORLD_MAP` beat from
   pass-through to a real reveal. **The map UI, the `TeleportService` execution, and the Passport-readout feel
   are Studio** — split honestly below.
+- **Step 10 — Appalachia & Alaska.** The rosters (creatures, fish, rares, milestones) were **already
+  authored in Steps 4/5** — Step 10 **verified and extended** them; it did not re-author the stat blocks.
+  What was added: the KillWindow inputs (`escapeWindowSeconds` / `attackIntervalSeconds`) deferred from
+  Step 4 for the non-Bayou tiers; structured `spawnZones` on every non-ambiance Appalachia/Alaska target;
+  Appalachia/Alaska shell zone data + spawn config (LOC §8.4 ceilings/caps); a re-skin behavior-template-
+  reuse check; a `Fishing.requiresBoat` coastal/interior marker (data only — enforcement is Step 11); and
+  the **cross-tier difficulty rigor** as the headline headless deliverable. The rigor discharges the Step-4
+  owed T2→T4 check: strict `derived==authored` was proven unachievable cross-tier, replaced by the
+  spec-faithful floor/ceiling semantics (sufficiency + role band + co-op-only wall + co-op-soluble), with
+  two derivation defects fixed. Two genuine stat defects were caught and corrected. **The world geometry,
+  fast-travel execution, and co-op feel are Studio** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -91,10 +102,12 @@ Toolchain on `PATH`: **`luau`** (run tests), **`luau-analyze`** (`--!strict`, co
 src/
   types/   Ids · Enums · Schema   (string-id registries; the closed enums; all record TYPES + PlayerData + Config)
   config/  Tuning (EQUIPMENT_MASTER §1 set + §-persistence params + §combat Step-4 knobs) · Equipment ·
-           Creatures (+ Step-4 spawnZones/KillWindow inputs) · Fish · Destinations (gate DAG) · RankPerks ·
-           Validation (build-time assertions, incl. Step-4 authored==derived min-tiers) · Catalog (self-validates)
-           · Shells (Step 3 — the Bayou shell; self-validates + Step-4 placement check)
-           · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing)
+           Creatures (+ Step-4 spawnZones/KillWindow inputs; +Step-10 Appalachia/Alaska KillWindow inputs + spawnZones) ·
+           Fish (+ Step-10 Appalachia/Alaska spawnZones + requiresBoat marker) · Destinations (gate DAG) · RankPerks ·
+           Validation (build-time assertions, incl. Step-4 authored==derived min-tiers for Bayou;
+             +Step-10 cross-tier floor/ceiling semantics: sufficiency, role band, co-op-only wall, co-op-soluble) ·
+           Catalog (self-validates) · Shells (Step 3 — the Bayou shell; +Step-10 Appalachia/Alaska shells; self-validates + placement check)
+           · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing; +Step-10 Appalachia/Alaska caps)
            · Decor (Step 8 — the starter MVL decor/theme/framing catalog; Cash-priced, balance-free, tradeable=false; self-validates)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
@@ -153,7 +166,8 @@ tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Val
          Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler;
          Step 7: Onboarding/Daily/ClaimDailyHandler;
          Step 8: Lodge/TrophyHall/SalvageHandler/DisplayHandler/LodgeShopHandler;
-         Step 9: Progression/Travel/WorldMapHandler) · negative/ (MUST fail analysis)
+         Step 9: Progression/Travel/WorldMapHandler;
+         Step 10: CrossTier assertions — sufficiency/role-band/co-op-wall/co-op-soluble for Appalachia+Alaska) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -326,10 +340,10 @@ inputs are left nil, owed at Step 10). Added the **Nutria** floor creature (LOC 
 - **Rank-XP magnitudes** are illustrative (the *weighting* by difficulty/rarity is the design, SYS_progression §4).
 - **First-spawn cap bypass** (the funnel's guaranteed first kill) → Step 7. **Rare event scheduling** → Step 13.
 
-**Owed, NOT faked — the MVL T2→T4 difficulty check** (SYS_combat build notes: Alaska clears on T4 gear;
-caribou/moose milestone soloable, grizzly apex co-op, RD-A) needs Appalachia + Alaska creatures'
-survival-bounded inputs and is therefore **owed at Step 10**, not here. The Bayou is the only Destination
-that exists; only the **T1 floor bands** are validated (no premature cross-tier checks).
+~~**Owed at Step 10**: the T2→T4 difficulty check~~ — **DISCHARGED (Step 10)**. See the Step 10 section for
+the full story: strict `derived==authored` was unachievable cross-tier; the spec-faithful floor/ceiling
+semantics (sufficiency + role band + co-op-wall + co-op-soluble) were asserted instead, with two derivation
+defects fixed and two stat defects corrected.
 
 ## Step 5 — the fishing system (extend, don't fork; the bar is split, honestly)
 
@@ -386,9 +400,11 @@ the 6 Bayou fish are placed in `channel_banks`/`catfish_hole`.
 for the Step-5 playtest); **premium bait** (paid `TimeToBite` accelerator) → Step 14 (stub; assert
 rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible, no Boat gating built).
 
-**Owed, NOT faked → Step 10:** Alaska's king-salmon milestone + the coastal Boat gate + the halibut apex,
-and the dual-loop **reconciliation/drift** check (fishing Cash/hr vs hunting Cash/hr) — they need the
-higher-tier rosters and live data. Step 5 provides fishing's *rate*; it does **not** prove balance.
+~~**Owed at Step 10**: Alaska's king-salmon milestone + the coastal Boat gate + the halibut apex, and the
+dual-loop reconciliation/drift check~~ — **DISCHARGED (Step 10)**. King Salmon is confirmed coastal/Boat-
+gated (`requiresBoat=true`; enforcement → Step 11). The halibut `typicalWeightKg.max` was corrected 180→80
+for co-op-solubility. Economy reconciliation (`routineHourSum` = `Income(T)` both loops) holds for
+Appalachia and Alaska.
 
 ## Step 6 — economy & shops (the convergence; the bar is split, honestly)
 
@@ -571,6 +587,126 @@ auto-sell is built) → **Step 14** (decor here is Cash-priced); the ongoing dec
 companions" surface (rare dogs/mounts beyond the Trophy Hall) → deferred (LiveOps / a future Kennel
 deep-dive — do **not** overload the Trophy Hall). **Displayed trophies grant no non-cosmetic benefit, ever.**
 
+## Step 10 — Appalachia & Alaska (the cross-tier difficulty check; the bar is split, honestly)
+
+### What was built vs what was already there
+
+The creature, fish, rare, and milestone **stat blocks were authored in Steps 4 and 5** (minWeaponTier /
+minArmorTier / minRodTier / minReelTier, fightDifficulty, weights, spawnWeights, behaviorTemplate). Step
+10's job was to **verify and extend** them, not re-author them. What Step 10 added or completed:
+
+- **KillWindow inputs** (the Step-4 survival-bounded owed items): `escapeWindowSeconds` (flee timer for
+  fleers) and `attackIntervalSeconds` (DPS cycle for aggressors), sourced from LOC §3, on every non-ambiance
+  Appalachia/Alaska creature (the Bayou already had them from Step 4).
+- **Structured `spawnZones`** on every non-ambiance Appalachia/Alaska target (hunting + fishing), so
+  `Spawner.validatePlacement` can verify every target has a legal zone.
+- **Appalachia/Alaska shell zone data + spawn config** — per-destination spawn zones + throughput ceilings
+  + anti-farming caps authored from LOC §8.4; wired into the loop-agnostic Spawner.
+- **Re-skin behavior-template-reuse check** — a re-skin species must reuse its origin's behavior template,
+  or be a recognizably calmer find/flee variant (accommodating the Spirit Moose as a passive find).
+- **`Fishing.requiresBoat` marker** — a per-species boolean distinguishing coastal (Boat-gated) from
+  interior water fishing. King Salmon is coastal/`requiresBoat=true`; implementation enforcement → Step 11.
+
+### The cross-tier difficulty rigor — discharged honestly
+
+**The headline headless deliverable.** Step 4 owed the T2→T4 difficulty check (SYS_combat build notes:
+Alaska clears on T4 gear; caribou/moose milestone soloable, grizzly apex co-op). It was owed here because
+the check needs the KillWindow inputs and higher-tier rosters — both now present.
+
+**Why strict `derived == authored` is unachievable cross-tier (and why the Bayou was fine).**
+`Combat.deriveMinTiers` computes the *physical minimum* gear that satisfies the kill inequality
+(`ShotsToKill ≤ KillWindow / CycleTime`). The catalog authors the *design role-anchor*: floor creature at
+T−1, mid creature at T, apex at T+1 (SYS_progression §5 / SYS_combat §3). At the Bayou (all T1) these
+happen to coincide — the derivation yields T1 and the authored minimum is T1 — so the Bayou's strict
+equality holds. Cross-tier they diverge: a mid-tier T3 creature might derive T2 (the physical minimum is
+T2 but the design says it should feel like T3-territory). For fishing there is no input analogous to
+KillWindow — there is no fight-time-to-catch formula input that would let the derivation cross-tier-assert.
+The strict equality is a Bayou-tier-1 coincidence, not a universal law. **User-confirmed decision** (Step
+10): replace the strict assertion with the spec's floor/ceiling SEMANTICS.
+
+**The four assertions that replaced it:**
+1. **Sufficiency** — every non-ambiance, non-rare target is killable/landable by a player at its authored
+   minimum gear tier (the inequality strictly holds at the authored tier).
+2. **Role band** — every authored minimum tier falls in `[T−1, T+1]` where T is the destination tier
+   (floor creature at most T−1, apex at most T+1 — the progression §5 promise).
+3. **Co-op-only WALL** — an apex creature with `minWeaponTier > 4` (or fishing `max(rod,reel) > 4`) is
+   provably not soloable at the max MVL tier (T4 at launch); it requires a party — the incentive, not a
+   hard gameplay lock.
+4. **Co-op-soluble** — the co-op-only apex IS conquerable by a `partyCap`-size party using the real
+   `coopEffectiveHealth` / `coopNetDrain` math. (Grizzly Bear and Giant Halibut pass; neither is a
+   stationary wall, just a party puzzle.)
+The **Bayou keeps strict `derived == authored`** (it held at T1 and is unchanged).
+
+**Two derivation defects fixed to make the model match SYS_combat §3 worked examples:**
+1. **Survival window** — was `hitsToDown · interval`, now `(hitsToDown − 1) · interval`. SYS_combat §3
+   defines the escape window as the time between the first attack and the killing blow (the creature has
+   landed `hitsToDown−1` hits when the window expires on the last hit). The old formula over-counted by
+   one interval, making every survival-bounded creature appear *easier* to solo than the spec intended.
+2. **Apex co-op offset** — apex creatures (marker `coop == "party"`) receive a "behaves-as-T+1" DR
+   offset (SYS_combat §4: an apex creature's damage reduction is computed as if it is one tier above the
+   attacker's, beyond the normal DR formula). Without this offset the grizzly derives as T4-soloable
+   (matching the wrong answer). With both fixes the derivation reproduces every SYS_combat §3 worked
+   soloability example: boar soloable at T2; cougar not soloable at T2 but soloable at T3; grizzly not
+   soloable at T4 but co-op-soluble.
+
+**The two stat defects the rigor caught and fixed:**
+1. **`appalachia_northern_pike` `minRodTier` 2→3.** At T2 rod (entry rig), `LandWindow ≈ 5.2 s` vs
+   `FightTime ≈ 20.4 s` — the fish snaps. LOC_02 §3 itself says "comfortably a T3 rod target." The pike
+   is rod-bound; `minReelTier` stays 2 (the reel is not the bottleneck).
+2. **`alaska_giant_halibut` `typicalWeightKg.max` 180→80.** The Step-5
+   `representativeWeight = typicalWeightKg.max` rule made the authored 180 a hard wall even co-op:
+   `FightTime 38.55 > LandWindow 37.2` — no party could land it. 80 kg matches EQUIPMENT_MASTER §4.4's
+   worked stamina example (441 j); at 80 kg a solo player throws (FightTime 45.6 > LandWindow 37.2) but
+   a `partyCap` party lands it (FightTime 18.3 ≤ LandWindow 37.2) — correctly co-op-soluble.
+   `recordWeightKg = 230` and `minReelTier = 5` are intact (the stat block's rare-record and reel
+   requirement are unaffected).
+
+**The co-op-only-apex / soloable-milestone split:**
+- **Bull Moose** (hunting milestone, Appalachia) and **King Salmon** (fishing milestone, Alaska): T4-
+  soloable. A solo player can always conquer Appalachia and Alaska — this is the intended progression.
+- **Grizzly Bear** (hunting apex, Alaska) and **Giant Halibut** (fishing apex, Alaska): CO-OP-ONLY (need T5
+  gear that does not exist at MVL → a party is required). These are the party-incentive creatures, never a
+  gate (you can clear Alaska solo; the apex is a bonus challenge).
+- The co-op marker is tier-keyed (`minWeaponTier > 4` / `max(rod,reel) > 4`) — not a hardcoded id list.
+
+**Economy reconciliation stays green:** `routineHourSum` for Appalachia = 1700 and Alaska = 4913 (both
+loops) hold in the Economy spec at 892 assertions.
+
+**Headless-proven (the complete list):**
+- All four cross-tier assertions pass for every non-ambiance, non-rare Appalachia/Alaska species.
+- The two derivation defect fixes reproduce SYS_combat §3 worked examples exactly.
+- The pike and halibut stat corrections make their inequalities satisfy sufficiency.
+- `Spawner.validatePlacement` covers all new non-ambiance targets (structured `spawnZones` present).
+- Re-skin behavior-template-reuse check passes for all Step-10 re-skins (Spirit Moose ≡ passive find).
+- The Bayou strict `derived==authored` is unchanged and green.
+- Economy reconciliation: `Income(2)=1700` / `Income(4)=4913` both loops, both new destinations.
+- Steps 1–9 tests are entirely unchanged (892 total assertions, 0 failed).
+
+**Studio / telemetry — NOT headless (all unchecked):**
+- [ ] Both Appalachia and Alaska worlds **render within mobile budget** (the geometry is built additively
+      from the LOC shells at spatial offsets; frame rate on a mid phone is the bar).
+- [ ] **Fast-travel executes** to the right arrival anchor (`ArrivalService.resolveDestinationArrival`
+      with the within-place `PivotTo` path) — this closes the Step-9 `TODO(step-10)` for execution beyond
+      Lodge/Bayou; verify the character lands at the correct landmark, not the Bayou.
+- [ ] **Alaska interior vs coastal read as distinct areas** — the coastal sub-zone (King Salmon, Giant
+      Halibut) is visually walled off (Step 11 enforces the Boat gate; here only the data marker exists).
+- [ ] The **co-op apex is fightable by a party and visibly infeasible solo** — the Grizzly and Halibut
+      should feel appropriately intimidating without being a confusing hard block.
+- [ ] **Telemetry hooks populate:** fast-travel usage is wired; per-destination time-to-conquer, co-op-apex
+      attempt/success rate, the T2→T4 drop-off funnel, and per-destination income-vs-band are `TODO`'d in
+      the code (they need conquest/co-op events not yet fired in Studio).
+
+**Deferrals from Step 10 (named, not silently baked):**
+- **Boat item + coastal sub-area enforcement** (Boat-gating the King Salmon + Giant Halibut zones) → **Step 11**.
+- **Dogs** (Pointer for Appalachia upland, Husky for Alaska — LOC §6.2) → **Step 11** (priced by the
+  economy curve; the Kennel fixture is placed in the Lodge).
+- **Rockies (T3 destination)** → **post-launch** (the gate DAG already includes it; the LOC/roster are
+  future content).
+- **Full multi-world spawner gameplay generalization** (cross-place TeleportService, concurrent-world
+  spawner lifecycle, server-list-aware pop management) → **iterative Studio work**.
+- **Conquest/co-op telemetry events** (per-destination time-to-conquer, apex attempt/success) → **Studio
+  iteration** (the hooks are `TODO`'d; the economy/playtime data shape the events).
+
 ## Step 9 — World Map, fast-travel & gating (the bar is split, honestly)
 
 Two properties a wrong build violates: **the unlocked set is persisted truth (not a live derivation)** —
@@ -648,11 +784,18 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
 | The funnel first-spawn / first-bite guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
 | ~~The real **`Payout`** formula + the idle amount + gear sinks~~ — **DONE (Step 6)**; remaining: the **shop UI** (Studio) + the **Cash revive-in-place price** (a minor sink, not yet wired) | Studio / later |
 | The **rewarded-ad revive** | Step 14 |
-| **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D); the MVL **T2→T4 difficulty check** + the **dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters + king-salmon/halibut) | post-MVL / Step 10 |
+| **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D) | post-MVL |
+| ~~MVL **T2→T4 difficulty check**~~ — **DONE (Step 10)**: cross-tier floor/ceiling semantics (sufficiency + role band + co-op-wall + co-op-soluble) replace strict `derived==authored` (proven unachievable cross-tier; user-confirmed). Two derivation defects fixed; two stat defects caught and corrected. | ✅ Step 10 |
+| ~~**dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters)~~ — **DONE (Step 6/10)**: `routineHourSum` = `Income(T)` both loops, all destinations (Bayou/Appalachia/Alaska) | ✅ Step 6 + Step 10 |
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
 | ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; remaining: trading's escrow/swap | Step 12 |
 | ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
-| ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; remaining: the map UI + the `TeleportService` execution beyond Lodge/Bayou | Step 10 |
+| ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; ~~the `TeleportService` execution beyond Lodge/Bayou~~ — **fast-travel execution (within-place PivotTo via `ArrivalService.resolveDestinationArrival`) DONE (Step 10, Studio playtest pending)**; remaining: the map UI | Studio / later |
+| **Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones — data marker `requiresBoat` done in Step 10; runtime enforcement not built) | Step 11 |
+| **Dogs** (Pointer for Appalachia, Husky for Alaska — LOC §6.2; Kennel fixture placed in Lodge) | Step 11 |
+| **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content | post-launch |
+| Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
+| Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |
 | Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback (call CAS `HELD↔ESCROWED` + Transaction + paired ledger entries) | Step 12 |
 | Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`) | Step 14 |
 | `TODO(open)`: MemoryStore cross-server lock brokering · `TODO(ops)`: `auditLogDestination` choice, point-in-time rollback operation | ops/later |
@@ -680,6 +823,33 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
    last-location are viable alternatives). Also (Step 6): routine `Payout` is **normalized per loop** by
    `AvgRoutineMultiplier(dest, loop)` (RD5) so each loop's routine hour sums to `Income(T)` by construction
    — the robust fix vs the flat `Income(T)/rate` baseline, which made dual-loop parity fragile.
+9. **Cross-tier min-tier assertion semantics — strict equality unachievable; spec-faithful floor/ceiling
+   semantics adopted (Step 10; user-confirmed).** `Combat.deriveMinTiers` computes the *physical minimum*
+   gear; the catalog authors the *design role-anchor* (floor=T−1, mid=T, apex=T+1 per SYS_progression §5 /
+   SYS_combat §3). These coincide at the Bayou (all T1) but diverge cross-tier. For fishing there is no
+   KillWindow-analog from which to derive a tier cross-tier. The resolution: the Bayou keeps strict
+   `derived==authored`; Appalachia/Alaska assert the spec's four semantic properties (sufficiency + role
+   band + co-op-only wall + co-op-soluble) instead. Two derivation defects fixed (survival-window
+   `(hitsToDown−1)·interval`; apex DR offset per SYS_combat §4) to reproduce the §3 worked examples.
+10. **King Salmon stays coastal and Boat-gated** (Step 10). The build prompt §D suggested placing King
+    Salmon as an interior (non-Boat) species. This contradicts LOC_04 §4 (King Salmon habitat is the
+    coastal estuary) and LOC_04 §7 (all estuary fishing requires Boat access). The spec wins: King Salmon
+    is marked `requiresBoat=true`; Boat enforcement → Step 11. The prompt §D claim is rejected.
+11. **Non-threat fleer `minArmorTier` 1→0** (Step 10). Flee-only species (rabbit, squirrel, Spirit Moose)
+    have `coop="none"` and pose no lethal threat. SYS_combat §3 defines `minArmorTier = 0` for non-lethal
+    encounters; authoring `1` was a copy-paste error from the template. Corrected to 0 at load; no player
+    impact (the non-lethal clamp already prevents damage regardless).
+12. **`appalachia_northern_pike` `minRodTier` 2→3** (Step 10). At rod tier 2, `LandWindow ≈ 5.2 s` but
+    `FightTime ≈ 20.4 s` — the fish snaps on any T2 rod (EQUIPMENT_MASTER §4.2 entry rig). The authored
+    value of 2 violated sufficiency. LOC_02 §3 describes the pike as "comfortably a T3 rod target."
+    `minReelTier` stays 2 (the reel is not the bottleneck). The fix restores sufficiency.
+13. **`alaska_giant_halibut` `typicalWeightKg.max` 180→80** (Step 10). The Step-5 rule
+    `representativeWeight = typicalWeightKg.max` made the authored 180 kg a hard wall even for a partyCap
+    party (`FightTime 38.55 > LandWindow 37.2`). 80 kg matches EQUIPMENT_MASTER §4.4's stamina example
+    (441 j); at 80 kg a solo player correctly throws (FightTime 45.6 > LandWindow 37.2) and a partyCap
+    party lands it (FightTime 18.3 ≤ LandWindow 37.2). `recordWeightKg = 230` and `minReelTier = 5` are
+    intact (the record weight and reel requirement are part of the authored design, not the representative
+    fight weight).
 
 ## Definition of Done — status
 
@@ -760,7 +930,20 @@ Rockies re-thread (data-only DAG re-point, no code change). ⌂ (Studio, uncheck
 `TeleportService` execution, the Passport readout, the onboarding reveal feel, and the progression telemetry.
 Step 9 **calls** `evaluateGate`/`EffectiveTier`/the teleport scaffold — it rebuilds none of them.
 
-**706 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+**Step 10:** ✅ (headless) KillWindow inputs (`escapeWindowSeconds`/`attackIntervalSeconds`) added for all
+non-ambiance Appalachia/Alaska creatures; structured `spawnZones` on every non-ambiance Appalachia/Alaska
+target; Appalachia/Alaska shell zone data + spawn config (LOC §8.4 ceilings/caps); re-skin behavior-template-
+reuse check; `Fishing.requiresBoat` coastal/interior marker; **cross-tier difficulty rigor**: the four
+floor/ceiling assertions (sufficiency + role band + co-op-only wall + co-op-soluble) replace the Bayou's
+strict `derived==authored` (unachievable cross-tier; user-confirmed) — two derivation defects fixed
+(`(hitsToDown−1)·interval` survival window; apex DR offset per SYS_combat §4); two stat defects caught and
+corrected (pike `minRodTier` 2→3; halibut `typicalWeightKg.max` 180→80); economy reconciliation stays green
+for both new destinations (`routineHourSum` = `Income(T)` both loops). ⌂ (Studio, unchecked above) both
+worlds render within mobile budget; fast-travel executes to the right anchor (closes `TODO(step-10)`);
+Alaska coastal vs interior read distinct; co-op apex fightable-by-party/infeasible-solo; telemetry hooks
+populate. Step 10 **calls** the existing KillWindow/Spawner/Shell/Economy machinery — it rebuilds none.
+
+**892 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
 place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
