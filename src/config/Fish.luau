@@ -401,7 +401,12 @@ local rows: { Fish } = {
 		name = "Giant Halibut (the Barn Door)",
 		tier = 4,
 		rarity = Ra.Uncommon, -- coastal apex; co-op-only at MVL (no T5 reel); pays Uncommon salvage
-		typicalWeightKg = { min = 70, max = 180 },
+		-- max=80 (not 180): the Step-5 rule uses typicalWeightKg.max as representativeWeight for StaminaToLand.
+		-- max=180 overstated the fight (stamina 931, solo FightTime>LandWindow AND co-op FightTime>LandWindow → wall).
+		-- EQUIPMENT_MASTER §4.4 / LOC_04 §4 work the halibut at stamina 441 ≈ weight 80: solo FightTime 45.6 > 37.2
+		-- (throws) AND a partyCap=4 party FightTime 18.3 ≤ 37.2 (lands) → co-op-soluble, not a wall. (recordWeightKg
+		-- stays at 230 — the "barn door" legend is real; that's the all-time record, not the typical fight weight.)
+		typicalWeightKg = { min = 70, max = 80 },
 		recordWeightKg = 230,
 		fightDifficulty = 98,
 		minRodTier = 4,
@@ -432,6 +437,9 @@ local rows: { Fish } = {
 		destinationId = D.Alaska,
 		name = "Ghost of the Gulf (colossal Halibut)",
 		tier = 4,
+		-- Co-op-only by the same minReelTier=5 mechanism as the giant_halibut; its colossal weight (200–300 kg)
+		-- is intentional flavor (the 'white whale' legend) and is excluded from the co-op-soluble band because
+		-- it is Mythic (RARE+) — the band asserts only non-rare fish. Weight is NOT changed here.
 		rarity = Ra.Mythic, -- Alaska's 'white whale'; co-op-only (a Mythic that is also a wall)
 		typicalWeightKg = { min = 200, max = 300 },
 		recordWeightKg = 350,

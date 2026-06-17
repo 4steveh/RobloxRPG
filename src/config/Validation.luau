@@ -169,12 +169,13 @@ function V.validateConfig(config: Config)
 		end
 		-- Step-4/10 (SYS_combat §3): the min-weapon/min-armor-tier fields are DERIVED, not authored truth.
 		-- Bayou: assert derived==authored (T1 physical-min == design floor; holds for the non-lethal zone).
-		-- Appalachia: cross-tier equality is unachievable (deriveMinTiers computes the physical-minimum;
+		-- Appalachia/Alaska: cross-tier equality is unachievable (deriveMinTiers computes the physical-minimum;
 		--   the catalog authors the design role-anchor floor=T-1/mid=T/apex=T+1) — assert the spec's
-		--   floor/ceiling SEMANTICS instead: sufficiency (soloableAt authored tier) + role band [T-1,T+1].
-		-- Alaska: NO spawnZones yet (Phase 2 / Task 2.6) — gate kept to bayou|appalachia only.
+		--   floor/ceiling SEMANTICS instead: sufficiency (soloableAt authored tier, or wall+co-op proof for
+		--   co-op-only apex with minWeaponTierToKill > 4) + role band [T-1,T+1].
+		-- deep_sea/rockies: stub fixtures with no spawnZones — excluded from this gate.
 		if not c.ambianceOnly then
-			if c.destinationId == "bayou" or c.destinationId == "appalachia" then
+			if c.destinationId == "bayou" or c.destinationId == "appalachia" or c.destinationId == "alaska" then
 				assert(c.spawnZones ~= nil and #(c.spawnZones :: { string }) > 0, c.id .. ": a hunting target must carry structured spawnZones")
 			end
 			if c.destinationId == "bayou" then
@@ -182,8 +183,10 @@ function V.validateConfig(config: Config)
 				local derived = Combat.deriveMinTiers(config, c)
 				assert(derived.minWeaponTier == c.minWeaponTierToKill, string.format("%s: authored minWeaponTierToKill %d ≠ derived %d (§3 kill inequality)", c.id, c.minWeaponTierToKill, derived.minWeaponTier))
 				assert(derived.minArmorTier == c.minArmorTierToSurvive, string.format("%s: authored minArmorTierToSurvive %d ≠ derived %d (Bayou non-lethal → n/a=0)", c.id, c.minArmorTierToSurvive, derived.minArmorTier))
-			elseif c.destinationId == "appalachia" then
-				-- Cross-tier: strict equality unachievable; assert the spec's floor/ceiling semantics.
+			elseif c.destinationId == "appalachia" or c.destinationId == "alaska" then
+				-- Cross-tier (appalachia + alaska): strict equality unachievable; assert the spec's semantics.
+				-- Co-op-only apex (minWeaponTierToKill > 4): skip the soloableAt sufficiency check — the design
+				-- intent is that the creature is a WALL solo at T4 and co-op-soluble at T4 with a full party.
 				if c.minWeaponTierToKill <= 4 then
 					assert(Combat.soloableAt(config, c, c.minWeaponTierToKill, math.max(c.minArmorTierToSurvive, c.minWeaponTierToKill)), c.id .. ": must be soloable at its authored min-tier (floor/ceiling sufficiency, §3)")
 				end
@@ -195,10 +198,10 @@ function V.validateConfig(config: Config)
 		V.assertFish(f)
 		-- Step-5/10 (SYS_fishing §3): min rod/reel tiers are DERIVED. Bayou: assert derived==authored for
 		-- the ROUTINE band (rares excluded per RD5 — the Leviathan's colossal weight intentionally exceeds
-		-- the T1 fight model). Appalachia: cross-tier equality is unachievable — assert sufficiency
-		-- (landableAt authored rod+reel) + role band [T-1,T+1] instead.
-		-- Alaska: NO spawnZones yet (Phase 2 / Task 2.6) — gate kept to bayou|appalachia only.
-		if f.destinationId == "bayou" or f.destinationId == "appalachia" then
+		-- the T1 fight model). Appalachia/Alaska: cross-tier equality is unachievable — assert sufficiency
+		-- (landableAt authored rod+reel, or wall proof for co-op-only when max(rod,reel) > 4) + role band.
+		-- deep_sea/rockies: stub fixtures with no spawnZones — excluded from this gate.
+		if f.destinationId == "bayou" or f.destinationId == "appalachia" or f.destinationId == "alaska" then
 			assert(f.spawnZones ~= nil and #(f.spawnZones :: { string }) > 0, f.id .. ": a fish must carry structured spawnZones")
 			if not V.isRareOrAbove(f.rarity) then
 				if f.destinationId == "bayou" then
@@ -206,7 +209,11 @@ function V.validateConfig(config: Config)
 					assert(derived.minRodTier == f.minRodTier, string.format("%s: authored minRodTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minRodTier, derived.minRodTier))
 					assert(derived.minReelTier == f.minReelTier, string.format("%s: authored minReelTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minReelTier, derived.minReelTier))
 				else
-					assert(Fishing.landableAt(config, f, f.minRodTier, f.minReelTier), f.id .. ": must be landable at its authored rod+reel (sufficiency, §3)")
+					-- appalachia + alaska: co-op-only fish (max(rod,reel) > 4) skip the solo sufficiency check;
+					-- the band [T-1,T+1] is still enforced so the role anchor is correct.
+					if math.max(f.minRodTier, f.minReelTier) <= 4 then
+						assert(Fishing.landableAt(config, f, f.minRodTier, f.minReelTier), f.id .. ": must be landable at its authored rod+reel (sufficiency, §3)")
+					end
 					assert(f.minRodTier >= f.tier - 1 and f.minRodTier <= f.tier + 1, f.id .. ": authored minRodTier must sit in the role band [T-1, T+1]")
 				end
 			end
