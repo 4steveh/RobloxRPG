@@ -105,4 +105,28 @@ return function(t: Harness.T)
 		mis.fightDifficulty = 99 -- run force far exceeds a T1 rod's BreakThreshold → window collapses
 		t.ok("a 99-FD 'bluegill' no longer derives min-rod-tier 1", Fishing.deriveMinTiers(Catalog, mis).minRodTier ~= 1)
 	end
+
+	-- ── Task 0.2 (Step 10): landableAt + coopLandableAt helpers ──
+	t.section("Fishing — landableAt + co-op-landable helper")
+	do
+		-- landableAt: bayou_blue_catfish at (rod1, reel1) — already proven in the §2 inequality section.
+		local blue = Catalog.fish.bayou_blue_catfish
+		t.ok("blue catfish landable at (rod1, reel1) via landableAt helper", Fishing.landableAt(Catalog, blue, 1, 1))
+		-- A clone with fightDifficulty=99 throws at (rod1,reel1): NetDrain goes negative (reel can't drain), LandWindow=0.
+		local hard = table.clone(blue)
+		hard.fightDifficulty = 99
+		t.ok("FD=99 clone NOT landable at (rod1, reel1) (NetDrain<0, LandWindow=0)", Fishing.landableAt(Catalog, hard, 1, 1) == false)
+
+		-- coopLandableAt: a T4 fish that solo-throws at (rod4,reel4) but co-op-lands with partyCap=4.
+		-- Synthetic: clone bayou_blue_catfish, set tier=4, fightDifficulty=86, typicalWeightKg.max=100.
+		-- Solo (T4): nd_solo=17.5*0.7-86*0.08=12.25-6.88=~10.62, stam=0.5*86*(1+100/10)=0.5*86*11=473,
+		--   ft_solo=473/10.62≈44.54, lw=max(BreakThreshold(4)-p*86,0)=(96-51.6)=44.4 → 44.54>44.4 → THROWS.
+		-- Co-op (T4, party=4): nd_coop=nd_solo*(1+0.5*3)=10.62*2.5=26.55, ft_coop=473/26.55≈17.82 ≤ 44.4 → LANDS.
+		local reelBound = table.clone(blue)
+		reelBound.tier = 4
+		reelBound.fightDifficulty = 86
+		reelBound.typicalWeightKg = { min = 80, max = 100 }
+		t.ok("synthetic T4 reel-bound fish NOT landable solo (ft≈44.54 > lw=44.4)", Fishing.landableAt(Catalog, reelBound, 4, 4) == false)
+		t.ok("synthetic T4 reel-bound fish co-op-landable at full party (ft≈17.82 ≤ lw=44.4)", Fishing.coopLandableAt(Catalog, reelBound, 4, Catalog.tuning.combat.coop.partyCap))
+	end
 end

@@ -119,6 +119,24 @@ function M.drainDerivable(config: Config, reelTier: number, level: GearLevel, E:
 	return math.abs(claimed - expected) <= config.tuning.combat.damageToleranceAbs
 end
 
+-- Landability at a specific (rodTier, reelTier) at the §3 mid-gear / E_expected reference. The direct
+-- analog of Combat.soloableAt — the catch lands iff FightTime ≤ LandWindow with the chosen gear.
+function M.landableAt(config: Config, fish: Fish, rodTier: number, reelTier: number): boolean
+	local E = config.tuning.fishingFight.E_expected
+	local ft = M.fightTime(M.staminaToLand(config, fish), M.netDrain(M.reelDrainMax(config, reelTier, "mid"), E, M.fishRecovery(config, fish)))
+	return M.landable(ft, M.landWindow(config, rodTier, reelTier, fish, "mid"))
+end
+
+-- Co-op landability (§9): a party adds NetDrain sublinearly (coopNetDrain), shortening FightTime, so a
+-- tier's apex lands on T gear that would throw solo. At the MVL top tier (Alaska) the apex (halibut) is
+-- co-op-only — no T+1 reel — so this is where the property first does real work.
+function M.coopLandableAt(config: Config, fish: Fish, gearTier: number, partySize: number): boolean
+	local E = config.tuning.fishingFight.E_expected
+	local baseNet = M.netDrain(M.reelDrainMax(config, gearTier, "mid"), E, M.fishRecovery(config, fish))
+	local ft = M.fightTime(M.staminaToLand(config, fish), M.coopNetDrain(config, baseNet, partySize))
+	return M.landable(ft, M.landWindow(config, gearTier, gearTier, fish, "mid"))
+end
+
 -- ── §3 min-tier DERIVATION (mirror Combat.deriveMinTiers) ──
 -- Reel drives FightTime; rod drives LandWindow. Evaluated at the §3 mid-gear reference and E_expected.
 local MAX_DERIVE_TIER = 10

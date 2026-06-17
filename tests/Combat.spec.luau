@@ -207,4 +207,23 @@ return function(t: Harness.T)
 		t.ok("grizzly NOT soloable at T4 (apex effTier=5, window 2.5 s, 3 shots·1.25 = 3.75 > 2.5)", Combat.soloableAt(Catalog, grizzly, 4, 4) == false)
 		t.ok("grizzly soloable at T5 (window 5.0 s, 2 shots·1.21 = 2.42 ≤ 5.0)", Combat.soloableAt(Catalog, grizzly, 5, 5))
 	end
+
+	-- ── Task 0.2 (Step 10): co-op-soloable helper (§6 party clears co-op-scaled Health; tank survives) ──
+	t.section("Combat — co-op-soloable: party clears the apex that is a solo wall at T4")
+	do
+		-- Synthetic grizzly (the Step-10 Alaska apex archetype): tier=4, apex (coop="party"),
+		-- health=100, damageToPlayer=85, attackIntervalSeconds=2.5.
+		-- Solo at T4: effTier=5, DR(4,5)=0.38, taken=52.7, hitsToDown=2, window=2.5 s; 3 shots*1.25=3.75 > 2.5 → WALL.
+		-- Co-op at T4 (partyCap=4): effHealth=250, perDmg=49, killTime≈1.594 s, tankHits=floor(1.594/2.5)=0 → 0<100 → TRUE.
+		local grizzly = table.clone(Catalog.creatures.appalachia_wild_boar)
+		grizzly.tier = 4
+		grizzly.health = 100
+		grizzly.damageToPlayer = 85
+		grizzly.attackIntervalSeconds = 2.5
+		grizzly.behavior = "aggressive"
+		grizzly.coop = "party"
+		t.ok("grizzly NOT soloable at T4/T4 (the solo wall)", Combat.soloableAt(Catalog, grizzly, 4, 4) == false)
+		t.ok("grizzly co-op-soloable at T4 with full party (partyCap=4)", Combat.coopSoloableAt(Catalog, grizzly, 4, Catalog.tuning.combat.coop.partyCap))
+		t.ok("grizzly NOT co-op-soloable solo (party of 1 == solo wall)", Combat.coopSoloableAt(Catalog, grizzly, 4, 1) == false)
+	end
 end

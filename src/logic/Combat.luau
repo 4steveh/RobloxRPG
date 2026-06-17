@@ -245,6 +245,30 @@ function M.soloableAt(config: Config, creature: Creature, weaponTier: number, ar
 	return M.isKillable(stk, window, M.cycleTime(config, weaponTier))
 end
 
+-- Co-op solubility (§6): a party clears the co-op-scaled Health with combined DPS; the worst-case tank
+-- (holds aggro the whole fight) must survive the fight's duration. Soluble iff the tank's accumulated
+-- post-armor hits over the kill time stay under playerBaseHP. Uses coopEffectiveHealth + the (apex) DR.
+function M.coopSoloableAt(config: Config, creature: Creature, gearTier: number, partySize: number): boolean
+	local n = math.min(math.max(partySize, 1), config.tuning.combat.coop.partyCap)
+	if n <= 1 then
+		return M.soloableAt(config, creature, gearTier, gearTier) -- solo == the wall
+	end
+	local effHealth = M.coopEffectiveHealth(config, creature.health, n)
+	local perPlayerDamage = M.weaponDamage(config, gearTier, "mid") * config.tuning.skill.Z_expected * config.tuning.weapon.rangeFalloffInBand
+	if perPlayerDamage <= 0 then
+		return false
+	end
+	local killTime = (effHealth / (n * perPlayerDamage)) * M.cycleTime(config, gearTier)
+	local interval = creature.attackIntervalSeconds
+	if interval == nil or interval <= 0 then
+		return true -- no survival threat (e.g. a non-lethal/escape target) → trivially co-op-soluble
+	end
+	local effTier = creature.tier + (if M.isApex(creature) then 1 else 0)
+	local taken = M.damageTaken(creature.damageToPlayer, M.dr(config, gearTier, effTier))
+	local tankHits = math.floor(killTime / interval) -- hits the aggro-holder eats over the fight
+	return tankHits * taken < config.tuning.combat.playerBaseHP
+end
+
 export type MinTiers = { minWeaponTier: number, minArmorTier: number }
 function M.deriveMinTiers(config: Config, creature: Creature): MinTiers
 	local zExpected = config.tuning.skill.Z_expected
