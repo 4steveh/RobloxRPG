@@ -167,34 +167,48 @@ function V.validateConfig(config: Config)
 			-- ("rabbits in Alaska, but bigger"): tier ≥ origin, behavior reuses the template (progression §6).
 			V.assertCreatureReskin(c, config)
 		end
-		-- Step-4 (SYS_combat §3): the min-weapon/min-armor-tier fields are DERIVED, not authored truth.
-		-- Assert the catalog matches the derivation for the BAYOU — the only Destination that exists; the
-		-- T2→T4 (Appalachia/Alaska) survival-bounded derivation is owed at Step 10 (no premature cross-tier
-		-- checks). Also require structured spawnZones on every non-ambiance Bayou target (Step 4 P1).
-		if c.destinationId == "bayou" and not c.ambianceOnly then
-			assert(c.spawnZones ~= nil and #(c.spawnZones :: { string }) > 0, c.id .. ": a Bayou hunting target must carry structured spawnZones (Step 4 P1)")
-			local derived = Combat.deriveMinTiers(config, c)
-			assert(derived.minWeaponTier == c.minWeaponTierToKill,
-				string.format("%s: authored minWeaponTierToKill %d ≠ derived %d (§3 kill inequality)", c.id, c.minWeaponTierToKill, derived.minWeaponTier))
-			assert(derived.minArmorTier == c.minArmorTierToSurvive,
-				string.format("%s: authored minArmorTierToSurvive %d ≠ derived %d (Bayou non-lethal → n/a=0)", c.id, c.minArmorTierToSurvive, derived.minArmorTier))
+		-- Step-4/10 (SYS_combat §3): the min-weapon/min-armor-tier fields are DERIVED, not authored truth.
+		-- Bayou: assert derived==authored (T1 physical-min == design floor; holds for the non-lethal zone).
+		-- Appalachia: cross-tier equality is unachievable (deriveMinTiers computes the physical-minimum;
+		--   the catalog authors the design role-anchor floor=T-1/mid=T/apex=T+1) — assert the spec's
+		--   floor/ceiling SEMANTICS instead: sufficiency (soloableAt authored tier) + role band [T-1,T+1].
+		-- Alaska: NO spawnZones yet (Phase 2 / Task 2.6) — gate kept to bayou|appalachia only.
+		if not c.ambianceOnly then
+			if c.destinationId == "bayou" or c.destinationId == "appalachia" then
+				assert(c.spawnZones ~= nil and #(c.spawnZones :: { string }) > 0, c.id .. ": a hunting target must carry structured spawnZones")
+			end
+			if c.destinationId == "bayou" then
+				-- Bayou keeps strict derived==authored (T1 physical-min == design floor; holds).
+				local derived = Combat.deriveMinTiers(config, c)
+				assert(derived.minWeaponTier == c.minWeaponTierToKill, string.format("%s: authored minWeaponTierToKill %d ≠ derived %d (§3 kill inequality)", c.id, c.minWeaponTierToKill, derived.minWeaponTier))
+				assert(derived.minArmorTier == c.minArmorTierToSurvive, string.format("%s: authored minArmorTierToSurvive %d ≠ derived %d (Bayou non-lethal → n/a=0)", c.id, c.minArmorTierToSurvive, derived.minArmorTier))
+			elseif c.destinationId == "appalachia" then
+				-- Cross-tier: strict equality unachievable; assert the spec's floor/ceiling semantics.
+				if c.minWeaponTierToKill <= 4 then
+					assert(Combat.soloableAt(config, c, c.minWeaponTierToKill, math.max(c.minArmorTierToSurvive, c.minWeaponTierToKill)), c.id .. ": must be soloable at its authored min-tier (floor/ceiling sufficiency, §3)")
+				end
+				assert(c.minWeaponTierToKill >= c.tier - 1 and c.minWeaponTierToKill <= c.tier + 1, c.id .. ": authored minWeaponTier must sit in the role band [T-1, T+1]")
+			end
 		end
 	end
 	for _, f in config.fish do
 		V.assertFish(f)
-		-- Step-5 (SYS_fishing §3): min rod/reel tiers are DERIVED, asserted == authored for the BAYOU
-		-- ROUTINE band only. Rares are bonus-on-top finds excluded from the band (RD5) — e.g. the
-		-- Leviathan's colossal weight intentionally exceeds the T1 fight model ("the difficulty is reaching
-		-- the condition, not the fight", LOC §5). Appalachia/Alaska + the cross-tier derivation are owed at
-		-- Step 10. Also require structured spawnZones on every Bayou fish (Step 5 prerequisite).
-		if f.destinationId == "bayou" then
-			assert(f.spawnZones ~= nil and #(f.spawnZones :: { string }) > 0, f.id .. ": a Bayou fish must carry structured spawnZones (Step 5 prereq)")
+		-- Step-5/10 (SYS_fishing §3): min rod/reel tiers are DERIVED. Bayou: assert derived==authored for
+		-- the ROUTINE band (rares excluded per RD5 — the Leviathan's colossal weight intentionally exceeds
+		-- the T1 fight model). Appalachia: cross-tier equality is unachievable — assert sufficiency
+		-- (landableAt authored rod+reel) + role band [T-1,T+1] instead.
+		-- Alaska: NO spawnZones yet (Phase 2 / Task 2.6) — gate kept to bayou|appalachia only.
+		if f.destinationId == "bayou" or f.destinationId == "appalachia" then
+			assert(f.spawnZones ~= nil and #(f.spawnZones :: { string }) > 0, f.id .. ": a fish must carry structured spawnZones")
 			if not V.isRareOrAbove(f.rarity) then
-				local derived = Fishing.deriveMinTiers(config, f)
-				assert(derived.minRodTier == f.minRodTier,
-					string.format("%s: authored minRodTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minRodTier, derived.minRodTier))
-				assert(derived.minReelTier == f.minReelTier,
-					string.format("%s: authored minReelTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minReelTier, derived.minReelTier))
+				if f.destinationId == "bayou" then
+					local derived = Fishing.deriveMinTiers(config, f)
+					assert(derived.minRodTier == f.minRodTier, string.format("%s: authored minRodTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minRodTier, derived.minRodTier))
+					assert(derived.minReelTier == f.minReelTier, string.format("%s: authored minReelTier %d ≠ derived %d (§2 catchability inequality)", f.id, f.minReelTier, derived.minReelTier))
+				else
+					assert(Fishing.landableAt(config, f, f.minRodTier, f.minReelTier), f.id .. ": must be landable at its authored rod+reel (sufficiency, §3)")
+					assert(f.minRodTier >= f.tier - 1 and f.minRodTier <= f.tier + 1, f.id .. ": authored minRodTier must sit in the role band [T-1, T+1]")
+				end
 			end
 		end
 	end

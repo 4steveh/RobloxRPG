@@ -259,8 +259,8 @@ local rows: { Fish } = {
 		typicalWeightKg = { min = 2, max = 5 },
 		recordWeightKg = 8,
 		fightDifficulty = 78,
-		minRodTier = 2,
-		minReelTier = 2,
+		minRodTier = 3, -- rod-bound snap at T2 (LandWindow≈5.2 ≪ FightTime≈20.4); comfortably 3 (LOC_02 §3)
+		minReelTier = 2, -- reel2 lands it at rod3: FightTime 20.45 ≤ LandWindow 27.2
 		waterType = W.lake,
 		spawnZones = { "mill_pond" },
 		cash = { min = 66, max = 80 },
