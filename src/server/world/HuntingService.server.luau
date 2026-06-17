@@ -32,6 +32,7 @@ local Combat = require("@src/logic/Combat")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local FireHandler = require("@src/server/combat/FireHandler")
 local EquipHandler = require("@src/server/authority/handlers/EquipHandler")
+local Onboarding = require("@src/logic/Onboarding")
 local SessionService = require("@src/server/SessionService")
 local ArrivalService = require("@src/server/ArrivalService")
 local Adapters = require("@src/server/RobloxAdapters")
@@ -263,10 +264,30 @@ local function guardHumanoid(hum)
 	end)
 end
 
+-- Step 7 first-spawn guarantee (the no-empty-field D1 killer): for a first-time player whose first hunt is
+-- still ungranted, guarantee a close target in the arrival hunting area, BYPASSING the density cap — but
+-- ONLY when the headless eligibility predicate says so (it returns false for a post-first / non-arrival /
+-- returning player, so the caps hold for everything else — no farming leak). The predicate is the tested
+-- guarantee; this is the Studio spawn. (Session ownership consolidation with BayouBlockout: TODO(step-8).)
+local FIRST_HUNT_AREA = "sunny_levee"
+local function guaranteeFirstHunt(plr)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil then
+		return
+	end
+	if Onboarding.firstSpawnEligible(Catalog, session.profile, BAYOU, FIRST_HUNT_AREA, "Hunting") then
+		local pool = Spawner.routineTargetsInZone(Catalog, BAYOU, FIRST_HUNT_AREA, "Hunting")
+		if #pool > 0 then
+			spawnTarget(pool[1], FIRST_HUNT_AREA) -- bypasses MaxConcurrentTargets for the FIRST hunt only
+		end
+	end
+end
+
 Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function(char)
 		local hum = char:WaitForChild("Humanoid")
 		guardHumanoid(hum)
+		guaranteeFirstHunt(plr)
 	end)
 end)
 

@@ -15,6 +15,7 @@
 local Schema = require("@src/types/Schema")
 local Economy = require("@src/logic/Economy")
 local Profile = require("@src/logic/Profile")
+local Onboarding = require("@src/logic/Onboarding")
 local Ledger = require("@src/server/ledger/Ledger")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local Types = require("@src/server/persistence/Types")
@@ -127,6 +128,9 @@ function M.upgradeHandler(deps: ShopDeps): Gauntlet.IntentHandler
 			}, ctx.now)
 			assert(debit.ok, "upgrade commit: affordability verified, no yield, debit must succeed")
 			commodity.intraLevel += 1 -- intra-tier only — never changes EHT/EFT, never satisfies a Gate
+			-- Step 7: the FIRST_PURCHASE funnel beat completes on a "gearUpgrade" (the intra-tier buy), NOT a
+			-- slot-buy — advance it here, inside the same atomic commit.
+			Onboarding.advance(ctx.profile, "gearUpgrade", ctx.now)
 			if deps.telemetry ~= nil then
 				deps.telemetry.incr("economy.upgrade:tier" .. tostring(item.tier), 1)
 			end

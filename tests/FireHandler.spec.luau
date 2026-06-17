@@ -110,4 +110,32 @@ return function(t: Harness.T)
 		t.eq("no orphan Rank XP", p.hunterRankXP, 0)
 		t.ok("no orphan conquest", p.conqueredDestinations.bayou == nil)
 	end
+
+	t.section("FireHandler — a kill advances the onboarding funnel ATOMICALLY with the reward (Step 7)")
+	do
+		local p = Util.mkProfile(Catalog, { weapon = 1 }) -- funnelBeat FIRST_HUNT
+		local session: Gauntlet.Session = { playerId = 1, profile = p, live = true }
+		local r = Gauntlet.handle(newReg(), { intent = "fire", playerId = 1, payload = shot("bayou_wood_duck", "vital", 10, 0) }, session, deps(true))
+		t.ok("the kill succeeds", r.ok)
+		t.eq("the funnel advanced FIRST_HUNT → FIRST_CATCH (inside the commit)", p.onboarding.funnelBeat, "FIRST_CATCH")
+		t.ok("the daily hunting objective was recorded", p.daily.huntDone == true)
+	end
+
+	t.section("FireHandler — a failed write-through reverts the beat advance too (no orphan advance)")
+	do
+		local p = Util.mkProfile(Catalog, { weapon = 1 })
+		local session: Gauntlet.Session = { playerId = 1, profile = p, live = true }
+		local r = Gauntlet.handle(newReg(), { intent = "fire", playerId = 1, payload = shot("bayou_wood_duck", "vital", 10, 0) }, session, deps(false))
+		t.ok("persist_failed", r.ok == false and r.reason == "persist_failed")
+		t.eq("the beat advance was REVERTED with the reward", p.onboarding.funnelBeat, "FIRST_HUNT")
+		t.ok("the daily objective was reverted too", p.daily.huntDone == false)
+	end
+
+	t.section("FireHandler — an ambiance kill does NOT advance the funnel (no Cash, no comprehension beat)")
+	do
+		local p = Util.mkProfile(Catalog, { weapon = 1 })
+		local session: Gauntlet.Session = { playerId = 1, profile = p, live = true }
+		Gauntlet.handle(newReg(), { intent = "fire", playerId = 1, payload = shot("bayou_great_egret", "vital", 10, 0) }, session, deps(true))
+		t.eq("the egret kill leaves the funnel at FIRST_HUNT", p.onboarding.funnelBeat, "FIRST_HUNT")
+	end
 end

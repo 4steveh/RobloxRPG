@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–6)
+# Wild World — Build (Steps 1–7)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -32,6 +32,12 @@ note per step.
   handlers minting commodities; and the **dual-loop reconciliation** (01 risk #3) + the MVL gear-Cash jump
   are proven headless. **The formulas/sinks/reconciliation are headless-proven; the shop UI, felt pacing,
   and the *live* (measured) reconciliation are Studio/telemetry** — split honestly below.
+- **Step 7 — The Onboarding Funnel (First Five Minutes).** A **different-shaped, mostly-UX** step: the
+  headless core is a thin-but-rigorous server-owned `OnboardingState` machine (data-driven beats advancing
+  on *authoritative* events inside the handlers' atomic commit), a scoped first-spawn **eligibility
+  predicate**, the no-real-money-until-`COMPLETE` gate, and the daily-quest **skeleton**. **The funnel
+  *working* is a playtest/telemetry verdict (the D1 > 25% gate), not a green-CI one** — the felt FTUE and
+  every D1 metric are Studio/telemetry, split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -73,9 +79,11 @@ src/
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
            · Fishing (Step 5 — reel/rod curves, FightTime ≤ LandWindow, min rod/reel derivation, Angler XP, drain validators, co-op)
-           · Economy (Step 6 — Income/GearCost/IntraTierClimb/Payout/salvageFloor + the per-loop routine-band normalization + reconciliation)
+           · Economy (Step 6 — Income/GearCost/IntraTierClimb/Payout/salvageFloor + per-loop normalization + reconciliation; +Step-7 dailyQuestReward/crossLoopBonus)
            · Spawner (Step 4 — caps/engagement rate, exclusions, rare predicate, placement; GENERALIZED Step 5; +modeledRatePerHour Step 6)
            · Profile (+ Step-6 mintCommodity: the gear-grant primitive the shops + the starter loadout use)
+           · Onboarding (Step 7 — the data-driven funnel state machine: advance/firstSpawnEligible/isOnboardingComplete; server-auth, idempotent, atomic)
+           · Daily (Step 7 — the daily cross-loop pair objective state + the server-time reset; the board-claim skeleton)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -85,6 +93,8 @@ src/
       CatchHandler.luau     (Step 5) the "catch" intent handler — the gauntlet's step-3 fight resolution + the (shared) reward commit (critical)
     shop/
       ShopHandler.luau      (Step 6) the Outfitter/Tackle-Shop gear sinks — buy + intra-tier upgrade gauntlet handlers (critical, atomic Cash debit + commodity mint)
+    daily/
+      ClaimDailyHandler.luau (Step 7) the daily cross-loop-pair claim — credits the faucet + breadth bonus, completes DAILY_INTRO (critical, idempotent per day)
     idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
     world/BayouBlockout.server.luau    ⌂ STUDIO-ONLY — builds the placeholder shell from Shells config + the arrival flow
     world/HuntingService.server.luau   ⌂ STUDIO-ONLY (Step 4) — physical spawner + fire RemoteEvent + raycast LOS + non-lethal clamp + respawn
@@ -112,7 +122,8 @@ src/
     RobloxAdapters.luau   thin injection-based Roblox adapters (Studio-only binding; strict-clean headless)
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
          ProfileStore/Ledger/ArtifactStore/Gauntlet/Idle/Integrity; Step 3: Shell/Arrival; Step 4:
-         Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler) · negative/ (MUST fail analysis)
+         Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler;
+         Step 7: Onboarding/Daily/ClaimDailyHandler) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -398,6 +409,56 @@ the **salvage TRANSITION + choose-disposition UI** → Step 8 (Step 6 supplies t
 / Lodge decor** (the evergreen inflation ballast) → Step 8/14; **Boats/Mounts/Dogs** (priced by this curve)
 → Step 11; **trade tax** → Step 12; **dailies / cross-loop daily bonus delivery** → Step 7/13.
 
+## Step 7 — the onboarding funnel (mostly UX; the headless core is thin but rigorous)
+
+This is a **different-shaped** step from 1–6: most of its value is the felt first-five-minutes and the **D1
+telemetry**, which only real players validate. The headless core is real but deliberately **thin** — and
+held to the full session-locked-profile discipline (server-auth, idempotent, resume-safe) because it lives
+in that profile.
+
+**Headless-proven:**
+- **The `OnboardingState` machine is data-driven + server-authoritative.** Beats
+  (`FIRST_HUNT → FIRST_CATCH → FIRST_PURCHASE → WORLD_MAP → LOOP_CONFIRM → DAILY_INTRO → COMPLETE`) are
+  declared data; each advances **only on an authoritative event** (a validated kill / catch / `"gearUpgrade"`
+  purchase / daily claim), never a client flag. `Onboarding.advance` runs **inside the handler's
+  `Transaction`** — so a beat advances **atomically with the reward** (a forced save failure reverts the
+  advance *and* the reward — tested) and is idempotent.
+- **One-shot.** `COMPLETE` is a one-time threshold (like an unlocked Destination) — a returning player never
+  re-enters; a post-completion event never re-grants.
+- **Disconnect-resume.** `OnboardingState` is in the session-locked profile (persisted at login + on
+  `markDirty`/autosave), so a dropped player reloads at the last-saved beat — **never a full restart**.
+- **The first-spawn guarantee is a scoped eligibility predicate.** `firstSpawnEligible` is true **only** for
+  a first-time player, in the loop's arrival-proximate area, at the beat that first needs that loop's
+  target — and **false** for a post-first / non-arrival / returning case (the **no-low-tier-farming-leak**
+  guarantee). *The guaranteed spawn itself is Studio (the services call the predicate); the headless
+  deliverable is the predicate.*
+- **The no-real-money gate.** `isOnboardingComplete` is false through the funnel, true at `COMPLETE` — the
+  structural predicate Step 14's store must gate on (the first session is provably real-money-prompt-free).
+- **Ambiance kills don't advance** the funnel (no Cash → not a comprehension beat) — tested.
+- **The daily skeleton.** `Daily` tracks the cross-loop pair (one hunt + one catch) with a **server-time**
+  reset (never client elapsed); `ClaimDailyHandler` credits `Economy.dailyQuestReward` + `Economy.crossLoopBonus`
+  **once per day** (idempotent) through the ledger and completes the `DAILY_INTRO` handoff. The economy
+  amounts (deferred by Step 6) scale off `T_current = max(EHT, EFT)`.
+- Steps 1–6 tests stay green (the handlers now advance the funnel + record the daily objective atomically).
+
+**Studio / telemetry — NOT headless (the real bar; all unchecked):**
+- [ ] The opening chain *plays* on a phone: ≤60 s to first Cash, ≤120 s to first cross-loop Cash, ≤5–7 min
+      to `DAILY_INTRO`, with single arrows / world-space pings / unmissable "+Cash" feedback.
+- [ ] The first-purchase beat reads as a *wanted* earned-Cash upgrade — no real-money prompt, no countdown.
+- [ ] Aim-assist boost guarantees the first shot lands **and tapers** to the standard cap after onboarding.
+- [ ] The **D1 dashboard**: per-beat drop-off, time-to-first-reward, conversion, **D1 segmented by the beat
+      the session ended on**, session-2 daily-claim — all `isOnboarding`-tagged, separable from steady-state.
+- [ ] The funnel moves D1 toward the **> 25%** launch gate (the verdict only real players give).
+
+**Seams / deferrals (named, not silently resolved):**
+- **`WORLD_MAP` is a pass-through here** — Step 9 swaps the pass-through for the real World-Map reveal + a
+  real completion predicate (a config/handler swap, no machine change).
+- **Daily content / rotation / cadence** → Step 13; **the store / real-money** → Step 14 (gates on
+  `isOnboardingComplete`); **idle-accrual intro** → session 2 (deliberately withheld — surfacing "earn while
+  away" in the first 5 min teaches a new player to log off); **co-op** → later tiers (the Bayou is solo).
+- **A/B knobs preserved as config** (not silently resolved): hunt-first vs fish-first, World-Map reveal
+  timing, aim-assist taper, chain length, first-purchase affordability — beats are data-driven for exactly this.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -488,7 +549,17 @@ tier never changes EHT/EFT); the gating-price drift check; the starter grant con
 ⌂ (Studio/telemetry, unchecked above) **the shop UI, the felt pacing, and the *live* (measured)
 reconciliation** — the modeled per-loop proof is not the live proof.
 
-**493 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+**Step 7:** ✅ (headless) the data-driven `OnboardingState` machine (server-auth completion on validated
+kill/catch/`gearUpgrade`/claim events, **atomic with the reward** inside the handler `Transaction`,
+idempotent one-shot, disconnect-resume via the session-locked profile); the scoped `firstSpawnEligible`
+predicate (the no-farming-leak guarantee); `isOnboardingComplete` (the real-money gate); ambiance kills
+don't advance; the daily skeleton (`Daily` server-time reset + `ClaimDailyHandler` paying
+`dailyQuestReward`+`crossLoopBonus` once/day); the deferred economy amounts. ⌂ (Studio/telemetry, unchecked
+above) **the felt FTUE, the pacing, the aim-assist taper, and EVERY D1 metric** — and, by its nature,
+**this step's success is a telemetry verdict (D1 > 25%), not a green-CI one.** `WORLD_MAP` is a declared
+pass-through (Step 9 makes it real).
+
+**546 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
 place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓

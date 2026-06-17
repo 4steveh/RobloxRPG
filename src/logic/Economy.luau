@@ -103,6 +103,16 @@ function M.salvageFloor(config: Config, tier: number, rarity: string, loop: Loop
 	return round(config.tuning.economy.salvageFloorFraction * baseline * M.rarityMultiplier(config, rarity))
 end
 
+-- §1/§6 daily-quest amounts (Step 7). Both scale off the player's current tier (the caller passes
+-- T_current = max(EHT, EFT), the idle resolution): the daily faucet is a fraction of Income(T); the
+-- cross-loop bonus is ≈ half an hour of current-tier income (the breadth kicker for one hunt + one catch).
+function M.dailyQuestReward(config: Config, tier: number): number
+	return round(config.tuning.economy.dailyQuestFraction * M.income(config, tier))
+end
+function M.crossLoopBonus(config: Config, tier: number): number
+	return round(config.tuning.economy.crossLoopBonusHours * M.income(config, tier))
+end
+
 -- §6 reconciliation: the normalized routine hour for a (destination, loop) — equals Income(dest tier) BY
 -- CONSTRUCTION (mean of mult/avgMult = 1). The test asserts this per MVL tier on each loop → parity is
 -- automatic despite different absolute rates and different per-loop Common/Uncommon mixes.

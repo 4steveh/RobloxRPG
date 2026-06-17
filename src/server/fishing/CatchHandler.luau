@@ -18,6 +18,8 @@ local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Fishing = require("@src/logic/Fishing")
 local EffectiveTier = require("@src/logic/EffectiveTier")
+local Onboarding = require("@src/logic/Onboarding")
+local Daily = require("@src/logic/Daily")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local RewardPipeline = require("@src/server/combat/RewardPipeline")
 local Types = require("@src/server/persistence/Types")
@@ -110,12 +112,18 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 				loop = Enums.Loop.Fishing,
 				partySize = ctx.payload.partySize,
 			}
-			RewardPipeline.resolve(ctx.profile, ctx.config, event, {
+			local result = RewardPipeline.resolve(ctx.profile, ctx.config, event, {
 				idGen = deps.idGen,
 				now = ctx.now,
 				payoutFn = deps.payoutFn,
 				telemetry = deps.telemetry,
 			})
+			-- Step 7: advance the funnel + record the daily objective atomically (no MVL fish is ambiance,
+			-- so a catch always counts; the guard mirrors hunting for symmetry).
+			if not result.ambiance then
+				Onboarding.advance(ctx.profile, "catch", ctx.now)
+				Daily.recordAction(ctx.profile.daily, Enums.Loop.Fishing, ctx.now)
+			end
 		end,
 	}
 end

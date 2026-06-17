@@ -155,6 +155,20 @@ local nonTrophyDispositions: { [Disposition]: boolean } = {
 }
 Enums.NON_TROPHY_DISPOSITIONS = table.freeze(nonTrophyDispositions)
 
+-- Onboarding funnel beats (SYS_onboarding_funnel build-notes) — the server-owned tutorial state machine.
+-- WORLD_MAP is declared but PASS-THROUGH at MVL (its reveal surface is Step 9). COMPLETE is a one-time
+-- threshold (a returning player never re-enters). Beats are advanced ONLY by authoritative server events.
+export type FunnelBeat = "FIRST_HUNT" | "FIRST_CATCH" | "FIRST_PURCHASE" | "WORLD_MAP" | "LOOP_CONFIRM" | "DAILY_INTRO" | "COMPLETE"
+Enums.FunnelBeat = table.freeze({
+	FIRST_HUNT = "FIRST_HUNT" :: FunnelBeat,
+	FIRST_CATCH = "FIRST_CATCH" :: FunnelBeat,
+	FIRST_PURCHASE = "FIRST_PURCHASE" :: FunnelBeat,
+	WORLD_MAP = "WORLD_MAP" :: FunnelBeat,
+	LOOP_CONFIRM = "LOOP_CONFIRM" :: FunnelBeat,
+	DAILY_INTRO = "DAILY_INTRO" :: FunnelBeat,
+	COMPLETE = "COMPLETE" :: FunnelBeat,
+})
+
 -- Real-money product kinds (Roblox terms, 04). Cash-cost items use the cash leg instead.
 export type RealMoneyKind = "gamepass" | "devproduct"
 Enums.RealMoneyKind = table.freeze({

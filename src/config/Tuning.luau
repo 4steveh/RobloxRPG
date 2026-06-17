@@ -159,6 +159,11 @@ Tuning.economy = table.freeze({
 	-- a DELIBERATELY LOW fraction of its conceptual faucet value, so rare value flows to P2P trade / the
 	-- Trophy Hall, not the Cash supply. The salvage TRANSITION + credit are Step 8; this is just the amount.
 	salvageFloorFraction = 0.15,
+	-- §1/§6 daily-quest amounts (Step 7 adds the functions economy deferred): the daily faucet is a fraction
+	-- of current-tier income (scaled so it never becomes a low-tier-farming vector); the cross-loop bonus is
+	-- ≈ half an hour of current-tier income for doing one hunt AND one catch in a day (breadth-as-reward).
+	dailyQuestFraction = 0.25,
+	crossLoopBonusHours = 0.5,
 })
 
 -- Big one-time access/convenience sink multipliers (EQUIPMENT_MASTER §4.5–§4.7; coarse defaults, OQ-D).

@@ -37,6 +37,9 @@ return function(t: Harness.T)
 		return true
 	end)())
 	t.ok("no entitlements, no artifacts, no fungibles", #p.activeEntitlements == 0 and next(p.artifacts) == nil and next(p.inventory.fungible) == nil)
+	t.ok("onboarding begins at FIRST_HUNT (Step 7)", p.onboarding ~= nil and p.onboarding.funnelBeat == "FIRST_HUNT")
+	t.ok("a fresh profile has not completed onboarding", p.onboarding ~= nil and p.onboarding.completedAt == nil)
+	t.ok("the daily state is zeroed (no objectives done, unclaimed)", p.daily ~= nil and p.daily.huntDone == false and p.daily.fishDone == false and p.daily.claimed == false)
 
 	-- the equipped starter weapon resolves (by stable instanceId) to a Tier-1 catalog item
 	local weaponInstanceId = assert(p.equipped.weapon)

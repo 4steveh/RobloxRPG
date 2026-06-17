@@ -18,6 +18,8 @@ local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Combat = require("@src/logic/Combat")
 local EffectiveTier = require("@src/logic/EffectiveTier")
+local Onboarding = require("@src/logic/Onboarding")
+local Daily = require("@src/logic/Daily")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local RewardPipeline = require("@src/server/combat/RewardPipeline")
 local Types = require("@src/server/persistence/Types")
@@ -111,12 +113,18 @@ function M.new(deps: FireDeps): Gauntlet.IntentHandler
 				loop = Enums.Loop.Hunting,
 				partySize = ctx.payload.partySize,
 			}
-			RewardPipeline.resolve(ctx.profile, ctx.config, event, {
+			local result = RewardPipeline.resolve(ctx.profile, ctx.config, event, {
 				idGen = deps.idGen,
 				now = ctx.now,
 				payoutFn = deps.payoutFn,
 				telemetry = deps.telemetry,
 			})
+			-- Step 7: advance the funnel + record the daily objective INSIDE this commit (atomic with the
+			-- reward, idempotent). An ambiance kill pays nothing → it is not a comprehension beat, so skip it.
+			if not result.ambiance then
+				Onboarding.advance(ctx.profile, "kill", ctx.now)
+				Daily.recordAction(ctx.profile.daily, Enums.Loop.Hunting, ctx.now)
+			end
 		end,
 	}
 end

@@ -17,6 +17,7 @@ type MonetizationRole = Enums.MonetizationRole
 type RankPerkCategory = Enums.RankPerkCategory
 type Disposition = Enums.Disposition
 type ArtifactKind = Enums.ArtifactKind
+type FunnelBeat = Enums.FunnelBeat
 type RealMoneyKind = Enums.RealMoneyKind
 type DestinationId = Ids.DestinationId
 type TargetId = Ids.TargetId
@@ -231,6 +232,31 @@ export type PlayerData = {
 	lastSaveTimestamp: number, -- written at every save; the §6 hard-crash idle fallback basis
 	sessionOpen: boolean, -- true while a live session holds the profile; a loaded `true` ⇒ prior session crashed (§6)
 	activeEntitlements: { Entitlement },
+	-- ── Step-7 onboarding funnel + daily-quest state (server-owned, in the session-locked profile) ──
+	onboarding: OnboardingState,
+	daily: DailyState,
+}
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Onboarding funnel (Step 7) — the server-owned tutorial state machine. Survives disconnect (it's in the
+-- session-locked profile), never client-spoofed; COMPLETE is a one-time threshold. `progress` is the
+-- per-beat counter (LOOP_CONFIRM needs N loop actions); `beatStartedAt` feeds per-beat dwell telemetry.
+-- ─────────────────────────────────────────────────────────────────────────────
+export type OnboardingState = {
+	funnelBeat: FunnelBeat,
+	beatStartedAt: number, -- server time the current beat began (now − this = dwell, for drop-off telemetry)
+	completedAt: number?, -- set when COMPLETE; its presence is the "returning player" marker
+	progress: number, -- per-beat event count (resets on each transition)
+}
+
+-- Daily-quest state (Step 7 skeleton) — the cross-loop pair + the reset basis. `resetBasis` is a NEW
+-- server-time field (its own; no collision with logout/lastSave); the daily window rolls off it via the
+-- server clock, never client-reported elapsed. Content/rotation is Step 13; this is the board+claim skeleton.
+export type DailyState = {
+	resetBasis: number, -- server time of the current daily window's start
+	huntDone: boolean, -- the day's hunting objective satisfied (a validated kill since resetBasis)
+	fishDone: boolean, -- the day's fishing objective satisfied (a validated catch since resetBasis)
+	claimed: boolean, -- the cross-loop pair already claimed this window (idempotent per day)
 }
 
 -- ─────────────────────────────────────────────────────────────────────────────

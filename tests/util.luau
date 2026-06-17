@@ -80,6 +80,8 @@ function U.mkProfile(config: Config, equip: Equip): PlayerData
 		lastSaveTimestamp = 0,
 		sessionOpen = false,
 		activeEntitlements = {},
+		onboarding = { funnelBeat = Enums.FunnelBeat.FIRST_HUNT, beatStartedAt = 0, completedAt = nil, progress = 0 },
+		daily = { resetBasis = 0, huntDone = false, fishDone = false, claimed = false },
 	}
 end
 

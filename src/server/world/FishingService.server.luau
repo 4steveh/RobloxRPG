@@ -32,6 +32,7 @@ local Gauntlet = require("@src/server/authority/Gauntlet")
 local CatchHandler = require("@src/server/fishing/CatchHandler")
 local SessionService = require("@src/server/SessionService")
 local Adapters = require("@src/server/RobloxAdapters")
+local Onboarding = require("@src/logic/Onboarding")
 
 local BAYOU = "bayou"
 local shell = Shells.byDestination[BAYOU]
@@ -219,6 +220,22 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 			castRequest:FireClient(plr, "bite", liveBites[nearest].fishId)
 		end
 	end
+end)
+
+-- Step 7 first-fish guarantee — the fishing mirror of the hunt guarantee. Eligible ONLY once the player has
+-- made their first kill (the funnel introduces fishing AFTER the first hunt → firstSpawnEligible is true at
+-- the FIRST_CATCH beat), in the arrival fishing water, for a first-time player; the cap holds otherwise.
+local FIRST_FISH_AREA = "channel_banks"
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function()
+		local session = sessionService.sessions[plr.UserId]
+		if session ~= nil and Onboarding.firstSpawnEligible(Catalog, session.profile, BAYOU, FIRST_FISH_AREA, "Fishing") then
+			local pool = Spawner.routineTargetsInZone(Catalog, BAYOU, FIRST_FISH_AREA, "Fishing")
+			if #pool > 0 then
+				spawnBite(pool[1], FIRST_FISH_AREA) -- guaranteed first bite (bypasses the bite cap, first only)
+			end
+		end
+	end)
 end)
 
 -- NON-PUNITIVE loss (§1 / Decision 1): a snap/throw/timeout forfeits ONLY the current fight — never banked

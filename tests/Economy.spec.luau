@@ -76,4 +76,11 @@ return function(t: Harness.T)
 		t.ok("a Mythic's salvage floor is far below its conceptual faucet value", Economy.salvageFloor(Catalog, 1, "Mythic", H) < fullFaucetValue * 0.25)
 		t.ok("the salvage floor is positive", Economy.salvageFloor(Catalog, 1, "Legendary", H) > 0)
 	end
+
+	t.section("Economy — the daily-quest faucet + cross-loop bonus (Step 7; scale off Income(T_current))")
+	do
+		t.eq("dailyQuestReward(1) = 0.25 · Income(1) = 250", Economy.dailyQuestReward(Catalog, 1), 250)
+		t.eq("crossLoopBonus(1) ≈ 0.5 hr of Income(1) = 500", Economy.crossLoopBonus(Catalog, 1), 500)
+		t.ok("both scale with the player's current tier", Economy.dailyQuestReward(Catalog, 2) > Economy.dailyQuestReward(Catalog, 1) and Economy.crossLoopBonus(Catalog, 2) > Economy.crossLoopBonus(Catalog, 1))
+	end
 end

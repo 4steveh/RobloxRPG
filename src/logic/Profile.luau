@@ -79,6 +79,9 @@ function M.freshProfile(config: Config): PlayerData
 		lastSaveTimestamp = 0,
 		sessionOpen = false,
 		activeEntitlements = {},
+		-- Step 7: a first-time player begins the funnel at FIRST_HUNT (the grant above marks them new).
+		onboarding = { funnelBeat = Enums.FunnelBeat.FIRST_HUNT, beatStartedAt = 0, completedAt = nil, progress = 0 },
+		daily = { resetBasis = 0, huntDone = false, fishDone = false, claimed = false },
 	}
 end
 
