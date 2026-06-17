@@ -8,6 +8,8 @@ local Util = require("@tests/util")
 local Catalog = require("@src/config/Catalog")
 local Economy = require("@src/logic/Economy")
 local Profile = require("@src/logic/Profile")
+local Validation = require("@src/config/Validation")
+local Enums = require("@src/types/Enums")
 
 return function(t: Harness.T)
 	t.section("Lodge — freshProfile + mkProfile seed the count-based lodge state (slots 0, no decor, empty layout)")
@@ -28,5 +30,42 @@ return function(t: Harness.T)
 		t.eq("the 3rd (boughtSlots 2) = round(5000·1.5^2) = 11250", Economy.slotExpansionPrice(Catalog, 2), 11250)
 		t.ok("strictly escalating (each costs more than the last — the unbounded sink)",
 			Economy.slotExpansionPrice(Catalog, 5) > Economy.slotExpansionPrice(Catalog, 4))
+	end
+
+	t.section("Decor — the catalog loads, is non-empty, and every SKU is Cash-priced + balance-free")
+	do
+		local n = 0
+		for id, d in Catalog.decor do
+			n += 1
+			t.ok(id .. ": id matches the key", d.id == id)
+			t.ok(id .. ": Cash-priced (no real-money decor at MVL — Step 14)", (d.cost :: any).cash ~= nil)
+			t.ok(id .. ": typed-owned (tradeable=false)", d.tradeable == false)
+		end
+		t.ok("the starter MVL decor catalog is non-empty (the sink must function)", n > 0)
+	end
+
+	t.section("Decor — assertDecorItem rejects a NON-balance-free SKU (the existing cosmetic discipline)")
+	do
+		t.errs("a decor with a non-identity (power-progression) role is rejected at load", function()
+			Validation.assertDecorItem({
+				id = "decor_bad", name = "Bad", kind = Enums.DecorKind.decor,
+				cost = { cash = 100 }, tradeable = false,
+				monetizationRoles = { Enums.MonetizationRole.powerProgression }, notes = "illegal",
+			})
+		end)
+		t.errs("a real-money-priced decor is rejected here (real-money decor is Step 14)", function()
+			Validation.assertDecorItem({
+				id = "decor_rm", name = "RM", kind = Enums.DecorKind.decor,
+				cost = { realMoney = { kind = Enums.RealMoneyKind.gamepass } }, tradeable = false,
+				monetizationRoles = { Enums.MonetizationRole.identity }, notes = "illegal here",
+			})
+		end)
+		t.errs("a tradeable decor is rejected here (tradeable = the rare-cosmetic artifact path)", function()
+			Validation.assertDecorItem({
+				id = "decor_tr", name = "Tr", kind = Enums.DecorKind.decor,
+				cost = { cash = 100 }, tradeable = true,
+				monetizationRoles = { Enums.MonetizationRole.identity }, notes = "illegal here",
+			})
+		end)
 	end
 end

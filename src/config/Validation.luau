@@ -21,6 +21,7 @@ type Artifact = Schema.Artifact
 type Config = Schema.Config
 type Disposition = Enums.Disposition
 type ArtifactKind = Enums.ArtifactKind
+type DecorItem = Schema.DecorItem
 
 local V = {}
 
@@ -55,6 +56,20 @@ end
 function V.assertRankPerkCategory(category: string)
 	if category ~= Enums.RankPerkCategory.identity and category ~= Enums.RankPerkCategory.convenience then
 		error(string.format("illegal rank-perk category '%s' — only identity|convenience are legal (power is not pay-to-win-safe)", category))
+	end
+end
+
+-- Decor balance-free guarantee (SYS_lodge_trophy §3 / EQUIPMENT_MASTER §6 — extends the cosmetic check).
+-- A DecorItem has NO stats/accessGrant/tierInput field, so balance-free is by construction; this enforces
+-- the rest: identity-ONLY monetization, Cash-priced (real-money decor is Step 14), tradeable=false (a
+-- tradeable cosmetic routes to the rare-cosmetic ARTIFACT path, not the typed-owned sink). The runtime
+-- assertion also guards data-driven / LiveOps-added decor SKUs.
+function V.assertDecorItem(d: DecorItem)
+	assert((d.cost :: any).cash ~= nil, d.id .. ": decor must be Cash-priced (real-money decor is Step 14)")
+	assert(d.tradeable == false, d.id .. ": Step-8 decor is the typed-owned path (tradeable=false; a tradeable cosmetic is the artifact path)")
+	for _, role in d.monetizationRoles do
+		assert(Enums.MonetizationRoleSet[role] == true, d.id .. ": illegal monetization role '" .. tostring(role) .. "'")
+		assert(role == Enums.MonetizationRole.identity, d.id .. ": decor is identity-only / balance-free (the zero-stat guarantee)")
 	end
 end
 
@@ -171,6 +186,9 @@ function V.validateConfig(config: Config)
 	end
 	for _, perk in config.rankPerks do
 		V.assertRankPerkCategory(perk.category)
+	end
+	for _, d in config.decor do
+		V.assertDecorItem(d)
 	end
 
 	-- Destinations + gate DAG integrity.
