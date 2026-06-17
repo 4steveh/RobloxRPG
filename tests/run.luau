@@ -45,6 +45,8 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/DisplayHandler.spec"),
 	-- Step 8 (Lodge & Trophy Hall — continued)
 	require("@tests/LodgeShopHandler.spec"),
+	-- Step 9 (World Map, fast-travel, gating)
+	require("@tests/Progression.spec"),
 }
 
 for _, spec in specs do
