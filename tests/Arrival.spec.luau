@@ -34,4 +34,23 @@ return function(t: Harness.T)
 	t.ok("kind is 'lodge'", a2.kind == "lodge")
 	t.ok("a COMPLETE player is NOT routed to a Destination (the Lodge is the hub, not a Destination)", a2.destinationId == nil)
 	t.ok("the Lodge arrival zone + anchor come from Shells.lodge", a2.zoneId == Shells.lodge.zoneId and a2.anchor.z == Shells.lodge.anchor.z)
+
+	t.section("resolveDestinationArrival — Appalachia fast-travel anchor")
+	local ap = ArrivalService.resolveDestinationArrival("appalachia", Shells, Catalog)
+	t.ok("kind is 'destination'", ap.kind == "destination")
+	t.ok("destinationId is 'appalachia'", ap.destinationId == "appalachia")
+	local apArrivalZone = Shells.byDestination["appalachia"].zones[Shells.byDestination["appalachia"].arrivalZoneId]
+	t.ok("anchor equals Appalachia arrival-zone center", ap.anchor.x == apArrivalZone.center.x and ap.anchor.z == apArrivalZone.center.z)
+
+	t.section("resolveDestinationArrival — Alaska fast-travel anchor (harbor_camp)")
+	local ak = ArrivalService.resolveDestinationArrival("alaska", Shells, Catalog)
+	t.ok("kind is 'destination'", ak.kind == "destination")
+	t.ok("destinationId is 'alaska'", ak.destinationId == "alaska")
+	local akArrivalZone = Shells.byDestination["alaska"].zones[Shells.byDestination["alaska"].arrivalZoneId]
+	t.ok("anchor equals Alaska arrival-zone center (harbor_camp)", ak.anchor.x == akArrivalZone.center.x and ak.anchor.z == akArrivalZone.center.z)
+
+	t.section("resolveDestinationArrival — unknown destination raises (no shell)")
+	t.errs("deep_sea has no shell → assert fires", function()
+		ArrivalService.resolveDestinationArrival("deep_sea", Shells, Catalog)
+	end)
 end

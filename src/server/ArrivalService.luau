@@ -24,6 +24,15 @@ local M = {}
 -- A tagged arrival target: the Lodge hub (kind="lodge", no destinationId) or a Destination (kind="destination").
 export type Arrival = { kind: "lodge" | "destination", destinationId: Ids.DestinationId?, zoneId: string, anchor: Vec3 }
 
+-- Resolve the arrival anchor for an EXPLICIT fast-travel destination (the Studio TeleportService executor
+-- calls this after DestinationService.travelTo authorises the travel). This does NOT re-check the unlock
+-- gate — DestinationService.travelTo already enforces the persisted unlocked set (Step 9). This resolver
+-- is the pure map: (already-authorised destinationId) → physical arrival anchor.
+function M.resolveDestinationArrival(destinationId: Ids.DestinationId, shells: ShellRegistry, _config: Config): Arrival
+	local shell = assert(shells.byDestination[destinationId], "ArrivalService: no shell for fast-travel destination '" .. destinationId .. "'")
+	return { kind = "destination", destinationId = destinationId, zoneId = shell.arrivalZoneId, anchor = Shell.arrivalAnchor(shell) }
+end
+
 function M.resolveArrival(profile: PlayerData, shells: ShellRegistry, config: Config): Arrival
 	-- Step 8: a returning (funnel-COMPLETE) player lands in the Lodge hub, not the Bayou root.
 	if Onboarding.isOnboardingComplete(profile) then
