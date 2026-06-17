@@ -27,7 +27,7 @@ local BEATS: { [string]: BeatDef } = {
 	[B.FIRST_HUNT] = { completesOn = { kill = true }, requiredCount = 1, next = B.FIRST_CATCH, passThrough = false },
 	[B.FIRST_CATCH] = { completesOn = { catch = true }, requiredCount = 1, next = B.FIRST_PURCHASE, passThrough = false },
 	[B.FIRST_PURCHASE] = { completesOn = { gearUpgrade = true }, requiredCount = 1, next = B.WORLD_MAP, passThrough = false },
-	[B.WORLD_MAP] = { completesOn = nil, requiredCount = 1, next = B.LOOP_CONFIRM, passThrough = true }, -- Step 9 makes this real
+	[B.WORLD_MAP] = { completesOn = { worldMapOpen = true }, requiredCount = 1, next = B.LOOP_CONFIRM, passThrough = false }, -- Step 9: real reveal beat (was pass-through)
 	[B.LOOP_CONFIRM] = { completesOn = { kill = true, catch = true }, requiredCount = 3, next = B.DAILY_INTRO, passThrough = false },
 	[B.DAILY_INTRO] = { completesOn = { dailyClaim = true }, requiredCount = 1, next = B.COMPLETE, passThrough = false },
 	[B.COMPLETE] = { completesOn = nil, requiredCount = 1, next = nil, passThrough = false },

@@ -21,8 +21,10 @@ return function(t: Harness.T)
 		Onboarding.advance(p, "catch", 20)
 		t.eq("a catch → FIRST_PURCHASE", p.onboarding.funnelBeat, "FIRST_PURCHASE")
 		Onboarding.advance(p, "gearUpgrade", 30)
-		t.eq("a gearUpgrade → LOOP_CONFIRM (WORLD_MAP passed through — Step 9 makes it real)", p.onboarding.funnelBeat, "LOOP_CONFIRM")
-		t.ok("beatStartedAt tracks the transition time (dwell telemetry)", p.onboarding.beatStartedAt == 30)
+		t.eq("a gearUpgrade → WORLD_MAP (now a real reveal beat, Step 9)", p.onboarding.funnelBeat, "WORLD_MAP")
+		Onboarding.advance(p, "worldMapOpen", 35)
+		t.eq("opening the World Map → LOOP_CONFIRM", p.onboarding.funnelBeat, "LOOP_CONFIRM")
+		t.ok("beatStartedAt tracks the transition time (dwell telemetry)", p.onboarding.beatStartedAt == 35)
 		Onboarding.advance(p, "kill", 40)
 		Onboarding.advance(p, "catch", 50)
 		t.eq("LOOP_CONFIRM needs 3 loop actions — still confirming after 2", p.onboarding.funnelBeat, "LOOP_CONFIRM")
@@ -44,7 +46,7 @@ return function(t: Harness.T)
 	t.section("Onboarding — idempotent one-shot: a returning (COMPLETE) player never re-enters")
 	do
 		local p = Util.mkProfile(Catalog, {})
-		for _, e in { "kill", "catch", "gearUpgrade", "kill", "catch", "kill", "dailyClaim" } do
+		for _, e in { "kill", "catch", "gearUpgrade", "worldMapOpen", "kill", "catch", "kill", "dailyClaim" } do
 			Onboarding.advance(p, e, 100)
 		end
 		t.eq("reached COMPLETE", p.onboarding.funnelBeat, "COMPLETE")
@@ -58,7 +60,7 @@ return function(t: Harness.T)
 	do
 		local p = Util.mkProfile(Catalog, {})
 		t.ok("a first-time player is NOT complete (no store / real-money UI)", Onboarding.isOnboardingComplete(p) == false)
-		for _, e in { "kill", "catch", "gearUpgrade", "kill", "catch", "kill", "dailyClaim" } do
+		for _, e in { "kill", "catch", "gearUpgrade", "worldMapOpen", "kill", "catch", "kill", "dailyClaim" } do
 			Onboarding.advance(p, e, 1)
 		end
 		t.ok("after the chain, onboarding IS complete (Step 14's store may now surface)", Onboarding.isOnboardingComplete(p))
@@ -77,7 +79,7 @@ return function(t: Harness.T)
 		t.ok("the first HUNT is no longer guaranteed once it's been done (post-first)", Onboarding.firstSpawnEligible(Catalog, afterKill, "bayou", "sunny_levee", H) == false)
 
 		local done = Util.mkProfile(Catalog, {})
-		for _, e in { "kill", "catch", "gearUpgrade", "kill", "catch", "kill", "dailyClaim" } do
+		for _, e in { "kill", "catch", "gearUpgrade", "worldMapOpen", "kill", "catch", "kill", "dailyClaim" } do
 			Onboarding.advance(done, e, 1)
 		end
 		t.ok("a returning (COMPLETE) player gets NO guaranteed spawn (caps hold)", Onboarding.firstSpawnEligible(Catalog, done, "bayou", "sunny_levee", H) == false)

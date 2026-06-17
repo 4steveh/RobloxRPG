@@ -48,6 +48,7 @@ local specs: { (Harness.T) -> () } = {
 	-- Step 9 (World Map, fast-travel, gating)
 	require("@tests/Progression.spec"),
 	require("@tests/Travel.spec"),
+	require("@tests/WorldMapHandler.spec"),
 }
 
 for _, spec in specs do
