@@ -123,7 +123,7 @@ function M.validatePlacement(config: Config, shell: Shell, loopSpawn: LoopSpawn,
 	if (loop or Enums.Loop.Hunting) == Enums.Loop.Fishing then
 		for _, f in config.fish do
 			if f.destinationId == shell.destinationId then
-				local zones = assert(f.spawnZones, f.id .. ": a Bayou fish must carry spawnZones (Step 5 prereq)")
+				local zones = assert(f.spawnZones, f.id .. ": a fish must carry spawnZones (Step 5 prereq)")
 				for _, zoneId in zones do
 					assert(shell.zones[zoneId] ~= nil, f.id .. ": spawnZone '" .. zoneId .. "' is not a real zone in shell '" .. shell.destinationId .. "'")
 				end

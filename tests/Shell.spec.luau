@@ -65,4 +65,49 @@ return function(t: Harness.T)
 
 	t.section("Shell — framework keyed by DestinationId (reusable for a 2nd Destination)")
 	t.ok("the registry is keyed by DestinationId", bayou.destinationId == Ids.Destination.Bayou)
+
+	-- ── Appalachia shell (Task 1.3) ──────────────────────────────────────────
+	t.section("Appalachia Shell — registered + structural invariants")
+	local ap = Shells.byDestination[Ids.Destination.Appalachia]
+	t.ok("Appalachia shell is registered", ap ~= nil)
+	if ap ~= nil then
+		t.ok("Appalachia arrivalZoneId resolves to a zone", ap.zones[ap.arrivalZoneId] ~= nil)
+		t.ok("Appalachia §2.6.3 signpost co-located with vendor outpost", ap.travelSignpostAnchor.x == ap.vendorOutpostAnchor.x and ap.travelSignpostAnchor.z == ap.vendorOutpostAnchor.z)
+
+		t.section("Appalachia Shell — all canonical zone ids present")
+		for _, zid in { "outpost_cabin", "old_field", "oak_ridges", "creek_bottoms", "lookout_ridge", "hollow_creek", "mill_pond" } do
+			t.ok("zone present + id stable: " .. zid, ap.zones[zid] ~= nil and ap.zones[zid].id == zid)
+		end
+
+		t.section("Appalachia Shell — landmarks present (lookout_ridge beacon)")
+		t.ok("lookout_ridge landmark present + is beacon", ap.landmarks.lookout_ridge ~= nil and ap.landmarks.lookout_ridge.isBeacon == true)
+		for _, lid in { "lookout_ridge", "hollow_creek", "mill_pond", "the_old_field", "outpost_cabin" } do
+			t.ok("landmark present + id stable: " .. lid, ap.landmarks[lid] ~= nil and ap.landmarks[lid].id == lid)
+		end
+
+		t.section("Appalachia Shell — every creature/fish spawnZone resolves to a shell zone")
+		for cid, c in Catalog.creatures do
+			if c.destinationId == Ids.Destination.Appalachia and not c.ambianceOnly then
+				local zones = c.spawnZones
+				if zones ~= nil then
+					for _, zid in zones do
+						t.ok("creature " .. cid .. " spawnZone resolves: " .. zid, ap.zones[zid] ~= nil)
+					end
+				end
+			end
+		end
+		for fid, f in Catalog.fish do
+			if f.destinationId == Ids.Destination.Appalachia then
+				local zones = f.spawnZones
+				if zones ~= nil then
+					for _, zid in zones do
+						t.ok("fish " .. fid .. " spawnZone resolves: " .. zid, ap.zones[zid] ~= nil)
+					end
+				end
+			end
+		end
+
+		t.section("Appalachia Shell — ambiance coverage (gray squirrel → old_field)")
+		t.ok("appalachia_gray_squirrel placed in old_field", ap.ambiancePlacements["appalachia_gray_squirrel"] == "old_field")
+	end
 end
