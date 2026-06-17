@@ -50,6 +50,15 @@ local movement = Shells.movement
 local huntingSpawn = Spawning.byDestination[BAYOU].hunting
 local fishingSpawn = Spawning.byDestination[BAYOU].fishing
 
+-- ── STEP-10: world spatial offsets (hub-and-spoke — all three worlds coexist in one place at offsets).
+-- The Bayou offset is (0,0,0) so the existing Bayou login placement and all Bayou coord math is unaffected.
+-- Used by buildWorldGeometry (geometry) AND the fast-travel pivot (3.3) so they stay in sync.
+local worldOffsets = {
+	bayou      = Vector3.new(0,    0, 0),
+	appalachia = Vector3.new(2000, 0, 0),
+	alaska     = Vector3.new(4000, 0, 0),
+}
+
 local function vec(p)
 	return Vector3.new(p.x, p.y, p.z)
 end
@@ -61,6 +70,19 @@ local telemetry = Adapters.telemetry(function(metric, value)
 	-- `evergreen-sink share of endgame Cash` (economy.evergreenSink:slot/decor vs total endgame Cash), first-
 	-- trophy-display rate / time-to-first-mount (lodge.mount), slot-expansion purchase curve, take-down-to-
 	-- trade rate (lodge.takeDown), Lodge-visit / in-Lodge session time (the co-op-hub signal — Studio).
+	--
+	-- STEP-10 (3.4) telemetry — WIRED (these incr() calls fire at their event points below):
+	--   travel.fast_travel:<destinationId>  — fired in the "travel" action branch on result.ok (3.3)
+	--
+	-- STEP-10 (3.4) telemetry — TODO (need conquest/co-op events; deeper Studio work):
+	--   destination.time_to_conquer:<destinationId>  — per-Destination time from first-arrival to Tier apex
+	--                                                   kill; needs conquest event + timestamp store.
+	--   coop.apex_attempt:<destinationId>  — co-op grizzly/halibut attempt start; needs party-formation event.
+	--   coop.apex_success:<destinationId>  — co-op apex kill confirmed; needs Gauntlet party payload.
+	--   gate.t2_to_t4_dropoff:<destinationId>  — players who unlock T2 but do not reach T4; needs periodic
+	--                                             profile scan (idle player check) or session-end hook.
+	--   economy.destination_routine_income:<destinationId>  — per-session Cash earned in a Destination vs the
+	--                                                          EHT/EFT band; needs session-end flush with totals.
 end)
 local sessionService = SessionService.new({
 	store = Adapters.dataStore(DataStoreService:GetDataStore("WildWorld_Profiles_v1")),
@@ -167,6 +189,110 @@ bayouSpawn.Parent = world
 Lighting.FogStart = shell.render.fogStart
 Lighting.FogEnd = shell.render.fogEnd
 Lighting.FogColor = Color3.fromRGB(150, 160, 130)
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- STEP-10 (3.1): buildWorldGeometry — reusable low-poly placeholder builder for non-Bayou worlds.
+-- The Bayou world build above is LEFT INLINE (the proven playtest baseline — additive only; we do NOT
+-- refactor it to go through this helper so equivalence is guaranteed). This helper is called ONLY for
+-- Appalachia and Alaska. Each world is placed at a spatial originOffset so they don't overlap.
+--
+-- Fog is global (Lighting), so per-world fog is NOT set here (the Bayou's fog already wires Lighting
+-- above). A later step can swap fog on world-transition. Alaska's coastal_inlet/open_gulf zones render
+-- as geometry but are visually present only; Boat-gating is enforced at the data layer (Step 11).
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+local function buildWorldGeometry(destinationId, originOffset)
+	local targetShell = Shells.byDestination[destinationId]
+	if targetShell == nil then return end
+
+	local folder = Instance.new("Folder")
+	folder.Name = destinationId:sub(1,1):upper() .. destinationId:sub(2) .. "Shell_Placeholder"
+	folder.Parent = workspace
+
+	local function wpart(name, size, position, color, parent)
+		local p = Instance.new("Part")
+		p.Name = name
+		p.Size = size
+		p.Position = originOffset + position
+		p.Anchored = true
+		p.Color = color
+		p.TopSurface = Enum.SurfaceType.Smooth
+		p.Parent = parent or folder
+		return p
+	end
+
+	-- Ground pad: 500×500 centered on the world origin (low-poly placeholder per LOC §2.5).
+	local groundColor = (destinationId == "appalachia") and Color3.fromRGB(62, 80, 48) or Color3.fromRGB(70, 70, 65)
+	wpart("Ground", Vector3.new(500, 2, 500), Vector3.new(0, -1, 0), groundColor)
+
+	-- Zones
+	local zonesF = Instance.new("Folder")
+	zonesF.Name = "Zones"
+	zonesF.Parent = folder
+	for zid, z in targetShell.zones do
+		local isWater = z.kind == "fishing" or z.kind == "rareSite"
+		-- Alaska coastal zones: rendered but walled-off visually (no enforcement here — Step 11 Boat gate).
+		local zColor = isWater and Color3.fromRGB(55, 85, 105) or Color3.fromRGB(96, 116, 64)
+		local zpad = wpart(z.name, Vector3.new(z.size.x, 0.4, z.size.z), Vector3.new(z.center.x, 0.2, z.center.z), zColor, zonesF)
+		zpad.Material = isWater and Enum.Material.Glass or Enum.Material.Grass
+		zpad.Transparency = isWater and 0.3 or 0
+		zpad:SetAttribute("zoneId", zid)
+		zpad:SetAttribute("zoneKind", z.kind)
+		if isWater and destinationId == "alaska" and (zid == "coastal_inlet" or zid == "open_gulf") then
+			-- NOTE: coastal Boat-gated sub-area. Geometry present; navigation is non-traversable until Step 11.
+			zpad:SetAttribute("boatGated", true)
+		end
+	end
+
+	-- Landmark beacons (isBeacon=true → tall pillar like the Bayou Old Cypress; others → small shack)
+	for _, lm in targetShell.landmarks do
+		local lsize = lm.isBeacon and Vector3.new(8, 80, 8) or Vector3.new(24, 12, 18)
+		local lcolor = lm.isBeacon and Color3.fromRGB(60, 50, 40) or Color3.fromRGB(110, 90, 70)
+		local loffset = lm.isBeacon and Vector3.new(0, 40, 0) or Vector3.new(0, 6, 0)
+		wpart(lm.name .. "_Beacon", lsize, Vector3.new(lm.anchor.x, 0, lm.anchor.z) + loffset, lcolor)
+	end
+
+	-- Vendor outpost anchors
+	local vo = targetShell.vendorOutpostAnchor
+	wpart("Outfitter_Anchor",    Vector3.new(4, 8, 4), Vector3.new(vo.x - 8, 4, vo.z), Color3.fromRGB(150, 120, 90))
+	wpart("TackleShop_Anchor",   Vector3.new(4, 8, 4), Vector3.new(vo.x + 8, 4, vo.z), Color3.fromRGB(90, 120, 150))
+
+	-- Travel signpost
+	local ts = targetShell.travelSignpostAnchor
+	wpart("TravelSignpost_Anchor", Vector3.new(2, 10, 2), Vector3.new(ts.x, 5, ts.z + 6), Color3.fromRGB(120, 100, 60))
+
+	-- Ambiance pieces (same 4-per-zone pattern as the Bayou)
+	local ambF = Instance.new("Folder")
+	ambF.Name = "Ambiance"
+	ambF.Parent = folder
+	for speciesId, zoneId in targetShell.ambiancePlacements do
+		local z = targetShell.zones[zoneId]
+		local species = Catalog.creatures[speciesId]
+		if z ~= nil and species ~= nil then
+			for i = 1, 4 do
+				local a = wpart(species.name, Vector3.new(1.5, 1.5, 1.5), Vector3.new(z.center.x + i * 7 - 14, 1, z.center.z + i * 5 - 12), Color3.fromRGB(220, 220, 200), ambF)
+				a:SetAttribute("ambianceOnly", true)
+				a:SetAttribute("speciesId", speciesId)
+			end
+		end
+	end
+
+	-- Arrival spawn location
+	local arrZ = targetShell.zones[targetShell.arrivalZoneId]
+	if arrZ ~= nil then
+		local sp = Instance.new("SpawnLocation")
+		sp.Name = destinationId:sub(1,1):upper() .. destinationId:sub(2) .. "Arrival"
+		sp.Anchored = true
+		sp.Enabled = false -- placement driven by ArrivalService/PivotTo, not auto-spawn
+		sp.Size = Vector3.new(12, 1, 12)
+		sp.Color = Color3.fromRGB(120, 130, 90)
+		sp.Position = originOffset + Vector3.new(arrZ.center.x, 0.5, arrZ.center.z)
+		sp.Parent = folder
+	end
+end
+
+-- Build Appalachia and Alaska placeholder geometry (additive — Bayou inline block above is untouched).
+buildWorldGeometry("appalachia", worldOffsets.appalachia)
+buildWorldGeometry("alaska",     worldOffsets.alaska)
 
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
 -- THE LODGE (Step 8 — the hub interior placeholder + service fixtures). Low-poly placeholder; finished art
@@ -506,10 +632,21 @@ travelRequest.OnServerEvent:Connect(function(plr, action, destinationId)
 	end
 	if action == "travel" then
 		local result = DestinationService.travelTo(session.profile, destinationId)
+		-- STEP-10 (3.3): the gate is already enforced by DestinationService.travelTo (Step 9 — the persisted
+		-- unlocked set; travelTo can't bypass the gate). This block is the EXECUTION: resolve the destination
+		-- arrival anchor via ArrivalService.resolveDestinationArrival and PivotTo the character there.
+		-- All three worlds coexist in one place at their worldOffsets (hub-and-spoke MVL approach); the offset
+		-- is added to the shell-local anchor so the player lands in the correct world's geometry.
+		-- (Full cross-place TeleportService:Teleport is a later optimization — not needed while all worlds are
+		-- in one Studio place. result.teleportTarget is passed through for future use.)
 		if result.ok then
-			-- TODO(step-10): TeleportService place/spawn to result.teleportTarget for the real Destinations;
-			-- the only unlocked travel target at MVL is the Bayou (Lodge → Bayou). Return-to-Lodge is the
-			-- existing leave flow (ArrivalService), not fast-travel.
+			local char = plr.Character
+			local arrival = ArrivalService.resolveDestinationArrival(destinationId, Shells, Catalog)
+			local offset = worldOffsets[destinationId] or Vector3.new(0, 0, 0)
+			if char ~= nil and char.PrimaryPart ~= nil then
+				char:PivotTo(CFrame.new(vec(arrival.anchor) + offset + Vector3.new(0, 3, 0)))
+			end
+			telemetry.incr("travel.fast_travel:" .. destinationId, 1)
 			travelRequest:FireClient(plr, "traveling", destinationId, result.teleportTarget)
 		else
 			travelRequest:FireClient(plr, "denied", destinationId, result.reason)
@@ -602,4 +739,4 @@ print("[WildWorld] WorldServer online — ONE login owner; handlers:", (function
 		n += 1
 	end
 	return n
-end)(), "· Bayou + Lodge built")
+end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live")
