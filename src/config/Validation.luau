@@ -141,6 +141,19 @@ function V.assertFish(f: Fish)
 	end
 end
 
+-- Re-skin integrity: tier ≥ origin's AND behavior reuses the origin's template (progression §6).
+-- A re-skin may always be a calmer flee/passive 'find' variant of an aggressive/pack origin (LOC §5 —
+-- e.g. alaska_spirit_moose is `flees` while its origin alaska_bull_moose is `aggressive`).
+function V.assertCreatureReskin(c: Creature, config: Config)
+	local originId = assert(c.reskinOf, c.id .. ": assertCreatureReskin called on a non-reskin (reskinOf is nil)")
+	local source = assert(config.creatures[originId], c.id .. ": reskinOf '" .. originId .. "' must resolve to a creature")
+	assert(c.tier >= source.tier, c.id .. ": a re-skin's displayed tier (" .. c.tier .. ") must be ≥ its origin's (" .. source.tier .. ")")
+	-- Re-skins reuse a behavior TEMPLATE (progression §6). It must reuse the origin's archetype, OR be a
+	-- calmer flee/passive 'find' variant of an aggressive/pack origin (LOC §5 — e.g. the Spirit Moose).
+	local reusesTemplate = c.behavior == source.behavior or c.behavior == "flees" or c.behavior == "passive"
+	assert(reusesTemplate, c.id .. ": a re-skin must reuse its origin's behavior template (progression §6)")
+end
+
 -- Whole-catalog validation: per-row checks + cross-reference integrity (the seams that only show up
 -- across catalogs — reskins, milestone targets, gate prerequisites).
 function V.validateConfig(config: Config)
@@ -150,11 +163,9 @@ function V.validateConfig(config: Config)
 	for _, c in config.creatures do
 		V.assertCreature(c)
 		if c.reskinOf ~= nil then
-			local source = assert(config.creatures[c.reskinOf], c.id .. ": reskinOf '" .. c.reskinOf .. "' must resolve to a creature")
 			-- The re-skin's OWN tier is authoritative and it is balanced/rewarded at its DISPLAYED tier
-			-- ("rabbits in Alaska, but bigger"): a re-skin populates a HIGHER-or-equal tier than its origin,
-			-- never below (progression §6 — reskins populate a tier's floor/low-mid, never carry origin balance).
-			assert(c.tier >= source.tier, c.id .. ": a re-skin's displayed tier (" .. c.tier .. ") must be ≥ its origin's (" .. source.tier .. ")")
+			-- ("rabbits in Alaska, but bigger"): tier ≥ origin, behavior reuses the template (progression §6).
+			V.assertCreatureReskin(c, config)
 		end
 		-- Step-4 (SYS_combat §3): the min-weapon/min-armor-tier fields are DERIVED, not authored truth.
 		-- Assert the catalog matches the derivation for the BAYOU — the only Destination that exists; the

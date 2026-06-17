@@ -94,4 +94,20 @@ return function(t: Harness.T)
 		}
 		Validation.assertEquipmentItem(bad)
 	end)
+
+	t.section("Validation — a re-skin reuses its origin's behavior template (progression §6)")
+	t.test("every catalog re-skin shares its origin's behavior", function()
+		for _, c in Catalog.creatures do
+			if c.reskinOf ~= nil then
+				local origin = Catalog.creatures[c.reskinOf]
+				assert(origin ~= nil, c.id .. ": reskinOf must resolve")
+				Validation.assertCreatureReskin(c, Catalog)
+			end
+		end
+	end)
+	t.errs("a re-skin that changes behavior is rejected", function()
+		local bad = table.clone(Catalog.creatures.appalachia_piebald_whitetail)
+		bad.behavior = "aggressive" -- origin (whitetail) is `flees`
+		Validation.assertCreatureReskin(bad, Catalog)
+	end)
 end
