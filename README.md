@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–7)
+# Wild World — Build (Steps 1–8)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -38,6 +38,17 @@ note per step.
   predicate**, the no-real-money-until-`COMPLETE` gate, and the daily-quest **skeleton**. **The funnel
   *working* is a playtest/telemetry verdict (the D1 > 25% gate), not a green-CI one** — the felt FTUE and
   every D1 metric are Studio/telemetry, split honestly below.
+- **Step 8 — The Lodge & Trophy Hall.** A **thin-but-rigorous headless core** + a **large Studio bulk**. The
+  Trophy Hall is a **VIEW, not a store** — `filter(profile.artifacts, DISPLAYED)`, no parallel list, no
+  desync/dupe surface. Step 8 builds the **flows that CALL the existing primitives** (it reimplements none):
+  **salvage** (the §4 CAS `→ SALVAGED` + the `salvageFloor` credit, in one `Transaction` — atomic,
+  idempotent via the CAS precondition, terminal), **display / take-down** (the `HELD↔DISPLAYED` CAS, gated on
+  owned **slot capacity**), the **slot + decor Cash sink** (the economy's §9 evergreen inflation ballast —
+  escalating/uncapped slots + a balance-free decor catalog), and the **Lodge arrival routing** (a
+  funnel-`COMPLETE` player returns to the Lodge; a first-time player to the Bayou root). The **one-server
+  bootstrap** consolidates the per-step `.server` slices into a single login owner. **The flows are
+  headless-proven; the bootstrap, the Lodge interior, trophy rendering, the "Mount it" prompt, decor
+  placement, and the visit/social path are Studio** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -75,6 +86,7 @@ src/
            Validation (build-time assertions, incl. Step-4 authored==derived min-tiers) · Catalog (self-validates)
            · Shells (Step 3 — the Bayou shell; self-validates + Step-4 placement check)
            · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing)
+           · Decor (Step 8 — the starter MVL decor/theme/framing catalog; Cash-priced, balance-free, tradeable=false; self-validates)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
@@ -84,6 +96,8 @@ src/
            · Profile (+ Step-6 mintCommodity: the gear-grant primitive the shops + the starter loadout use)
            · Onboarding (Step 7 — the data-driven funnel state machine: advance/firstSpawnEligible/isOnboardingComplete; server-auth, idempotent, atomic)
            · Daily (Step 7 — the daily cross-loop pair objective state + the server-time reset; the board-claim skeleton)
+           · TrophyHall (Step 8 — the VIEW: filter(artifacts, DISPLAYED); plaque from provenance; slot usage; NO parallel store)
+           · Economy (+ Step-8 slotExpansionPrice: the escalating/uncapped evergreen-sink slot price)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -95,10 +109,12 @@ src/
       ShopHandler.luau      (Step 6) the Outfitter/Tackle-Shop gear sinks — buy + intra-tier upgrade gauntlet handlers (critical, atomic Cash debit + commodity mint)
     daily/
       ClaimDailyHandler.luau (Step 7) the daily cross-loop-pair claim — credits the faucet + breadth bonus, completes DAILY_INTRO (critical, idempotent per day)
+    lodge/
+      SalvageHandler.luau     (Step 8) the "salvage" intent — §4 CAS →SALVAGED + salvageFloor credit, one Transaction (critical, atomic, idempotent, terminal)
+      DisplayHandler.luau     (Step 8) "mountTrophy"/"takeDownTrophy" — HELD↔DISPLAYED CAS + slot-capacity gate (critical; no Cash)
+      LodgeShopHandler.luau   (Step 8) "buySlot"/"buyDecor" (the evergreen Cash sink, evergreen-tagged) + "placeDecor" (cosmetic layout)
     idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
-    world/BayouBlockout.server.luau    ⌂ STUDIO-ONLY — builds the placeholder shell from Shells config + the arrival flow
-    world/HuntingService.server.luau   ⌂ STUDIO-ONLY (Step 4) — physical spawner + fire RemoteEvent + raycast LOS + non-lethal clamp + respawn
-    world/FishingService.server.luau   ⌂ STUDIO-ONLY (Step 5) — physical bite spawner + spot-depletion + cast/bite/fight + non-punitive loss
+    world/WorldServer.server.luau   ⌂ STUDIO-ONLY (Step 8) — THE ONE login owner: one SessionService + one shared gauntlet registry (every handler), Bayou + Lodge build, both spawners + flows, kind-aware arrival
   client/CharacterController.client.luau   ⌂ STUDIO-ONLY — mobile camera/controls (→ StarterPlayerScripts)
   server/
     persistence/
@@ -123,7 +139,8 @@ src/
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
          ProfileStore/Ledger/ArtifactStore/Gauntlet/Idle/Integrity; Step 3: Shell/Arrival; Step 4:
          Combat/Spawner/RewardPipeline/FireHandler; Step 5: Fishing/CatchHandler; Step 6: Economy/ShopHandler;
-         Step 7: Onboarding/Daily/ClaimDailyHandler) · negative/ (MUST fail analysis)
+         Step 7: Onboarding/Daily/ClaimDailyHandler;
+         Step 8: Lodge/TrophyHall/SalvageHandler/DisplayHandler/LodgeShopHandler) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -459,6 +476,88 @@ in that profile.
 - **A/B knobs preserved as config** (not silently resolved): hunt-first vs fish-first, World-Map reveal
   timing, aim-assist taper, chain length, first-purchase affordability — beats are data-driven for exactly this.
 
+## Step 8 — the Lodge & Trophy Hall (view-not-store; call-don't-reimplement; the bar is split, honestly)
+
+The single most important property: **the Trophy Hall is a VIEW, not a store** — `filter(profile.artifacts,
+disposition == DISPLAYED)`. There is **no parallel `trophyWall` list** to keep in sync, hence no
+desync/dupe surface between inventory and wall (SYS_data_integrity §4). The plaque (what/where/when) reads
+the artifact's **provenance** — one source of truth, never re-entered. The second property: Step 8 **CALLS
+the existing primitives, it reimplements none** — `ArtifactStore.transition` (the §4 CAS), `Economy.salvageFloor`,
+`profile.artifacts`, `Onboarding.isOnboardingComplete`, the `Ledger`, the `Gauntlet`, `Transaction`.
+
+**Schema additions (Step 8 owns):** a count-based `PlayerData.lodge = { boughtSlots, ownedDecor, placements }`
+— typed-owned slots/decor (no `instanceId`/`equipped`/`artifactId`), distinct from the instance-based gear
+`commodities`; a `Config.decor` catalog (`Decor.luau`); `Tuning.lodge` (`baseTrophySlots = 8`, the
+escalating/uncapped `slotExpansionPrice`, `visitInstancingMode`); and a Lodge **arrival representation**
+(`Shells.lodge` + a `kind: "lodge" | "destination"` discriminator on `Arrival`) — the Lodge is the hub, NOT
+a `requiredTier==0` Destination, so it does not fit the shell/gate model.
+
+**Headless-proven (the flows + the sink — full discipline on the salvage path):**
+- **Salvage** — `transition(HELD|DISPLAYED → SALVAGED)` + a `salvageFloor` credit commit in **one
+  `Transaction`** (a forced save failure leaves the artifact **un-salvaged AND no Cash** — no orphan); a
+  re-salvage of a SALVAGED/escrowed artifact **fails the CAS precondition → no double-credit**; `SALVAGED`
+  is terminal; `DISPLAYED → SALVAGED` is **one** atomic transition. Server derives the floor from the
+  artifact's own provenance (never a client amount).
+- **Display / un-display** — `mountTrophy` (HELD→DISPLAYED) and `takeDownTrophy` (DISPLAYED→HELD) call the
+  CAS and re-render; **mounting past owned slot capacity is rejected** (`slots_full` — the sink pull); a
+  non-Trophy `→ DISPLAYED` is rejected (§4 kind-gating); a DISPLAYED trophy has **no direct trade path**
+  (take it down first — escrow/swap is Step 12).
+- **Trophy Hall view** — `TrophyHall.displayed(profile) = filter(artifacts, DISPLAYED)` with provenance read
+  from the artifact record; **no parallel structure persisted** (a test asserts the wall is derived, not
+  stored); also exposed read-only in `Replication.projection.trophyHall` (the client renders from the
+  server-computed shadow; a client edit changes nothing).
+- **Slot/decor sink** — `buySlot` (escalating, **uncapped** `slotExpansionPrice`) and `buyDecor` debit Cash +
+  grant the count-based owned slot/decor, **server-validated + atomic + evergreen-tagged** (`slotExpansion`
+  / `decor` ledger types; `economy.evergreenSink:*` telemetry — the §9 canary `evergreen-sink share of
+  endgame Cash`); **insufficient funds rejects with no partial state**; a decor SKU that is not balance-free
+  is **rejected at load** (`assertDecorItem`: identity-only monetization, Cash-priced, `tradeable=false`).
+  `placeDecor` records the cosmetic layout (no economy/anti-dupe weight).
+- **Arrival routing** — `resolveArrival` returns the **Lodge** for `isOnboardingComplete`, the **Bayou root**
+  for a first-time player (a headless branch test).
+- Steps 1–7 tests stay green (the artifact CAS + the ledger now carry the salvage/display/sink flows through
+  their existing atomic paths).
+
+**Studio / telemetry — NOT headless (the real bar; all unchecked):**
+- [ ] **The one-server bootstrap** — a single login/`SessionService` owner with every handler (hunting,
+      fishing, shop, daily, salvage/display/decor, world) on **one shared gauntlet registry**; the per-step
+      `.server` slices (`BayouBlockout`/`HuntingService`/`FishingService`) consolidated into one runnable
+      `WorldServer.server.luau`. **Verify exactly one login lock per profile** in a running session (the
+      headless session logic is unchanged; this is the wiring). The deleted slices each stood up their own
+      `SessionService` and could not coexist.
+- [ ] The Lodge interior renders within mobile budget (low-poly, streamed); service fixtures are
+      look-navigable (a gun rack reads as the Outfitter); built-vs-stub fixtures read as ready vs "coming"
+      (Trophy Hall/Outfitter/Tackle Shop built; World Map → 9, Trading Post → 12, Boat Dealer/Kennel → 11).
+- [ ] A mounted trophy renders with a **rarity-distinct model** (an albino reads white **without a UI
+      label**), a provenance plaque (weight-kg/where/when — the **weight-kg label is the Studio render**,
+      derived from the source species' weight data; provenance carries sourceId + mintedAt), and rarity
+      framing — readable in a screenshot.
+- [ ] The **"Mount it" auto-prompt** fires after the rare flourish (`autoPromptOnMint` on) as a UI beat that
+      leaves the artifact **HELD until tapped** (dismissing is a no-op; no auto-display path).
+- [ ] Decor placement *feels* like making the Lodge yours; the Hall fills as a visible return hook.
+- [ ] The **instancing/visit path** (own-Lodge vs shared-lobby vs visit-on-invite) — **not built**; deferred
+      to the server-model + moderation pass (see the flag below).
+- [ ] `evergreen-sink share` + the display/expansion/visit metrics populate.
+
+**Flagged (resolve-or-flag, not silently baked):**
+- **Lodge-visit instancing model — UNRESOLVED.** MVL builds the player's **own-Lodge** Trophy Hall + all
+  flows (instancing-agnostic — the content is a view either way; only *who can see it and how* is open).
+  `Tuning.lodge.visitInstancingMode = "ownInstance"`. Recommend a **shared Lodge social-lobby**
+  (partner-finding) **+ visitable individual Lodges on invite** (the flex) — but **confirm the mobile render
+  budget first**. Decide with the server/session model + a moderation pass (13+ audience, visiting
+  strangers). No visit/social path is built.
+- **`baseTrophySlots` / `slotExpansionPrice` numbers are provisional** (`8` / base `5000` · growth `1.5`) —
+  economy ratifies the absolute Cash post-soft-launch (same deferral as Step 7's daily amounts); the
+  **model** (escalating, uncapped, no `maxTrophySlots`) is fixed.
+
+**Deferrals (named with their owning step):** trading / `HELD→ESCROWED` / the swap → **Step 12** (Step 8
+routes "take down to trade" into take-down and hands off); the World Map / Travel Desk reveal + gated
+teleport → **Step 9** (the fixture is placed); Boats / Mounts / Dogs inventories → **Step 11** (fixtures
+placed); real-money decor + the **auto-sell game pass** (assert auto-sell-never-salvages-a-trophy where
+auto-sell is built) → **Step 14** (decor here is Cash-priced); the ongoing decor/theme/framing catalog
+**cadence** → **Step 13** (Step 8 ships the starter MVL catalog + the purchase mechanism); a "show off rare
+companions" surface (rare dogs/mounts beyond the Trophy Hall) → deferred (LiveOps / a future Kennel
+deep-dive — do **not** overload the Trophy Hall). **Displayed trophies grant no non-cosmetic benefit, ever.**
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -471,8 +570,8 @@ in that profile.
 | The **rewarded-ad revive** | Step 14 |
 | **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D); the MVL **T2→T4 difficulty check** + the **dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters + king-salmon/halibut) | post-MVL / Step 10 |
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
-| Real-money **currency packs / 2×-VIP multipliers (multiplicative stacking + max-stack ceiling) / auto-sell**; cosmetics & Lodge decor (the evergreen inflation ballast) | Steps 14 / 8 |
-| Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive) | Step 8 |
+| ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; remaining: trading's escrow/swap | Step 12 |
+| ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
 | World Map UI, **gated teleport execution + enforcement** | Step 9 |
 | Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback (call CAS `HELD↔ESCROWED` + Transaction + paired ledger entries) | Step 12 |
 | Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`) | Step 14 |
@@ -559,7 +658,19 @@ above) **the felt FTUE, the pacing, the aim-assist taper, and EVERY D1 metric** 
 **this step's success is a telemetry verdict (D1 > 25%), not a green-CI one.** `WORLD_MAP` is a declared
 pass-through (Step 9 makes it real).
 
-**546 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
+**Step 8:** ✅ (headless) the count-based `lodge` schema + `Decor` catalog (balance-free, self-validating) +
+`Tuning.lodge` + `Economy.slotExpansionPrice` (escalating/uncapped); the **Trophy Hall VIEW**
+(`filter(artifacts, DISPLAYED)`, plaque from provenance, slot usage, **no parallel store**, exposed in the
+projection); the **salvage** flow (CAS `→ SALVAGED` + `salvageFloor` credit in one `Transaction` — atomic,
+idempotent via the precondition, terminal; no orphan on a failed write; `DISPLAYED→SALVAGED` one transition);
+**display/take-down** (HELD↔DISPLAYED CAS + slot-capacity gate; non-trophy rejected; no direct trade path);
+the **slot/decor Cash sink** (escalating slot + balance-free decor buy/place — atomic, evergreen-tagged,
+insufficient-funds no partial); the **Lodge arrival branch** (`isOnboardingComplete` → Lodge, else Bayou).
+⌂ (Studio, unchecked above) **the one-server bootstrap (verify exactly one login lock)**, the Lodge interior,
+trophy rendering, the "Mount it" prompt, decor placement, and the **flagged** visit/social topology
+(own-Lodge MVL only). Step 8 **calls** the §4 CAS / `salvageFloor` / `artifacts` — it rebuilds none of them.
+
+**659 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
 place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
