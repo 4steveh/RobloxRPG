@@ -162,6 +162,9 @@ export type Gate = {
 	requiredTier: number,
 	milestoneTargets: { TargetId }, -- the prerequisite's conquest targets; loop-aware via the catalog
 	prerequisiteDestinations: { DestinationId }, -- the DAG edges (⊆ conqueredDestinations)
+	-- Step 9: entry-gate access items the player must OWN (e.g. a Boat for a water-locked Destination).
+	-- OPTIONAL: MVL Destinations omit it (no entry is access-gated; Alaska's Boat gates a sub-area, Step 10/11).
+	requiredAccessItems: { ItemId }?,
 }
 export type Destination = {
 	id: DestinationId,

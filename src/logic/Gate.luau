@@ -46,6 +46,16 @@ local function weakSlots(profile: PlayerData, config: Config, loop: Loop, requir
 	return weak
 end
 
+-- Owns an access item iff a commodity with that catalogId is in the inventory (vehicles are commodities).
+local function ownsAccessItem(profile: PlayerData, itemId: string): boolean
+	for _, c in profile.inventory.commodities do
+		if c.catalogId == itemId then
+			return true
+		end
+	end
+	return false
+end
+
 local function targetName(config: Config, targetId: string): string
 	local c = config.creatures[targetId]
 	if c ~= nil then
@@ -113,6 +123,17 @@ function M.evaluateGate(profile: PlayerData, destination: Destination, config: C
 			else
 				table.insert(reasons, string.format("Conquer %s", prereqName))
 			end
+		end
+	end
+
+	-- ── Access half (entry-gate only): the player must OWN each required access item (§2). Optional —
+	-- nil/empty for every MVL Destination. The sub-area Boat gate (Alaska coastal fishing) is NOT this.
+	local accessItems: { string } = gate.requiredAccessItems or {}
+	for _, itemId in accessItems do
+		if not ownsAccessItem(profile, itemId) then
+			local item = config.equipment[itemId]
+			local itemName = item ~= nil and item.name or itemId
+			table.insert(reasons, string.format("Acquire %s to reach %s", itemName, destination.name))
 		end
 	end
 

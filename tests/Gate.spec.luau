@@ -111,6 +111,27 @@ return function(t: Harness.T)
 	local fisherConq = Util.mkProfile(Catalog, { rod = 4, reel = 4, conquered = { D.Alaska } })
 	t.ok("unlocked once the fishing-only prerequisite is conquered", Gate.evaluateGate(fisherConq, singleLoopChained, Catalog).unlocked)
 
+	t.section("Gate — required_access_items entry-gate half (synthetic water-locked Destination)")
+	do
+		-- a synthetic Destination entry-gated by owning an access item (the future water-locked case).
+		local waterLocked: Schema.Destination = {
+			id = "synthetic_island",
+			name = "Synthetic Island",
+			tier = 1,
+			offeredLoops = { Enums.Loop.Fishing },
+			gate = { requiredTier = 0, milestoneTargets = {}, prerequisiteDestinations = {}, requiredAccessItems = { "synthetic_boat" } },
+			teleportTarget = "fixture",
+		}
+		local noBoat = Util.mkProfile(Catalog, { rod = 1, reel = 1 })
+		local rNoBoat = Gate.evaluateGate(noBoat, waterLocked, Catalog)
+		t.ok("locked without the access item", rNoBoat.unlocked == false)
+		t.ok("the unmet reason names the access item (actionable noun)", Util.anyContains(rNoBoat.unmetReasons, "synthetic_boat") or Util.anyContains(rNoBoat.unmetReasons, "Boat"))
+		-- own the access item: a commodity whose catalogId is the required item id.
+		local withBoat = Util.mkProfile(Catalog, { rod = 1, reel = 1 })
+		table.insert(withBoat.inventory.commodities, { instanceId = "boat1", catalogId = "synthetic_boat", intraLevel = 0, equipped = false })
+		t.ok("unlocked once the access item is owned", Gate.evaluateGate(withBoat, waterLocked, Catalog).unlocked)
+	end
+
 	t.section("Gate — Bayou is the free, always-unlocked root")
 	local fresh = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1 })
 	t.ok("Bayou unlocked with no gear and nothing conquered", Gate.evaluateGate(fresh, Catalog.destinations[D.Bayou], Catalog).unlocked)
