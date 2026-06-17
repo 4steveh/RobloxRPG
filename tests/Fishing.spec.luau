@@ -106,6 +106,15 @@ return function(t: Harness.T)
 		t.ok("a 99-FD 'bluegill' no longer derives min-rod-tier 1", Fishing.deriveMinTiers(Catalog, mis).minRodTier ~= 1)
 	end
 
+	-- ── Task 1.2 (Step 10): Appalachia fish carry spawnZones ──
+	t.section("Fishing — every Appalachia fish carries spawnZones")
+	t.ok("Appalachia fish all carry spawnZones resolving later to the shell", (function()
+		for _, f in Catalog.fish do
+			if f.destinationId == "appalachia" and (f.spawnZones == nil or #(f.spawnZones :: any) == 0) then return false end
+		end
+		return true
+	end)())
+
 	-- ── Task 0.2 (Step 10): landableAt + coopLandableAt helpers ──
 	t.section("Fishing — landableAt + co-op-landable helper")
 	do

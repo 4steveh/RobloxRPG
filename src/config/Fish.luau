@@ -198,6 +198,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.pond,
 		baitRequired = "worm",
+		spawnZones = { "mill_pond" },
 		cash = { min = 40, max = 50 },
 	}),
 	fish({
@@ -213,6 +214,7 @@ local rows: { Fish } = {
 		minReelTier = 1,
 		waterType = W.river,
 		baitRequired = "fly", -- basic required-item gate (never a tier input)
+		spawnZones = { "hollow_creek" },
 		cash = { min = 40, max = 50 },
 		conditions = { time = "dawn", weather = "overcast" },
 	}),
@@ -228,6 +230,7 @@ local rows: { Fish } = {
 		minRodTier = 2,
 		minReelTier = 2,
 		waterType = W.river,
+		spawnZones = { "hollow_creek", "mill_pond" },
 		cash = { min = 40, max = 50 },
 	}),
 	fish({
@@ -242,6 +245,7 @@ local rows: { Fish } = {
 		minRodTier = 2,
 		minReelTier = 2,
 		waterType = W.lake,
+		spawnZones = { "mill_pond" },
 		cash = { min = 66, max = 80 },
 		conditions = { time = "low light" },
 		isMilestoneTarget = true, -- Appalachia fishing conquest milestone
@@ -258,6 +262,7 @@ local rows: { Fish } = {
 		minRodTier = 2,
 		minReelTier = 2,
 		waterType = W.lake,
+		spawnZones = { "mill_pond" },
 		cash = { min = 66, max = 80 },
 	}),
 	fish({
@@ -272,6 +277,7 @@ local rows: { Fish } = {
 		minRodTier = 3, -- snaps at T2 even maxed; T3 or T2 + co-op
 		minReelTier = 3,
 		waterType = W.lake,
+		spawnZones = { "mill_pond" },
 		cash = { min = 66, max = 80 },
 		conditions = { time = "dusk", weather = "overcast" },
 	}),
@@ -288,6 +294,7 @@ local rows: { Fish } = {
 		minReelTier = 2,
 		waterType = W.lake,
 		baitRequired = "large bucktail",
+		spawnZones = { "mill_pond" },
 		conditions = { time = "dusk", weather = "storm" },
 		rare = rareFields(1500, "the storm-light hero catch — the fishing-side mirror of the Ghost Buck"),
 	}),
