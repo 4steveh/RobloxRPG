@@ -202,6 +202,37 @@ Tuning.liveops = table.freeze({
 	-- handler's `event.endTime + 1` (the inclusive-boundary fix), NOT this knob.
 })
 
+-- §monetization (Step 14 — SYS_economy §7 + EQUIPMENT_MASTER §4.8). The real-money layer's tuning knobs.
+-- Every magnitude is an ILLUSTRATIVE DEFAULT (a calibration knob measured against ARPU / inflation / the
+-- premium-bait rare-trend canary). The STRUCTURAL guarantees (pay-proof union, the ≤Uncommon bias ceiling,
+-- receipt idempotency) are NOT knobs — they are type-level / by-construction. These are the dials.
+Tuning.monetization = table.freeze({
+	-- §7 real-money active-income multipliers (server-validated, time-bounded entitlements; applied at the
+	-- active kill/catch GRANT only — never idle/daily/salvage/milestone). Stack MULTIPLICATIVELY up to the
+	-- max-stack ceiling so worst-case minting is bounded (§7). Keyed by Enums.CashMultiplier.
+	multipliers = table.freeze({ ["2xBoost"] = 2.0, vip = 1.1 } :: { [string]: number }),
+	maxStackCeiling = 2.5, -- §7 design max-stack cap (~2.5×) — bounds worst-case real-money Cash/hr
+	boostDurationSeconds = 3600, -- a time-limited 2x boost lasts ~1 hour of wall-clock (illustrative)
+	-- §A (EQUIPMENT_MASTER §4.8) premium bait/ammo — the CONVENIENCE effect (routine-grind compression only).
+	-- Shorter TimeToBite + small LandWindow bonus (bait); a tighter settle / effective-CycleTime edge (ammo).
+	-- The rarity bias is CAPPED at Uncommon STRUCTURALLY (the routine pool is Common/Uncommon by construction);
+	-- `uncommonBias` is the WATCH-KNOB — tighten toward 0 if telemetry shows premium bait inflating tradeable
+	-- rares (the §4.8 open flag). None of these touch `rareSpawnEligible` (bait-free) or the per-catch band.
+	premiumBait = table.freeze({
+		timeToBiteSpeedup = 0.25, -- shortens routine TimeToBite by 25% (more routine bites/hr — grind compression)
+		landWindowBonus = 0.10, -- a small routine LandWindow bonus (bait)
+		cycleTimeEdge = 0.10, -- premium ammo: tighter settle (a small effective-CycleTime edge)
+		uncommonBias = 0.5, -- THE WATCH-KNOB: routine Uncommon spawn weight × (1 + bias); 0 = neutral, tighten if rares inflate
+	}),
+	-- §F rewarded ad — an OPT-IN, BOUNDED Cash faucet (never required, never a gate). The amount is a small
+	-- fraction of current-tier hourly income, hard-capped at an absolute ceiling; a cooldown bounds frequency.
+	adReward = table.freeze({
+		incomeFraction = 0.05, -- the reward = a small fraction of Income(T_current) …
+		absoluteCap = 200, -- … hard-capped here regardless of tier (bounded — a low-tier-farming-proof ceiling)
+		cooldownSeconds = 300, -- minimum seconds between rewarded-ad claims (the frequency bound)
+	}),
+})
+
 -- Big one-time access/convenience sink multipliers (EQUIPMENT_MASTER §4.5–§4.7; coarse defaults, OQ-D).
 --   BoatCost = b·Income(T_water);  MountCost ≈ mountMultiplier·GearCost_slot(T);  DogCost ≈ dogMultiplier·GearCost_slot(T)
 Tuning.vehicles = table.freeze({

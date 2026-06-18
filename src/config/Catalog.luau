@@ -11,6 +11,7 @@ local Destinations = require("@src/config/Destinations")
 local RankPerks = require("@src/config/RankPerks")
 local Decor = require("@src/config/Decor")
 local LiveOps = require("@src/config/LiveOps")
+local Products = require("@src/config/Monetization")
 local Validation = require("@src/config/Validation")
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
@@ -70,6 +71,7 @@ local Catalog: Config = {
 	rankPerks = RankPerks,
 	decor = Decor,
 	liveOps = LiveOps,
+	products = Products, -- Step 14: the real-money product catalog (self-validates via assertProduct on load)
 	targetIndex = targetIndex,
 }
 

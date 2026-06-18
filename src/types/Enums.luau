@@ -188,6 +188,32 @@ Enums.RealMoneyKind = table.freeze({
 	devproduct = "devproduct" :: RealMoneyKind,
 })
 
+-- Step 14: the CLOSED set of what a real-money product may grant (SYS_economy §7 — sell WITH the player).
+-- This is the pay-proof keystone: a product's grant is a union of these SAFE variants ONLY (Cash | item |
+-- cosmetic | multiplier). There is deliberately NO `conquest`/`tier`/`effective-tier-input` kind, so a
+-- pay-to-win grant is UNREPRESENTABLE (the type-level guarantee, like the cosmetic "no stats field") — not a
+-- role-tag a mis-tagged config could evade. `Schema.ProductGrant` is the tagged union over these kinds.
+export type GrantKind = "cash" | "item" | "cosmetic" | "multiplier"
+local grantKindSet: { [GrantKind]: boolean } = { cash = true, item = true, cosmetic = true, multiplier = true }
+Enums.GrantKindSet = table.freeze(grantKindSet)
+Enums.GrantKind = table.freeze({
+	cash = "cash" :: GrantKind, -- a `currencypack` Cash faucet (hits the same milestone wall idle Cash does)
+	item = "item" :: GrantKind, -- grant an EXISTING catalog item (never tier gear — Validation.assertProduct)
+	cosmetic = "cosmetic" :: GrantKind, -- a balance-free cosmetic (the cosmeticOnly guarantee)
+	multiplier = "multiplier" :: GrantKind, -- a time-limited / persistent ACTIVE-income multiplier (never idle/milestone)
+})
+
+-- Step 14: the real-money active-income multipliers (SYS_economy §7). A CLOSED set — the 2x Cash boost
+-- (time-limited dev product) and VIP (persistent game pass). Applied at the active kill/catch GRANT only,
+-- stacked multiplicatively up to the §7 max-stack ceiling; never on idle/daily/salvage/milestone.
+export type CashMultiplier = "2xBoost" | "vip"
+local cashMultiplierSet: { [CashMultiplier]: boolean } = { ["2xBoost"] = true, vip = true }
+Enums.CashMultiplierSet = table.freeze(cashMultiplierSet)
+Enums.CashMultiplier = table.freeze({
+	boost2x = "2xBoost" :: CashMultiplier,
+	vip = "vip" :: CashMultiplier,
+})
+
 -- Lodge decor SKU kind (SYS_lodge_trophy §3). A closed set; decor is identity-only, balance-free.
 export type DecorKind = "decor" | "theme" | "framing"
 Enums.DecorKind = table.freeze({

@@ -135,4 +135,43 @@ return function(t: Harness.T)
 			Validation.assertEquipmentItem(Catalog.equipment["dog_coonhound"])
 		end)
 	end
+
+	t.section("Validation — Step 14 pay-proof product guard (no power product; no item-grant tier gear)")
+	do
+		t.test("every authored product validates cleanly (no false positive)", function()
+			for _, product in Catalog.products do
+				Validation.assertProduct(product, Catalog)
+			end
+		end)
+		-- the never-power role guard, extended from gear (Step 11) to the product catalog (Step 14)
+		t.errs("a product carrying the power-progression role is rejected (no pay-to-win)", function()
+			local bad: Schema.Product = {
+				id = "bad_power_product", name = "Bad", kind = "devproduct", assetId = "rbxassetid://X",
+				grant = { kind = "cash", amount = 100 }, role = "power-progression", notes = "",
+			}
+			Validation.assertProduct(bad, Catalog)
+		end)
+		-- a SAFE-kinded grant can still try to smuggle power two ways — both closed:
+		t.errs("an item grant of TIER GEAR (a weapon) is rejected — real money never hands a power input", function()
+			local bad: Schema.Product = {
+				id = "bad_gear_product", name = "Bad Gear", kind = "gamepass", assetId = "rbxassetid://X",
+				grant = { kind = "item", itemId = "weapon_lever_action_rifle" }, role = "convenience", notes = "",
+			}
+			Validation.assertProduct(bad, Catalog)
+		end)
+		t.errs("a cosmetic grant of a NON-cosmetic item is rejected (the balance-free guarantee)", function()
+			local bad: Schema.Product = {
+				id = "bad_cosmetic_product", name = "Bad Cosmetic", kind = "gamepass", assetId = "rbxassetid://X",
+				grant = { kind = "cosmetic", itemId = "weapon_lever_action_rifle" }, role = "identity", notes = "",
+			}
+			Validation.assertProduct(bad, Catalog)
+		end)
+		t.errs("a product with no assetId placeholder is rejected (the binding must exist)", function()
+			local bad: Schema.Product = {
+				id = "bad_noasset", name = "Bad", kind = "devproduct", assetId = "",
+				grant = { kind = "cash", amount = 100 }, role = "convenience", notes = "",
+			}
+			Validation.assertProduct(bad, Catalog)
+		end)
+	end
 end

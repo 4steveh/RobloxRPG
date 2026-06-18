@@ -356,6 +356,42 @@ export type Quest = { id: string, loop: QuestLoop, objective: string, themedFor:
 export type LiveOpsConfig = { events: EventCatalog, dailyQuestPool: { Quest } }
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Monetization (Step 14 — SYS_economy §7 / EQUIPMENT_MASTER §4.8–4.10 / 00 §4). The real-money layer,
+-- "sell WITH the player": real money compresses grind (Cash, multipliers) + removes friction, but NEVER
+-- buys a milestone, a tier, a rare, or a gate.
+--
+-- THE PAY-PROOF KEYSTONE — `ProductGrant` is a CLOSED tagged union of SAFE variants (Cash | item | cosmetic
+-- | multiplier). It has NO conquest/tier/effective-tier-input member, so a pay-to-win grant is
+-- UNREPRESENTABLE — the same type-level guarantee the Reward XOR and the cosmetic no-stats field give,
+-- stronger than a role-tag a mis-tagged config could sneak past. A function that tries to write the conquest
+-- set off a ProductGrant cannot type-check (negative fixture `pay_to_win_grant.luau`).
+-- ─────────────────────────────────────────────────────────────────────────────
+export type CashGrant = { kind: "cash", amount: number } -- injects a `currencypack` Cash faucet
+-- `item` grants an EXISTING catalog item (a game-pass Boat = the same ACCESS grant bought a different way; a
+-- premium-bait dev-product pack = a fungible stack). `quantity` is the fungible stack size (nil → 1 / a
+-- single commodity). Validation.assertProduct rejects an item grant of TIER GEAR (tierInput) — real money
+-- never hands a power input.
+export type ItemGrant = { kind: "item", itemId: ItemId, quantity: number? }
+export type CosmeticGrant = { kind: "cosmetic", itemId: ItemId } -- a balance-free cosmetic (cosmeticOnly; no stats)
+export type MultiplierGrant = { kind: "multiplier", multiplier: Enums.CashMultiplier } -- active-income multiplier (§7)
+export type ProductGrant = CashGrant | ItemGrant | CosmeticGrant | MultiplierGrant
+
+-- A real-money product (dev product or game pass). Config-driven: a new pack/pass is a config row (RD4-style).
+-- `assetId` is a Roblox asset-id PLACEHOLDER — Steve binds the real ids in Studio. `role` is the Template-B
+-- monetization role; Validation.assertProduct forbids `power-progression` on any product (the never-power
+-- guard extended to the catalog). The grant is the closed union above.
+export type Product = {
+	id: string,
+	name: string,
+	kind: RealMoneyKind, -- gamepass | devproduct (the platform purchase mechanism)
+	assetId: string, -- Roblox asset-id PLACEHOLDER (bound in Studio)
+	grant: ProductGrant,
+	role: MonetizationRole, -- never power-progression (asserted) — identity|convenience|access only
+	notes: string,
+}
+export type ProductCatalog = { [string]: Product }
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Destination SHELL (Step 3 — the navigable place). Pure DATA: positions are plain {x,y,z} tables (not
 -- Roblox Vector3) so the shell is headless. The world blockout converts to Vector3 at runtime. Keyed by
 -- DestinationId so a second Destination (Appalachia, Step 10) reuses the framework with new data.
@@ -415,6 +451,7 @@ export type Config = {
 	rankPerks: { RankPerk },
 	decor: DecorCatalog,
 	liveOps: LiveOpsConfig, -- Step 13: the event calendar + daily-quest pool (config-not-code, RD4)
+	products: ProductCatalog, -- Step 14: the real-money product catalog (dev products + game passes; config-driven)
 	targetIndex: { [TargetId]: TargetIndexEntry },
 }
 

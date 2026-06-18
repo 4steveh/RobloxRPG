@@ -17,6 +17,7 @@ local Enums = require("@src/types/Enums")
 local Combat = require("@src/logic/Combat")
 local Fishing = require("@src/logic/Fishing")
 local Economy = require("@src/logic/Economy")
+local Monetization = require("@src/logic/Monetization")
 local Ledger = require("@src/server/ledger/Ledger")
 local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
 local Types = require("@src/server/persistence/Types")
@@ -46,7 +47,8 @@ export type KillEvent = {
 }
 export type Result = {
 	ambiance: boolean,
-	cash: number,
+	cash: number, -- total Cash granted = base routine payout + the §14 boost bonus (0 for a rare mint)
+	boostCash: number, -- Step 14: the 2x/VIP active-income bonus portion of `cash` (0 = no active multiplier)
 	mintedArtifactId: string?,
 	rankXP: number,
 	conquestNewlySet: boolean,
@@ -112,7 +114,7 @@ end
 function M.resolve(profile: PlayerData, config: Config, event: KillEvent, deps: PipelineDeps): Result
 	local d = describe(config, event)
 	local result: Result =
-		{ ambiance = false, cash = 0, mintedArtifactId = nil, rankXP = 0, conquestNewlySet = false, cleanKillMoment = nil }
+		{ ambiance = false, cash = 0, boostCash = 0, mintedArtifactId = nil, rankXP = 0, conquestNewlySet = false, cleanKillMoment = nil }
 
 	-- 1. Ambiance FIRST — an ambiance creature can never be a faucet, milestone, or Rank-XP exploit.
 	if d.ambiance then
@@ -142,13 +144,35 @@ function M.resolve(profile: PlayerData, config: Config, event: KillEvent, deps: 
 		local amount = payoutFn(config, d.tier, d.rarity, d.destinationId, event.loop)
 		Ledger.applyEntry(profile.cash, {
 			type = d.ledgerType,
-			amount = amount,
+			amount = amount, -- the UNMULTIPLIED routine faucet (so the dual-loop reconciliation, which reads the formula, is untouched)
 			tier = d.tier,
 			loop = event.loop,
 			validatingEventId = event.validatingEventId,
 		}, deps.now)
 		result.cash = amount
 		incr(deps, "combat.payout:tier" .. tostring(d.tier))
+
+		-- Step 14 (SYS_economy §7): the 2x/VIP active-income multiplier applies HERE — at the active kill/catch
+		-- GRANT, downstream of payoutFn — and NOWHERE else. The base faucet above stays the routine payout, so
+		-- idle/daily/salvage (which read Economy.income, never this path) and the milestone (set below, not Cash)
+		-- are NEVER multiplied. The boost is a SEPARATE, real-money-tagged, loop="none" entry → separable +
+		-- bounded in telemetry (§7), and the routine-hour reconciliation is left intact. Rares mint in the IF
+		-- branch above (no Cash) so the multiplier can never apply to a milestone artifact.
+		local multiplier = Monetization.activeCashMultiplier(config, profile, deps.now)
+		local bonus = Monetization.boostBonus(amount, multiplier)
+		if bonus > 0 then
+			Ledger.applyEntry(profile.cash, {
+				type = "boostBonus", -- the real-money multiplier faucet subtype (separable; loop=none keeps reconciliation clean)
+				amount = bonus,
+				tier = d.tier,
+				loop = "none",
+				validatingEventId = event.validatingEventId .. ":boost",
+				realMoneyTag = "realmoney:boost", -- §7 metered-separately tag (boost-active income is separable)
+			}, deps.now)
+			result.cash += bonus
+			result.boostCash = bonus
+			incr(deps, "monetization.boostFaucet")
+		end
 	end
 
 	-- 3. Hunter/Angler Rank XP — active-play only (idle never calls this). Difficulty/rarity weighted.

@@ -60,6 +60,10 @@ local specs: { (Harness.T) -> () } = {
 	-- Step 13 (LiveOps calendar — scheduler, scarcity guard, budgets, daily rotation, alarm; event reward)
 	require("@tests/LiveOps.spec"),
 	require("@tests/EventRewardHandler.spec"),
+	-- Step 14 (Monetization — pay-proof, premium-bait cap, currency-pack idempotency, 2x/VIP, rewarded ad)
+	require("@tests/Monetization.spec"),
+	require("@tests/PurchaseService.spec"),
+	require("@tests/RewardedAdHandler.spec"),
 }
 
 for _, spec in specs do

@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local HttpService = game:GetService("HttpService")
 local DataStoreService = game:GetService("DataStoreService")
 local Lighting = game:GetService("Lighting")
+local MarketplaceService = game:GetService("MarketplaceService") -- Step 14: the real-money platform boundary
 
 -- headless modules (require-by-string via .luaurc; Rojo + Roblox resolve at runtime)
 local Catalog = require("@src/config/Catalog")
@@ -41,6 +42,8 @@ local DisplayHandler = require("@src/server/lodge/DisplayHandler")
 local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
 local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
 local EventRewardHandler = require("@src/server/liveops/EventRewardHandler")
+local PurchaseService = require("@src/server/monetization/PurchaseService") -- Step 14: the headless grant logic
+local RewardedAdHandler = require("@src/server/monetization/RewardedAdHandler")
 local TradeService = require("@src/server/trading/TradeService")
 local Progression = require("@src/logic/Progression")
 local DestinationService = require("@src/server/DestinationService")
@@ -132,6 +135,7 @@ Gauntlet.register(registry, LodgeShopHandler.buyDecorHandler({ idGen = idGen, te
 Gauntlet.register(registry, LodgeShopHandler.placeDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, WorldMapHandler.new({ telemetry = telemetry }))
 Gauntlet.register(registry, EventRewardHandler.new({ telemetry = telemetry })) -- Step 13: the thin event participation faucet
+Gauntlet.register(registry, RewardedAdHandler.new({ idGen = idGen, telemetry = telemetry })) -- Step 14: the opt-in rewarded-ad faucet
 
 -- Step 12: the Trading Post — a SPECIAL two-session path (NOT a gauntlet handler; the gauntlet is single-
 -- profile). It reaches both traders' profiles via the one SessionService and runs the atomic swap (TradeSwap)
@@ -165,6 +169,87 @@ local function gauntletDeps(plr)
 		end,
 		telemetry = telemetry,
 	}
+end
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- STEP-14 MONETIZATION — the MarketplaceService boundary (PLATFORM/Studio). The grant + idempotency logic is
+-- HEADLESS + tested (PurchaseService / RewardedAdHandler / RewardPipeline's multiplier hook, run-tests.sh);
+-- THIS block is the thin platform wiring: PromptProductPurchase / PromptGamePassPurchase, the ProcessReceipt
+-- callback, UserOwnsGamePassAsync, and the rewarded-ad SDK trigger. NOTHING here mints Cash on its own — it
+-- routes the platform events into the headless grant functions, which carry the pay-proof + idempotency.
+--
+-- ASSET-ID BINDING (Out of scope — Steve binds the real numeric ids in Studio): the catalog ships PLACEHOLDER
+-- assetIds (config/Monetization), so these maps are EMPTY until the real Roblox ProductId / GamePassId numbers
+-- are filled in below. Until then the prompts are inert and ProcessReceipt defers (NotProcessedYet) — no Cash
+-- can be granted before an id is bound, which is the safe direction.
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+local devProductIdToProduct = {} -- TODO(studio): [Roblox ProductId (number)] = Catalog.products["pack_cash_small" | "boost_2x_cash" | "devproduct_premium_*"]
+local gamePassIdToProduct = {} -- TODO(studio): [Roblox GamePassId (number)] = Catalog.products["vip_pass" | "gamepass_coastal_skiff" | "gamepass_founders_skin"]
+
+-- The dev-product receipt callback. Idempotent on the Roblox PurchaseId via PurchaseService.processReceipt
+-- (a re-delivered receipt is a no-op). Persist BEFORE acknowledging: PurchaseGranted only on a successful
+-- save, else NotProcessedYet so Roblox re-delivers (and the redeemed-set makes the re-delivery a no-op).
+MarketplaceService.ProcessReceipt = function(receiptInfo)
+	local product = devProductIdToProduct[receiptInfo.ProductId]
+	if product == nil then
+		return Enum.ProductPurchaseDecision.NotProcessedYet -- id not yet bound / unknown → let Roblox retry
+	end
+	local session = sessionService.sessions[receiptInfo.PlayerId]
+	if session == nil then
+		return Enum.ProductPurchaseDecision.NotProcessedYet -- player not on this server; retry where they are
+	end
+	local r = PurchaseService.processReceipt(session.profile, Catalog, product, receiptInfo.PurchaseId, os.time(), telemetry)
+	if r.alreadyGranted then
+		return Enum.ProductPurchaseDecision.PurchaseGranted -- granted in a prior delivery (idempotent)
+	end
+	if SessionService.saveNow(sessionService, receiptInfo.PlayerId) then
+		return Enum.ProductPurchaseDecision.PurchaseGranted
+	end
+	return Enum.ProductPurchaseDecision.NotProcessedYet
+end
+
+-- The store UI asks the server to PROMPT a real-money purchase (the platform call; the grant lands in
+-- ProcessReceipt above / the game-pass login check below). Cash is never granted here.
+local purchaseRequest = Instance.new("RemoteEvent")
+purchaseRequest.Name = "PurchaseRequest"
+purchaseRequest.Parent = ReplicatedStorage
+purchaseRequest.OnServerEvent:Connect(function(plr, kind, assetId)
+	if kind == "gamepass" then
+		MarketplaceService:PromptGamePassPurchase(plr, assetId)
+	else
+		MarketplaceService:PromptProductPurchase(plr, assetId)
+	end
+end)
+
+-- The rewarded-ad trigger. The client watches an ad via the SDK and, on a VERIFIED completion, fires this;
+-- the server runs the claimAdReward gauntlet intent (which enforces the bounded amount + the cooldown cap).
+-- TODO(studio): gate this on the real rewarded-ad SDK completion attestation (the handler is the backstop).
+local adRequest = Instance.new("RemoteEvent")
+adRequest.Name = "RewardedAdClaim"
+adRequest.Parent = ReplicatedStorage
+adRequest.OnServerEvent:Connect(function(plr)
+	local session = sessionService.sessions[plr.UserId]
+	if session ~= nil then
+		Gauntlet.handle(registry, { intent = "claimAdReward", playerId = plr.UserId, payload = {} }, session, gauntletDeps(plr))
+	end
+end)
+
+-- Grant the game-pass entitlements a player OWNS (idempotent — safe to call every login; PurchaseService
+-- skips an already-owned item / active VIP). Called from PlayerAdded after the session loads.
+local function grantOwnedGamePasses(plr)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil then
+		return
+	end
+	for passId, product in gamePassIdToProduct do
+		local ok, owns = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(plr.UserId, passId)
+		end)
+		if ok and owns then
+			PurchaseService.grantGamePass(session.profile, Catalog, product, os.time(), telemetry)
+		end
+	end
+	SessionService.markDirty(sessionService, plr.UserId)
 end
 
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -762,7 +847,7 @@ Players.PlayerAdded:Connect(function(plr)
 	local session = sessionService.sessions[plr.UserId]
 	if session ~= nil then
 		Progression.commitUnlocks(session.profile, Catalog)
-		SessionService.markDirty(sessionService, plr.UserId)
+		grantOwnedGamePasses(plr) -- Step 14: grant owned game-pass entitlements (idempotent; marks dirty)
 	end
 	plr.CharacterAdded:Connect(function(char)
 		local hum = char:WaitForChild("Humanoid")
@@ -793,4 +878,4 @@ print("[WildWorld] WorldServer online — ONE login owner; handlers:", (function
 		n += 1
 	end
 	return n
-end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live · LiveOps event clock driving world.event (Step 13)")
+end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live · LiveOps event clock driving world.event (Step 13) · monetization wired: ProcessReceipt + game-pass + rewarded-ad seams (Step 14)")

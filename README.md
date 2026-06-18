@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–13)
+# Wild World — Build (Steps 1–14)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -131,6 +131,9 @@ src/
            · FishBuilder (Step 13 — the shared XOR-enforcing fish() + rareFields() builder, used by both Fish and LiveOps mintsFish)
            · Validation (+Step-13 the RD1 scarcity-discipline guard: assertEventConfig/assertNewScarcityId/assertFishItemRefs/validateLiveOps — build-time rejection of rate-edit/clone/re-release [mintNew must be ∈ mintsFish, ∉ base catalog]; PEAK aggregate ceiling; one spawn-gating event at a time)
            · Fish (+Step-13 the requiresItem item-ownership field; builder extracted to FishBuilder) · Spawning (+Step-13 frozen_lake area, capped low)
+           · Monetization (Step 14 — the real-money product catalog: dev-products + game-passes → placeholder assetId / closed ProductGrant union / role; config-not-code, self-validates via assertProduct)
+           · Tuning (+Step-14 .monetization: the multiplier values + §7 max-stack ceiling + boost duration, the premium-bait effect + the ≤Uncommon watch-knob, the bounded rewarded-ad knobs)
+           · Validation (+Step-14 assertProduct: the pay-proof product guard — no power-progression product, no item-grant of tier gear, no non-cosmetic cosmetic grant, placeholder assetId present)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
@@ -145,10 +148,11 @@ src/
            · Progression (Step 9 — commitUnlocks: the persisted-truth unlock set; worldMapPins/passportCounts: the Passport surface; CALLS evaluateGate, never re-derives)
            · Fishing (+ Step-13 ownsRequiredItem: the commodity item-ownership check behind the Frozen-Lake gate — mirrors ownsBoatForWater, NOT canAccessZone)
            · LiveOps (Step 13 — PURE scheduler/budget/rotation/alarm: server-time activation [reverts after end] + world.event driver + server-time entitlements + PEAK-concurrent budget sweep + capped eventPayout + dailyQuestSet [cross-loop pair + theming] + Cash-priced decor quota + evergreenSinkAlarm)
+           · Monetization (Step 14 — PURE: activeCashMultiplier [server-time, multiplicative stack, §7 ceiling] + boostBonus · the premium bait/ammo effect [TimeToBite/LandWindow/CycleTime] + the STRUCTURAL ≤Uncommon cap [premiumRoutineWeight rejects Rare] · the bounded adReward · multiplier-entitlement encode/expiry)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
-      RewardPipeline.luau   (Step 4) the SHARED ordered atomic reward (loop-agnostic): ambiance→0 · Reward XOR · Rank XP · conquest. Step 5 adds ONE describe branch.
+      RewardPipeline.luau   (Step 4) the SHARED ordered atomic reward (loop-agnostic): ambiance→0 · Reward XOR · Rank XP · conquest. Step 5 adds ONE describe branch. (+Step-14: the 2x/VIP multiplier hooks the Cash branch — a SEPARATE boost-tagged loop=none entry; idle/daily/salvage/milestone untouched)
       FireHandler.luau      (Step 4) the "fire" intent handler — the gauntlet's step-3 shot resolution + the reward commit (critical)
     fishing/
       CatchHandler.luau     (Step 5) the "catch" intent handler — the gauntlet's step-3 fight resolution + the (shared) reward commit (critical)
@@ -164,8 +168,11 @@ src/
       WorldMapHandler.luau    (Step 9) the "openWorldMap" intent — completes the WORLD_MAP reveal beat + the commitUnlocks catch-all (critical)
     liveops/
       EventRewardHandler.luau (Step 13) the "claimEventReward" intent — budget-capped event-faucet ledger entry (type=eventReward, loop=none), per-window server-time-entitlement idempotency (critical)
+    monetization/
+      PurchaseService.luau    (Step 14) the headless grant logic the MarketplaceService callbacks invoke: processReceipt (dev-product, idempotent per PurchaseId — cash via attemptRealMoneyCredit) + grantGamePass (ownership-idempotent item/cosmetic/VIP) + applyGrant (the exhaustive non-cash grant; NO conquest/tier branch — pay-proof)
+      RewardedAdHandler.luau  (Step 14) the "claimAdReward" intent — a bounded, opt-in, ad-tagged (loop=none) faucet, server-time cooldown-capped, never advances a milestone (critical)
     idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
-    world/WorldServer.server.luau   ⌂ STUDIO-ONLY (Step 8) — THE ONE login owner: one SessionService + one shared gauntlet registry (every handler), Bayou + Lodge build, both spawners + flows, kind-aware arrival
+    world/WorldServer.server.luau   ⌂ STUDIO-ONLY (Step 8) — THE ONE login owner: one SessionService + one shared gauntlet registry (every handler), Bayou + Lodge build, both spawners + flows, kind-aware arrival (+Step-14: the MarketplaceService seams — ProcessReceipt → PurchaseService, UserOwnsGamePassAsync login grants, PromptProductPurchase + rewarded-ad RemoteEvents; the asset-id binding maps are TODO(studio))
   client/CharacterController.client.luau   ⌂ STUDIO-ONLY — mobile camera/controls (→ StarterPlayerScripts)
   server/
     persistence/
@@ -195,7 +202,8 @@ tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Val
          Step 9: Progression/Travel/WorldMapHandler;
          Step 10: CrossTier assertions — sufficiency/role-band/co-op-wall/co-op-soluble for Appalachia+Alaska;
          Step 11: VendorHandler; Step 12: PairTransaction/TradeSwap/TradeService;
-         Step 13: LiveOps [scheduler/budgets/guard/rotation/alarm] + EventRewardHandler [faucet/idempotency]) · negative/ (MUST fail analysis)
+         Step 13: LiveOps [scheduler/budgets/guard/rotation/alarm] + EventRewardHandler [faucet/idempotency];
+         Step 14: Monetization [multiplier stack/cap, the multiplier hits the active grant + NOT idle/daily/salvage/milestone, premium-bait cap + never-mandatory, ad bound] + PurchaseService [currency-pack idempotency, boost/item/cosmetic/VIP grants, pay-proof no-conquest] + RewardedAdHandler [bounded/cooldown] + Validation [assertProduct rejections]) · negative/ (MUST fail analysis — incl. pay_to_win_grant)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -917,22 +925,101 @@ Step 13 built the quota + alarm *mechanism*); **premium bait + game-pass Boat ti
 → **Step 14** (monetization); an event-specific mint/dupe/Cash path → **never** (event rares reuse the
 single-mint artifact + ledger wholesale); the marketplace/auction house → post-launch.
 
+## Step 14 — Monetization wiring (sell *with* the player; the bar is split, honestly)
+
+The real-money layer: premium bait/ammo, currency packs, 2x/VIP multipliers, game-pass Boat tiers +
+cosmetics, rewarded ads. **Not rigor-critical**, but it carries the design's most-punished failure mode —
+**pay-to-win** — so the sell-with-the-player guardrails are **structural** (00 §4 / SYS_economy §7). **This
+step wires effects onto inherited substrate**: the `MonetizationRole`/`RealMoneyKind` enums + the Step-11
+never-power guard, `Ledger.attemptRealMoneyCredit` (PurchaseId idempotency on the persistent
+`redeemedPurchaseIds` set), the bait-free `Spawner.rareSpawnEligible`, the play-only `Progression.commitUnlocks`
+conquest set, the `Entitlement`/`activeEntitlements` server-time substrate, and the Boat/cosmetic items + the
+Cash shop were all **inherited**.
+
+- **Pay-proof, made STRUCTURAL (§B — the integrity spine, built first).** A product's grant is a **closed
+  union** `Schema.ProductGrant = Cash | item | cosmetic | multiplier` with **no conquest/tier/effective-tier
+  variant** — so a "buy the milestone / skip the grind to unlock / buy a rare" product is **unrepresentable**,
+  the same type-level guarantee the Reward XOR and the cosmetic no-stats field give (negative fixture
+  `pay_to_win_grant.luau` — a `{ kind = "conquest" }` grant fails `luau-analyze`). The belt-and-suspenders
+  runtime guard `Validation.assertProduct` (run at `Catalog` load) **extends the Step-11 never-power role
+  guard to the product catalog** (no product carries `power-progression`) and closes the two ways a *safe*-
+  kinded grant could still smuggle power: an **`item` grant of tier gear** (`tierInput` → rejected) and a
+  **`cosmetic` grant of a non-cosmetic** (`cosmeticOnly` → required). And the monetization handlers **never
+  call `commitUnlocks` / write the conquest set** — proven by running *every* product's grant and asserting
+  `conqueredDestinations`/`unlockedDestinations` stay empty (bought Cash hits the **same** milestone wall idle
+  Cash does, Step 9). *The pay-to-win alarm is structurally zero.*
+- **Premium bait/ammo — the convenience effect + the STRUCTURAL ≤Uncommon cap (§A).** `logic/Monetization`
+  surfaces the routine-grind-compression effect (shorter `TimeToBite`, a small `LandWindow` bonus, a tighter
+  effective `CycleTime`) — more bites/shots per hour at the **same per-catch band** (Payout takes no bait
+  arg). The cap is structural at three levels, none a soft clamp: (1) `rareSpawnEligible` takes **no
+  bait/profile input** (asserted behaviorally — a held-bait player cannot change a world-gated rare roll; a
+  rare's `SpawnConditions` can name only time/weather/season/event, never an item); (2) the routine bias
+  operates **only on the Common/Uncommon routine pool** (`routineTargetsInZone` filters `rarity < Rare`), so
+  `premiumRoutineWeight` **rejects Rare-and-above** — a Rare-via-bait is unrepresentable, not clamped; (3) **no
+  target is takeable only with premium bait** (no fish names a premium item in `baitRequired`/`requiresItem`;
+  the land/kill math takes no bait arg; the premium items are `convenience`, never a tier input). The
+  **watch-knob** `uncommonBias` is a tuning constant — tighten toward 0 if telemetry shows rare inflation.
+- **Currency packs — idempotent Cash inject (§C).** `PurchaseService.processReceipt` reuses
+  `Ledger.attemptRealMoneyCredit` wholesale for a `cash` grant: an **atomic, `currencypack`-tagged** ledger
+  entry, granted **exactly once per Roblox PurchaseId** (a re-delivered receipt is a no-op — proven; a
+  *different* PurchaseId grants again). Non-cash dev products (a boost, a premium-bait pack) **mirror the same
+  PurchaseId idempotency on the same persistent set**.
+- **2x Cash boost / VIP — the active-payout multiplier (§D), and NOWHERE else.**
+  `Monetization.activeCashMultiplier` (a server-time entitlement; multiplicative stack capped at the §7
+  `maxStackCeiling`) is hooked in **`RewardPipeline`'s Cash branch** — downstream of `payoutFn`, the shared
+  active kill/catch grant point. The base kill/catch faucet stays the **unmultiplied routine payout** (so the
+  dual-loop reconciliation, which reads the *formula*, is untouched) and the boost is a **separate,
+  real-money-tagged, `loop="none"` `boostBonus` entry** (separable + bounded in telemetry). Idle, daily, and
+  salvage read `Economy.income`/formulas — **never this path** — so they are never multiplied (asserted on a
+  boosted profile); a rare **mints** (no Cash) so the multiplier can never touch a milestone artifact; the
+  milestone flag is a **boolean**, not Cash. The 2x boost is time-limited (reverts after the window, server
+  time); VIP is persistent (a game pass, re-granted idempotently on login).
+- **Game-pass Boat tiers + flagship cosmetics — grants, not power (§E).** `PurchaseService.grantGamePass` is
+  **ownership-idempotent** (safe every login): a Boat pass grants the existing `vehicle_coastal_skiff`
+  commodity (the **same access grant** bought a different way — never a tier/power input), a cosmetic pass
+  grants the balance-free `cosmetic_founders_skin`, VIP grants/refreshes the persistent multiplier — each a
+  no-op if already owned/active.
+- **Rewarded ads — an opt-in, bounded faucet (§F).** `RewardedAdHandler` (`claimAdReward`) injects a small,
+  **`ad`-tagged, `loop="none"`** reward (`Monetization.adReward` — a fraction of `Income(T_current)` hard-
+  capped at an absolute ceiling), frequency-bounded by a **server-time cooldown entitlement**, that **never
+  advances a milestone**. The ad-SDK completion attestation is Studio; the bounded/capped/tagged injection is
+  headless.
+- **The product catalog (§G — config-driven).** `config/Monetization.luau`: the dev-products + game-passes,
+  each a row with a **placeholder `assetId`** (Steve binds the real Roblox ids in Studio), a `grant` (the
+  closed union), and a `role`. A new pack/pass is a config row; the catalog self-validates on load
+  (`assertProduct`).
+- **Auto-sell — CUT (the v2 review correction).** The routine kill/catch payout is **immediate** (the
+  `RewardPipeline` grants Cash on the kill/catch; there is **no manual-sell step**), so a friction-removing
+  auto-sell has no friction to remove. Revisit only if a catch-inventory model is ever added.
+
+**Studio / platform (NOT headless — `WorldServer` seams written, all unchecked):**
+- [ ] MarketplaceService: `PromptProductPurchase`/`PromptGamePassPurchase`, the `ProcessReceipt` callback
+      (invokes `PurchaseService.processReceipt` → save → `PurchaseGranted`), `UserOwnsGamePassAsync` (the
+      login game-pass grants), the rewarded-ad SDK (the completion attestation gating `RewardedAdClaim`).
+- [ ] The store UI / purchase prompts / the boost-timer HUD.
+- [ ] **The real Roblox asset ids** — the catalog ships placeholders; bind the numeric `ProductId`/`GamePassId`
+      into `devProductIdToProduct`/`gamePassIdToProduct` in `WorldServer` (until bound, the prompts are inert
+      and `ProcessReceipt` defers — no Cash can be granted, the safe direction).
+- [ ] Telemetry populates: conversion (`monetization.purchase:<id>`), real-money-faucet share
+      (`currencypack`/`boostBonus`/`ad`), the premium-bait **rare-trend watch-knob**, ad adoption, ARPU/ARPPU,
+      and the **pay-proof canary** (= 0 — structurally, since no grant path touches conquest state).
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
 |---|---|
 | Finished art (cypress models, water shader, textures, sound) — the shell is placeholder blockout | Phase-3 art pass |
 | ~~**Boats** + water-type→Boat-access enforcement; the coastal sub-area gate~~ — **DONE (Step 11)**: zone-access gate (`Spawner.canAccessZone`/`offeredTargetsInZone`) + server backstop (`CatchHandler` `requires_boat`) + the BoatDealer Cash vendor; access-not-power is structural | ✅ Step 11 |
-| **Premium bait** (paid `TimeToBite` accelerator — stub here, asserts rare-spawn takes no bait); the **bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) | Steps 14 / 6-7 |
+| ~~**Premium bait** (paid `TimeToBite` accelerator — asserts rare-spawn takes no bait)~~ — **DONE (Step 14)**: the convenience effect (`logic/Monetization` TimeToBite/LandWindow/CycleTime) + the **structural ≤Uncommon cap** (rare roll bait-free, routine bias Common/Uncommon only, never mandatory) + the dev-product fungible-stack grant. Remaining: the **Cash-leg bait-shop buy handler + starter-bait grant** (the fungible Cash purchase, so "buy bait → catch" is end-to-end) | ✅ Step 14 / Steps 6-7 |
 | The funnel first-spawn / first-bite guarantee (bypasses caps for a first-time player) + funnel state machine; returning-player→Lodge respawn | Steps 7/8 |
 | ~~The real **`Payout`** formula + the idle amount + gear sinks~~ — **DONE (Step 6)**; remaining: the **shop UI** (Studio) + the **Cash revive-in-place price** (a minor sink, not yet wired) | Studio / later |
-| The **rewarded-ad revive** | Step 14 |
+| ~~The **rewarded-ad** faucet~~ — **DONE (Step 14)**: `RewardedAdHandler` (`claimAdReward`), a bounded/opt-in/`ad`-tagged/`loop=none` reward, cooldown-capped, never a gate. An ad-*revive* specifically is N/A at MVL (the Bayou is non-lethal — no death/revive sink yet; revisit if one is added) | ✅ Step 14 |
 | **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D) | post-MVL |
 | ~~MVL **T2→T4 difficulty check**~~ — **DONE (Step 10)**: cross-tier floor/ceiling semantics (sufficiency + role band + co-op-wall + co-op-soluble) replace strict `derived==authored` (proven unachievable cross-tier; user-confirmed). Two derivation defects fixed; two stat defects caught and corrected. | ✅ Step 10 |
 | ~~**dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters)~~ — **DONE (Step 6/10)**: `routineHourSum` = `Income(T)` both loops, all destinations (Bayou/Appalachia/Alaska) | ✅ Step 6 + Step 10 |
 | ~~Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4)~~ — **DONE (Step 13)**: `logic/LiveOps` server-time scheduler drives `world.event` (per-tick recompute, reverts after end); the RD1 scarcity guard + per-event/aggregate-PEAK budgets; Winter Freeze + Salmon Run config records; the Frozen-Lake item-ownership double-gate; the daily rotation + the evergreen-sink alarm mechanism | ✅ Step 13 |
 | ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; ~~trading's escrow/swap~~ — **DONE (Step 12)** | ✅ Steps 8 + 12 |
-| ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **the replenishment cadence quota + the evergreen-sink alarm mechanism DONE (Step 13)** (Cash-priced-only); the **SKU art / cadence batches** (EQUIPMENT_MASTER) + **real-money** decor + the **auto-sell** pass | Step 13 mechanism / Step 14 / content |
+| ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **the replenishment cadence quota + the evergreen-sink alarm mechanism DONE (Step 13)** (Cash-priced-only); **real-money flagship cosmetics DONE (Step 14)** (game-pass `cosmetic_founders_skin`, balance-free, ownership-idempotent); **auto-sell CUT (Step 14 v2** — the payout is immediate, no manual-sell step to remove); remaining: the **SKU art / cadence batches** (EQUIPMENT_MASTER) + **real-money decor** (decor stays Cash-only by `assertDecorItem`) | Step 13 / ✅ Step 14 / content |
 | ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; ~~the `TeleportService` execution beyond Lodge/Bayou~~ — the headless arrival-resolver seam (`ArrivalService.resolveDestinationArrival`) is **DONE + headless-tested**; the Studio fast-travel **EXECUTION** (within-place `PivotTo`) is written but **playtest-pending / not headless-verified** (see Step 10 Studio checklist); remaining: the map UI | Studio / later |
 | ~~**Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones)~~ — **DONE (Step 11)**: enforced (zone-access + catch backstop), vended, guardrailed; the fishing resolution takes no vehicle (access-not-power, structural) | ✅ Step 11 |
 | ~~**Dogs / Mounts** (Pointer/Husky; Horse/Snowmobile; Kennel & Stable + Boat Dealer fixtures built)~~ — **DONE (Step 11)**: vended as Cash sinks (the rare Redbone is trade-routed → Step 12); the never-gate/never-power guardrail holds; the detection/tracking + traversal *effects* are Studio | ✅ Step 11 |
@@ -940,7 +1027,7 @@ single-mint artifact + ledger wholesale); the marketplace/auction house → post
 | Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
 | Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |
 | ~~Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback~~ — **DONE (Step 12)**: `TradeService` state machine + version-bound double-confirm + escrow lifecycle; `TradeSwap` over the new `PairTransaction` + `ArtifactStore.transferOwnership` (live-to-new + tombstone-not-erase); `tradepay-out/in/tradetax` triple; the 8 checks headless-proven. Remaining: the Trading Post UI + the **reconcile-on-reload** consumer of the trade record (the two-key crash window) | ✅ Step 12 / ops |
-| Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`) | Step 14 |
+| ~~Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`)~~ — **DONE (Step 14)**: `PurchaseService` (currency-pack idempotent inject via `attemptRealMoneyCredit`; boost/item/cosmetic/VIP grants; game-pass ownership idempotency) + the pay-proof `ProductGrant` union + `Validation.assertProduct` + the 2x/VIP active-payout multiplier; the MarketplaceService/`ProcessReceipt`/`UserOwnsGamePassAsync`/ad-SDK platform calls + the store UI + the real asset ids are the Studio seam | ✅ Step 14 / Studio |
 | `TODO(open)`: MemoryStore cross-server lock brokering · `TODO(ops)`: `auditLogDestination` choice, point-in-time rollback operation | ops/later |
 
 ## Binding-spec reconciliations (judgment calls — flagged, not silently resolved)
@@ -1119,9 +1206,30 @@ claim by day esp. session 2, reactivation, cadence-adherence). The `T_current = 
 flagged (economy's open call), not re-resolved. Step 13 **calls** the inherited spawn predicate / ledger /
 entitlement / Daily substrate — it rebuilds none.
 
-**1135 assertions pass headless (Steps 1–13); both negative fixtures fail analysis as required; `rojo build`
-produces a place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not
-headless-green.
+**Step 14:** ✅ (headless) **pay-proof made structural** — the closed `ProductGrant` union (Cash | item |
+cosmetic | multiplier, **no conquest/tier variant** → a pay-to-win grant is unrepresentable; negative fixture
+`pay_to_win_grant.luau` fails analysis) + `Validation.assertProduct` (the never-power role guard extended to
+products; no item-grant of tier gear; no non-cosmetic cosmetic grant) + every grant proven to write **no
+conquest/unlock** (bought Cash hits the same milestone wall); the **premium-bait ≤Uncommon cap** (structural:
+`rareSpawnEligible` bait-free, the routine bias on Common/Uncommon only — `premiumRoutineWeight` rejects Rare,
+never mandatory) + the convenience effect (TimeToBite/LandWindow/CycleTime, the band untouched); the
+**currency-pack idempotent inject** (once per Roblox PurchaseId via `attemptRealMoneyCredit`; re-delivery a
+no-op); the **2x/VIP multiplier at the active-payout grant ONLY** (a separate `boostBonus`/`loop="none"`
+real-money-tagged entry; idle/daily/salvage/milestone proven unmultiplied; rares mint so never multiplied;
+multiplicative stack capped at the §7 ceiling); the **game-pass grants** (ownership-idempotent Boat/cosmetic/
+VIP — access/identity, never power); the **rewarded-ad faucet** (bounded, opt-in, `ad`-tagged, cooldown-
+capped, never a gate); the config-driven product catalog (placeholder asset ids). The real-money faucets are
+separate tagged subtypes (`currencypack`/`boostBonus`/`ad`, `loop="none"`) — **the dual-loop reconciliation is
+untouched**. ⌂ (Studio/platform, unchecked above) MarketplaceService (`PromptProductPurchase`, the
+`ProcessReceipt` callback wiring, `UserOwnsGamePassAsync`, the rewarded-ad SDK); the store UI / purchase
+prompts / boost-timer HUD; **the real Roblox asset ids** (placeholders shipped); the telemetry dashboards
+(conversion, real-money-faucet share, the premium-bait rare-trend watch-knob, ad adoption, ARPU/ARPPU, the
+**pay-proof canary = 0** — structurally). Step 14 **wires effects onto** the inherited enums / ledger
+idempotency / bait-free rare roll / play-only conquest set — it rebuilds none.
+
+**1228 assertions pass headless (Steps 1–14); all three negative fixtures (`reward_both`, `power_perk`,
+`pay_to_win_grant`) fail analysis as required; `rojo build` produces a place.** The Studio playtest checklists
+above are the honest bar for UI/feel/live-data — not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
 ```

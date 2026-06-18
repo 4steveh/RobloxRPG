@@ -312,6 +312,46 @@ function V.validateLiveOps(config: Config)
 	end
 end
 
+-- ── Step 14: the pay-proof monetization guard (SYS_economy §7 / 00 §4 — the integrity spine of the
+-- real-money layer). A build-time schema error, the same class as assertDecorItem (balance-free) and the
+-- Step-11 power-role guard. The STRUCTURAL keystone is the type: ProductGrant is a closed union with NO
+-- conquest/tier variant, so a pay-to-win grant is UNREPRESENTABLE (the negative fixture proves it). This
+-- runtime guard is the BELT-AND-SUSPENDERS half: it (i) extends the Step-11 never-power role guard to the
+-- product catalog (no product carries power-progression), and (ii) closes the two ways a SAFE-kinded grant
+-- could still smuggle power — an `item` grant of TIER GEAR, or a `cosmetic` grant of a non-balance-free item.
+-- It also guards data-driven / future LiveOps-added products. ──────────────────────────────────────────
+function V.assertProduct(p: Schema.Product, config: Config)
+	assert(p.assetId ~= "", p.id .. ": a product must carry an assetId (a placeholder bound in Studio)")
+	assert(Enums.MonetizationRoleSet[p.role] == true, p.id .. ": illegal monetization role '" .. tostring(p.role) .. "'")
+	-- The never-power guard (Step 11 → Step 14): no real-money product may carry power-progression. Sell WITH
+	-- the player — real money compresses grind / removes friction, it never buys a power input or a milestone.
+	assert(p.role ~= Enums.MonetizationRole.powerProgression,
+		p.id .. ": a real-money product may NOT carry the power-progression role (no pay-to-win — SYS_economy §7)")
+
+	local g = p.grant
+	assert(Enums.GrantKindSet[g.kind] == true, p.id .. ": illegal grant kind '" .. tostring(g.kind) .. "'")
+	if g.kind == "cash" then
+		assert(g.amount > 0, p.id .. ": a cash grant must inject a positive amount")
+	elseif g.kind == "item" then
+		local item = assert(config.equipment[g.itemId], p.id .. ": item grant '" .. g.itemId .. "' must resolve to an equipment item")
+		-- THE pay-proof line for an item grant: real money never hands a POWER input. An item grant can never
+		-- be tier gear (weapon/armor/rod/reel) — only access (a Boat), convenience (premium bait/ammo/tools),
+		-- or identity. tierInput is derived from category (assertEquipmentItem), so this cannot drift.
+		assert(not item.tierInput, p.id .. ": a real-money item grant may NOT be tier gear (tierInput) — that is pay-to-win")
+		if g.quantity ~= nil then
+			assert(g.quantity > 0, p.id .. ": an item-grant quantity must be > 0")
+		end
+	elseif g.kind == "cosmetic" then
+		local item = assert(config.equipment[g.itemId], p.id .. ": cosmetic grant '" .. g.itemId .. "' must resolve to an equipment item")
+		assert(item.cosmeticOnly, p.id .. ": a cosmetic grant must reference a cosmeticOnly item (balance-free, no stats)")
+	else
+		-- multiplier: must be a known ACTIVE-income multiplier tag (the closed CashMultiplier set). It touches
+		-- the active kill/catch grant only (RewardPipeline), never idle/daily/salvage/the conquest set.
+		assert(Enums.CashMultiplierSet[g.multiplier] == true,
+			p.id .. ": illegal cash multiplier '" .. tostring(g.multiplier) .. "'")
+	end
+end
+
 -- Whole-catalog validation: per-row checks + cross-reference integrity (the seams that only show up
 -- across catalogs — reskins, milestone targets, gate prerequisites).
 function V.validateConfig(config: Config)
@@ -388,6 +428,13 @@ function V.validateConfig(config: Config)
 	end
 	for _, d in config.decor do
 		V.assertDecorItem(d)
+	end
+
+	-- Step 14: the real-money product catalog self-validates on load (the pay-proof guard — no power-progression
+	-- product, no item grant of tier gear, no non-balance-free cosmetic grant; the closed union forbids the rest).
+	for id, product in config.products do
+		assert(product.id == id, "products key '" .. id .. "' must match its id '" .. product.id .. "'")
+		V.assertProduct(product, config)
 	end
 
 	-- Destinations + gate DAG integrity.
