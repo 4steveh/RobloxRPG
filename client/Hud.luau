@@ -99,7 +99,11 @@ function M.setGauge(visible, fraction)
 	end
 end
 
--- projection → header (tracks last balance for payout deltas)
+-- projection → header (tracks last balance for payout deltas). The FIRST projection sets the baseline
+-- SILENTLY (lastBalance starts nil): there is no login-time projection push, so the first projection IS the
+-- first payout and we have no prior balance to diff against. The Cash header still updates, and the
+-- kill/catch controllers fire their own "Down!"/"Landed!" toast, so the first payout is still visible.
+-- (A login-time projection push would let the first payout show its +$ delta too — deferred, see spec §9.)
 local lastBalance = nil
 function M.applyProjection(proj)
 	if proj == nil then

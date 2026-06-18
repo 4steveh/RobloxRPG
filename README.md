@@ -1067,6 +1067,50 @@ entries, and the `gauntlet.*`/swap/pay-proof/evergreen canaries were all **inher
 TeleportService / DataStore / analytics pipeline — and the dashboards) and **playtest tuning** (the game-feel
 bars enumerated in each step's Studio checklist + the live economy/retention calibration).
 
+## S1 (Studio runtime) — the Bayou vertical slice: client layer + shop/equip wire (the bar is split, honestly)
+
+The first Studio-runtime phase: connect the headless-verified handlers to a live loop. Spec/plan in
+`docs/superpowers/specs/2026-06-18-s1-bayou-client-layer-design.md` + `docs/superpowers/plans/`.
+
+**✅ Built + git-verifiable (this is the code layer; `./run-tests.sh` stays ALL GREEN — these files are
+Studio-only and outside the analyzer, but `rojo build` packages them and the syntax is sane):**
+- `WorldServer.server.luau` — an **additive `ShopRequest`** RemoteEvent block wiring the already-registered
+  in-game Cash-shop intents (`buy`/`equip`/`upgrade`) that previously had **no wire** (only the real-money
+  `PurchaseRequest` existed). Builds a catalog-priced listing (`Economy.gearCostSlot`) + owned-gear list +
+  a read-only projection. The spawn loops, the fire/raycast handler, and the existing gauntlet routing are
+  **untouched**.
+- `client/` controllers (the genuine gap): `Net` (RemoteEvent access), `Hud` (singleton: Cash/EHT/EFT header,
+  crosshair, toasts, fishing gauge, button factory), `FireController` (crosshair-aim → `FireRequest`; sends the
+  real camera origin for forward-compat though the server ignores it), `FishingController` (cast → hold-Reel
+  fight → land, with a watchdog that recovers if the server goes silent), `ShopController` (ProximityPrompts on
+  the existing vendor anchors/fixtures → buy/equip/upgrade panel), `TravelController` (minimal world-map).
+  `CharacterController` unchanged. The client **asserts nothing** — sends intents, renders the server's reply.
+
+**⌂ Deferred to the live Studio playtest (NOT headless — all unchecked):**
+- [ ] The full loop in Play mode: spawn → shoot a routine huntable → **T1 band payout** → buy the T2
+      `weapon_lever_action_rifle` → **equip it** → shoot a higher target → cast → catch a routine fish →
+      matching band → **rejoin: Cash + gear persist**.
+- [ ] Payout-band confirmation (Cash-header delta / analytics `combat.payout` / `economy.buy:tier`).
+- [ ] Aim **parallax** feel — the server raycasts from the character while the client aims from the camera
+      crosshair (parallel-but-offset rays); confirm close-range feel, and if off apply the camera-origin fix
+      server-side (the client already sends the origin).
+- [ ] The aesthetic geometry pass (the functional coordinate-aligned blockout already exists procedurally).
+
+**⚑ FLAGGED — pre-existing server defects surfaced by the S1 adversarial review (NOT patched, per the build
+rule "if a handler seems wrong, flag it; don't quietly patch it"):**
+- **Fire-rate is not enforced on damage *accumulation*.** In `WorldServer.server.luau` (the fire handler,
+  ~L611–628) `Combat.fireRateOk` gates only whether `lastShotAt` updates; the non-lethal `state.accumulated +=
+  shotDmg` + `"hit"` reply run **regardless**. Only the *killing* blow is routed through the gauntlet (which
+  re-validates fire-rate/damage/range), so rapid clicking accumulates damage **outside** the gauntlet's
+  headless-tested validators — corrupting combat pacing (kills feel too fast under spam). Fix when approved:
+  gate the whole shot — `if not Combat.fireRateOk(...) then return end`, and move the `lastShotAt` update out
+  of the conditional, before the lethal/non-lethal branch.
+- **A gauntlet-rejected shot/catch gives the client no feedback.** The fire handler's lethal path is
+  `if r.ok then … end` with no `else` (a rejected kill shot leaves the target silently alive); the fishing
+  path sends nothing on a rejected catch. Normal play with adequate gear never hits these, but they leave the
+  player without feedback. (The S1 fishing client now self-recovers via a watchdog; the fire-side silence is
+  the existing handler — flagged.)
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |

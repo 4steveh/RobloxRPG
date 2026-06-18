@@ -49,11 +49,30 @@ reelBtn.MouseButton1Up:Connect(function()
 	reeling = false
 end)
 
+local lastFightReply = 0
+
+local function resetToIdle()
+	state = STATE.idle
+	reeling = false
+	reelBtn.Visible = false
+	castBtn.Visible = true
+	Hud.setGauge(false)
+end
+
 local function fightLoop()
 	progressTicks = 0
+	lastFightReply = os.clock()
 	while state == STATE.fighting do
 		Net.cast:FireServer("fight", reeling and 1 or 0)
 		task.wait(0.15)
+		-- watchdog: the server acks every fight tick with "fightProgress" (or "landed"). If it goes SILENT —
+		-- the catch was rejected by the gauntlet, or the bite despawned (both clear the server-side fight
+		-- without a reply) — the fight is dead; recover to idle instead of spinning forever.
+		if state == STATE.fighting and (os.clock() - lastFightReply) > 1.5 then
+			resetToIdle()
+			Hud.toast("Fish got away — cast again", Color3.fromRGB(220, 200, 140))
+			return
+		end
 	end
 end
 
@@ -67,14 +86,12 @@ Net.cast.OnClientEvent:Connect(function(kind, fishId, extra)
 		Hud.toast("Bite! Hold REEL", Color3.fromRGB(150, 200, 230))
 		task.spawn(fightLoop)
 	elseif kind == "fightProgress" then
+		lastFightReply = os.clock()
 		progressTicks += 1
 		Hud.setGauge(true, math.clamp(progressTicks / 8, 0, 0.95)) -- cosmetic; true max is server-side
 	elseif kind == "landed" then
-		state = STATE.idle
-		reeling = false
-		reelBtn.Visible = false
-		castBtn.Visible = true
-		Hud.setGauge(false)
+		lastFightReply = os.clock()
+		resetToIdle()
 		Hud.applyProjection(extra) -- extra = projection (payout delta)
 		Hud.toast("Landed!", Color3.fromRGB(150, 230, 140))
 	end
