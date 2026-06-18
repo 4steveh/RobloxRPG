@@ -7,11 +7,34 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
+local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
 
 local M = {}
 local BASE_FOV = cam.FieldOfView
+
+-- ── sound (best-effort): engine-bundled rbxasset:// ids (load locally, no CDN); silent on any failure ──
+local SOUNDS = {
+	fire = "rbxasset://sounds/snap.wav",
+	hit = "rbxasset://sounds/hit.wav",
+	kill = "rbxasset://sounds/bass.wav",
+	cash = "rbxasset://sounds/electronicpingshort.wav",
+}
+local function playSound(key, volume)
+	local id = SOUNDS[key]
+	if id == nil then
+		return
+	end
+	pcall(function()
+		local snd = Instance.new("Sound")
+		snd.SoundId = id
+		snd.Volume = volume or 0.5
+		snd.Parent = SoundService
+		snd:Play()
+		Debris:AddItem(snd, 5)
+	end)
+end
 
 -- ── aim highlight ──────────────────────────────────────────────────────────────────────────────────
 local highlight = Instance.new("Highlight")
@@ -104,6 +127,8 @@ function M.onFire(aimRay)
 	-- recoil: a quick FOV punch that settles (does not fight the follow camera)
 	cam.FieldOfView = BASE_FOV + 4
 	TweenService:Create(cam, TweenInfo.new(0.18), { FieldOfView = BASE_FOV }):Play()
+
+	playSound("fire", 0.45)
 end
 
 function M.onHit()
@@ -112,6 +137,7 @@ function M.onHit()
 	task.delay(0.12, function()
 		highlight.OutlineColor = Color3.fromRGB(255, 230, 150)
 	end)
+	playSound("hit", 0.5)
 end
 
 function M.onKill(_projection)
@@ -143,6 +169,8 @@ function M.onKill(_projection)
 	TweenService:Create(anchorPart, TweenInfo.new(1.0), { CFrame = anchorPart.CFrame + Vector3.new(0, 3, 0) }):Play()
 	TweenService:Create(lbl, TweenInfo.new(1.0), { TextTransparency = 1, TextStrokeTransparency = 1 }):Play()
 	Debris:AddItem(anchorPart, 1.1)
+	playSound("kill", 0.55)
+	playSound("cash", 0.5)
 end
 
 return M
