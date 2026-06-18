@@ -10,10 +10,10 @@
 -- ambiance handling) are parameterized by `loop` (default Hunting → Step-4 callers are unchanged). A kill
 -- and a catch are the same Income(T) math; only the inputs differ.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Spawning = require("@src/config/Spawning")
-local Fishing = require("@src/logic/Fishing")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Spawning = require("../config/Spawning")
+local Fishing = require("./Fishing")
 
 type Config = Schema.Config
 type Shell = Schema.Shell

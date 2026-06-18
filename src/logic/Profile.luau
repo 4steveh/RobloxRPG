@@ -5,9 +5,9 @@
 -- and the starter Destination are DERIVED FROM CONFIG (items flagged availableAt=StarterLoadout; the
 -- Destination with requiredTier 0) — so this logic carries zero hardcoded content.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Validation = require("@src/config/Validation")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Validation = require("../config/Validation")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

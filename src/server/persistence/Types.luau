@@ -3,7 +3,7 @@
 -- logic is unit-testable headless against in-memory fakes (Fakes.luau) and runs in Studio against thin
 -- adapters (RobloxAdapters.luau). Logic depends on THESE types, never on DataStoreService directly.
 
-local Schema = require("@src/types/Schema")
+local Schema = require("../../types/Schema")
 
 local T = {}
 

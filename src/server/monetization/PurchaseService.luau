@@ -11,12 +11,12 @@
 -- grant here writes profile.conqueredDestinations or an effective-tier input; bought Cash hits the SAME
 -- milestone wall idle Cash does (Step 9). The pay-to-win canary is therefore structurally zero.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Profile = require("@src/logic/Profile")
-local Monetization = require("@src/logic/Monetization")
-local Ledger = require("@src/server/ledger/Ledger")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Profile = require("../../logic/Profile")
+local Monetization = require("../../logic/Monetization")
+local Ledger = require("../ledger/Ledger")
+local Types = require("../persistence/Types")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

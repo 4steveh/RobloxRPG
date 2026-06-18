@@ -3,10 +3,10 @@
 -- All fish grant a reward (no ambiance fish). Cash ranges are ILLUSTRATIVE (computed from economy's
 -- band), not authored. The Reward XOR boundary is baked into the builder (Rare+ → artifact, no Cash).
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
-local FishBuilder = require("@src/config/FishBuilder")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
+local FishBuilder = require("./FishBuilder")
 
 type Fish = Schema.Fish
 

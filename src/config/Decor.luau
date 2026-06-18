@@ -5,9 +5,9 @@
 -- SLA (Step 13, SYS_liveops_calendar) and the full table is EQUIPMENT_MASTER §4.9's. A malformed SKU fails
 -- the require via Catalog → Validation.assertDecorItem.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Ids = require("@src/types/Ids")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Ids = require("../types/Ids")
 
 type DecorItem = Schema.DecorItem
 local K = Enums.DecorKind

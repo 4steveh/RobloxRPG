@@ -5,13 +5,13 @@
 -- server-side (the sets are deep-copied; the numbers are values). The gate readouts are the single
 -- source of truth the UI consumes — the client never re-derives gate logic.
 
-local Schema = require("@src/types/Schema")
-local Balance = require("@src/logic/Balance")
-local EffectiveTier = require("@src/logic/EffectiveTier")
-local Gate = require("@src/logic/Gate")
-local Copy = require("@src/server/persistence/Copy")
-local TrophyHall = require("@src/logic/TrophyHall")
-local Progression = require("@src/logic/Progression")
+local Schema = require("../../types/Schema")
+local Balance = require("../../logic/Balance")
+local EffectiveTier = require("../../logic/EffectiveTier")
+local Gate = require("../../logic/Gate")
+local Copy = require("../persistence/Copy")
+local TrophyHall = require("../../logic/TrophyHall")
+local Progression = require("../../logic/Progression")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

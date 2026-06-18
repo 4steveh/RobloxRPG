@@ -5,10 +5,10 @@
 -- consistent even if a conquest/equip-time commit ever didn't persist). `critical` → the beat advance + any
 -- unlock commit write through atomically. The map UI itself is Studio (WorldServer fires this intent).
 
-local Onboarding = require("@src/logic/Onboarding")
-local Progression = require("@src/logic/Progression")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Onboarding = require("../../logic/Onboarding")
+local Progression = require("../../logic/Progression")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 

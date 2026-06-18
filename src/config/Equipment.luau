@@ -6,8 +6,8 @@
 -- `monetizationRoles` is the Template-B SET; it defaults from category (DEFAULT_ROLES) and is overridden
 -- per row where EQUIPMENT_MASTER §4 differs (free starters, heavy armor, premium consumables).
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
 
 type EquipmentItem = Schema.EquipmentItem
 type ItemId = string

@@ -9,8 +9,8 @@
 -- WHY no "skip the grind to unlock" / "buy the rare" / "buy the milestone" product exists here: it is
 -- UNREPRESENTABLE. ProductGrant has no conquest/tier variant (Schema), so such a row cannot be written.
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
 
 type Product = Schema.Product
 type ProductGrant = Schema.ProductGrant

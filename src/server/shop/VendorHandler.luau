@@ -9,12 +9,12 @@
 -- pack (Step 14), and never Cash-sells a tradeable rare breed (dog_redbone_rare -> Trading Post P2P, Step 12).
 -- The Boat is ACCESS, never power: this grants no stat, only the item.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Profile = require("@src/logic/Profile")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Profile = require("../../logic/Profile")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type EquipmentItem = Schema.EquipmentItem

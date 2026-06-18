@@ -4,7 +4,7 @@
 -- LAYOUT is verifiable even before the art exists. (The FEEL, sightlines, and frame rate are Studio-only.)
 -- Zero content literals — operates on the `shell` + `config` passed in.
 
-local Schema = require("@src/types/Schema")
+local Schema = require("../types/Schema")
 
 type Shell = Schema.Shell
 type Vec3 = Schema.Vec3

@@ -7,7 +7,7 @@
 -- is INHERITED from combat (Tuning.spread, RD-F) — not forked. Zero content literals. The fight FEEL
 -- (tension gauge, runs, haptics, cast) is Studio, not here.
 
-local Schema = require("@src/types/Schema")
+local Schema = require("../types/Schema")
 
 type Config = Schema.Config
 type Fish = Schema.Fish

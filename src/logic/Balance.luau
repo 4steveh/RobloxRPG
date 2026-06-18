@@ -3,7 +3,7 @@
 -- balance is a fold over signed entries, NEVER a stored mutable int. (The checkpoint+tail persistence
 -- optimization is Step 2; here the in-memory ledger is the source.) Zero content literals.
 
-local Schema = require("@src/types/Schema")
+local Schema = require("../types/Schema")
 
 type PlayerData = Schema.PlayerData
 

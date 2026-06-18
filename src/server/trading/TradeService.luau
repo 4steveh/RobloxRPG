@@ -7,13 +7,13 @@
 -- Two profiles are reached via injected getProfile/saveProfile (in Studio: SessionService; in tests: a table).
 -- The atomic two-profile swap + the anti-dupe are TradeSwap's; this is the flow that drives it.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Economy = require("@src/logic/Economy")
-local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
-local Transaction = require("@src/server/authority/Transaction")
-local TradeSwap = require("@src/server/trading/TradeSwap")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Economy = require("../../logic/Economy")
+local ArtifactStore = require("../artifacts/ArtifactStore")
+local Transaction = require("../authority/Transaction")
+local TradeSwap = require("./TradeSwap")
+local Types = require("../persistence/Types")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

@@ -3,9 +3,9 @@
 -- InMemoryDataStore deep-copies on store AND read (a real DataStore serializes values), so a mutation
 -- to an in-memory profile can never leak into the durable copy — essential for the atomicity tests.
 
-local Types = require("@src/server/persistence/Types")
-local Schema = require("@src/types/Schema")
-local Copy = require("@src/server/persistence/Copy")
+local Types = require("./Types")
+local Schema = require("../../types/Schema")
+local Copy = require("./Copy")
 
 type DataStoreLike = Types.DataStoreLike
 type Clock = Types.Clock

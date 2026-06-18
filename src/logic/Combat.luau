@@ -6,7 +6,7 @@
 -- (Tuning) and every creature/state value from the caller. The game FEEL these numbers drive
 -- (recoil/hit-stop/impact/audio/haptics/aim) is Studio and is NOT here (README playtest checklist).
 
-local Schema = require("@src/types/Schema")
+local Schema = require("../types/Schema")
 
 type Config = Schema.Config
 type Creature = Schema.Creature

@@ -5,14 +5,14 @@
 -- amounts are economy's (scaled off T_current = max(EHT, EFT)); the daily window resets off the server clock.
 -- `critical` → the credit + the claim flag + the beat advance commit atomically. Content/rotation is Step 13.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Economy = require("@src/logic/Economy")
-local Daily = require("@src/logic/Daily")
-local Onboarding = require("@src/logic/Onboarding")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Economy = require("../../logic/Economy")
+local Daily = require("../../logic/Daily")
+local Onboarding = require("../../logic/Onboarding")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 

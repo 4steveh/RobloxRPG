@@ -6,8 +6,8 @@
 -- The residual two-key CRASH window (key A persisted, server dies before key B) is NOT covered here — it is
 -- closed by the two-sided trade record (TradeSwap writes it to both tradeLogs) + reconcile-on-reload (README).
 
-local Copy = require("@src/server/persistence/Copy")
-local Schema = require("@src/types/Schema")
+local Copy = require("../persistence/Copy")
+local Schema = require("../../types/Schema")
 
 type PlayerData = Schema.PlayerData
 

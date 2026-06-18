@@ -5,10 +5,10 @@
 -- (the Ledger, Step 2); these are the pure amounts the faucets/sinks move. The felt pacing + the LIVE
 -- (measured) reconciliation are Studio/telemetry; this is the headless, by-construction half.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Spawner = require("@src/logic/Spawner")
-local EffectiveTier = require("@src/logic/EffectiveTier")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Spawner = require("./Spawner")
+local EffectiveTier = require("./EffectiveTier")
 
 type Config = Schema.Config
 type PlayerData = Schema.PlayerData

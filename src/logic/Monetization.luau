@@ -7,9 +7,9 @@
 -- PurchaseService) move. The pay-proof union (Schema.ProductGrant) is the type-level keystone; the conquest
 -- set is never an input or an output here — sell WITH the player, never the play requirement.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Economy = require("@src/logic/Economy")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Economy = require("./Economy")
 
 type Config = Schema.Config
 type PlayerData = Schema.PlayerData

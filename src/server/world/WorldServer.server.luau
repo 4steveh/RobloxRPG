@@ -22,37 +22,38 @@ local Lighting = game:GetService("Lighting")
 local MarketplaceService = game:GetService("MarketplaceService") -- Step 14: the real-money platform boundary
 
 -- headless modules (require-by-string via .luaurc; Rojo + Roblox resolve at runtime)
-local Catalog = require("@src/config/Catalog")
-local Shells = require("@src/config/Shells")
-local Spawning = require("@src/config/Spawning")
-local Spawner = require("@src/logic/Spawner")
-local Combat = require("@src/logic/Combat")
-local Fishing = require("@src/logic/Fishing")
-local LiveOps = require("@src/logic/LiveOps")
-local Onboarding = require("@src/logic/Onboarding")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local FireHandler = require("@src/server/combat/FireHandler")
-local CatchHandler = require("@src/server/fishing/CatchHandler")
-local EquipHandler = require("@src/server/authority/handlers/EquipHandler")
-local ShopHandler = require("@src/server/shop/ShopHandler")
-local VendorHandler = require("@src/server/shop/VendorHandler")
-local ClaimDailyHandler = require("@src/server/daily/ClaimDailyHandler")
-local SalvageHandler = require("@src/server/lodge/SalvageHandler")
-local DisplayHandler = require("@src/server/lodge/DisplayHandler")
-local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
-local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
-local EventRewardHandler = require("@src/server/liveops/EventRewardHandler")
-local PurchaseService = require("@src/server/monetization/PurchaseService") -- Step 14: the headless grant logic
-local RewardedAdHandler = require("@src/server/monetization/RewardedAdHandler")
-local TradeService = require("@src/server/trading/TradeService")
-local Progression = require("@src/logic/Progression")
-local Analytics = require("@src/logic/Analytics") -- Step 15: the session/funnel/retention emits + the metric defs
-local DestinationService = require("@src/server/DestinationService")
-local SessionService = require("@src/server/SessionService")
-local ArrivalService = require("@src/server/ArrivalService")
-local Adapters = require("@src/server/RobloxAdapters")
-local Economy = require("@src/logic/Economy") -- S1: in-game shop pricing (the amount the buy handler debits)
-local Replication = require("@src/server/authority/Replication") -- S1: read-only projection for shop "open"
+local Catalog = require("../../config/Catalog")
+local Shells = require("../../config/Shells")
+local Spawning = require("../../config/Spawning")
+local Spawner = require("../../logic/Spawner")
+local Combat = require("../../logic/Combat")
+local Fishing = require("../../logic/Fishing")
+local LiveOps = require("../../logic/LiveOps")
+local Onboarding = require("../../logic/Onboarding")
+local Gauntlet = require("../authority/Gauntlet")
+local FireHandler = require("../combat/FireHandler")
+local CatchHandler = require("../fishing/CatchHandler")
+local EquipHandler = require("../authority/handlers/EquipHandler")
+local ShopHandler = require("../shop/ShopHandler")
+local VendorHandler = require("../shop/VendorHandler")
+local ClaimDailyHandler = require("../daily/ClaimDailyHandler")
+local SalvageHandler = require("../lodge/SalvageHandler")
+local DisplayHandler = require("../lodge/DisplayHandler")
+local LodgeShopHandler = require("../lodge/LodgeShopHandler")
+local WorldMapHandler = require("../progression/WorldMapHandler")
+local EventRewardHandler = require("../liveops/EventRewardHandler")
+local PurchaseService = require("../monetization/PurchaseService") -- Step 14: the headless grant logic
+local RewardedAdHandler = require("../monetization/RewardedAdHandler")
+local TradeService = require("../trading/TradeService")
+local Progression = require("../../logic/Progression")
+local Analytics = require("../../logic/Analytics") -- Step 15: the session/funnel/retention emits + the metric defs
+local DestinationService = require("../DestinationService")
+local SessionService = require("../SessionService")
+local ArrivalService = require("../ArrivalService")
+local Adapters = require("../RobloxAdapters")
+local Fakes = require("../persistence/Fakes") -- S1 Studio: in-memory store fallback when DataStore is unavailable (unpublished place / API access off)
+local Economy = require("../../logic/Economy") -- S1: in-game shop pricing (the amount the buy handler debits)
+local Replication = require("../authority/Replication") -- S1: read-only projection for shop "open"
 
 local BAYOU = "bayou"
 local shell = Shells.byDestination[BAYOU]
@@ -125,8 +126,27 @@ end)
 --   if LiveOps.evergreenSinkAlarm(currentEvergreenSinkShare, Catalog) then  -- fire the out-of-band decor drop
 --     <schedule/flag a pulled-forward Cash-priced decor batch ahead of the baseline cadence>
 --   end
+-- S1 Studio resilience: GetDataStore THROWS in an unpublished place / with Studio API access off
+-- ("You must publish this place to the web to access DataStore"). A thrown error here would kill the whole
+-- world bootstrap (no remotes, no geometry). Degrade gracefully to an EPHEMERAL in-memory store so the place
+-- still boots and is fully playable — profiles just do not persist across sessions. Publish the place AND
+-- enable Studio → Game Settings → Security → "Enable Studio Access to API Services" for real persistence.
+local profileStore
+do
+	local ok, robloxDataStore = pcall(function()
+		return DataStoreService:GetDataStore("WildWorld_Profiles_v1")
+	end)
+	if ok then
+		profileStore = Adapters.dataStore(robloxDataStore)
+	else
+		warn("[WildWorld] DataStore unavailable (" .. tostring(robloxDataStore) .. ") — using an EPHEMERAL in-memory store. "
+			.. "Profiles will NOT persist. Publish the place + enable Studio API access for real persistence.")
+		profileStore = (Fakes.newDataStore())
+	end
+end
+
 local sessionService = SessionService.new({
-	store = Adapters.dataStore(DataStoreService:GetDataStore("WildWorld_Profiles_v1")),
+	store = profileStore,
 	clock = Adapters.clock(),
 	config = Catalog,
 	serverId = (game.JobId ~= "" and game.JobId) or "studio",

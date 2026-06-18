@@ -5,8 +5,8 @@
 -- surface between inventory and wall. Display/un-display/salvage are §4 CAS transitions (ArtifactStore);
 -- this module only READS state. Pure: zero content literals, zero mutation.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type PlayerData = Schema.PlayerData
 type Artifact = Schema.Artifact

@@ -12,7 +12,7 @@
 -- (it never consumes the reward-bearing ceiling). Rares are condition-gated independent spawns (the
 -- catalog's rare fields + spawn.conditions via Spawner.rareSpawnEligible), never a per-kill upgrade roll.
 
-local Ids = require("@src/types/Ids")
+local Ids = require("../types/Ids")
 
 local D = Ids.Destination
 

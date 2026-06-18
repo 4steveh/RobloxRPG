@@ -5,8 +5,8 @@
 -- write fails, the in-memory profile is REVERTED to the pre-transaction snapshot — neither half lands.
 -- This module builds the abstraction; the pipeline CONTENTS are Steps 4/5/6.
 
-local Schema = require("@src/types/Schema")
-local Copy = require("@src/server/persistence/Copy")
+local Schema = require("../../types/Schema")
+local Copy = require("../persistence/Copy")
 
 type PlayerData = Schema.PlayerData
 

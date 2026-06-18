@@ -10,10 +10,10 @@
 -- (one world.event at a time — the guard enforces it). Cash VALUES are economy's (cited, not authored): event
 -- value is scarce/identity (a rare mint writes NO Cash, RD2), so the Cash budgets are thin/zero.
 
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
-local Enums = require("@src/types/Enums")
-local FishBuilder = require("@src/config/FishBuilder")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
+local Enums = require("../types/Enums")
+local FishBuilder = require("./FishBuilder")
 
 local E = Ids.Event
 local D = Ids.Destination

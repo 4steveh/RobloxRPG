@@ -3,18 +3,18 @@
 -- the tuning constants + a derived target→(loop, home, tier, rarity, milestone) index, and runs the
 -- build-time validation on load (a malformed catalog fails the require — the loader/validator guarantee).
 
-local Tuning = require("@src/config/Tuning")
-local Equipment = require("@src/config/Equipment")
-local Creatures = require("@src/config/Creatures")
-local Fish = require("@src/config/Fish")
-local Destinations = require("@src/config/Destinations")
-local RankPerks = require("@src/config/RankPerks")
-local Decor = require("@src/config/Decor")
-local LiveOps = require("@src/config/LiveOps")
-local Products = require("@src/config/Monetization")
-local Validation = require("@src/config/Validation")
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Tuning = require("./Tuning")
+local Equipment = require("./Equipment")
+local Creatures = require("./Creatures")
+local Fish = require("./Fish")
+local Destinations = require("./Destinations")
+local RankPerks = require("./RankPerks")
+local Decor = require("./Decor")
+local LiveOps = require("./LiveOps")
+local Products = require("./Monetization")
+local Validation = require("./Validation")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type Config = Schema.Config
 

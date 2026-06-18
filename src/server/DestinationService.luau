@@ -3,10 +3,10 @@
 -- DestinationId. INTERFACE AND REGISTRY ONLY. The gated teleport flow (enforcement + execution) and the
 -- World Map UI are Step 9; the place/spawn resolution is also Step 9. Lives server-side (authoritative).
 
-local Catalog = require("@src/config/Catalog")
-local Gate = require("@src/logic/Gate")
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
+local Catalog = require("../config/Catalog")
+local Gate = require("../logic/Gate")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
 
 type PlayerData = Schema.PlayerData
 type DestinationId = Ids.DestinationId

@@ -4,8 +4,8 @@
 -- Cross-server MemoryStore brokering is TODO(open), not MVL. Logic-only — yields/backoff sleeping is the
 -- adapter's job (inject `sleep`); the in-memory transform is synchronous (no yield, the serialization point).
 
-local Types = require("@src/server/persistence/Types")
-local Schema = require("@src/types/Schema")
+local Types = require("./Types")
+local Schema = require("../../types/Schema")
 
 type DataStoreLike = Types.DataStoreLike
 type StoredProfile = Types.StoredProfile

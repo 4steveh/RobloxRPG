@@ -11,11 +11,11 @@
 -- THEN trading escrows it (HELD→ESCROWED, Step 12) — this handler routes "take down to trade" into take-down;
 -- it does NOT build escrow/the swap. These CALL the §4 CAS; they reimplement neither it nor the wall.
 
-local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
-local TrophyHall = require("@src/logic/TrophyHall")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Enums = require("@src/types/Enums")
-local Types = require("@src/server/persistence/Types")
+local ArtifactStore = require("../artifacts/ArtifactStore")
+local TrophyHall = require("../../logic/TrophyHall")
+local Gauntlet = require("../authority/Gauntlet")
+local Enums = require("../../types/Enums")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 

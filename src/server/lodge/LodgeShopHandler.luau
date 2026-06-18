@@ -7,11 +7,11 @@
 -- catalog load — assertDecorItem); here we only transact a Cash-priced SKU. placeDecor is cosmetic layout
 -- (no economy/anti-dupe weight) → non-critical (dirty-flag autosave). Real-money decor is Step 14.
 
-local Schema = require("@src/types/Schema")
-local Economy = require("@src/logic/Economy")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Economy = require("../../logic/Economy")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type DecorItem = Schema.DecorItem

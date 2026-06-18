@@ -14,17 +14,17 @@
 -- critical handler; a valid-but-unlanded fight here returns (false, "not_landed"). No death, no armor —
 -- the failure modes are gear that can't clear the fight (gear_insufficient) and losing the fish (Studio).
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Fishing = require("@src/logic/Fishing")
-local LiveOps = require("@src/logic/LiveOps")
-local EffectiveTier = require("@src/logic/EffectiveTier")
-local Onboarding = require("@src/logic/Onboarding")
-local Daily = require("@src/logic/Daily")
-local Progression = require("@src/logic/Progression")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local RewardPipeline = require("@src/server/combat/RewardPipeline")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Fishing = require("../../logic/Fishing")
+local LiveOps = require("../../logic/LiveOps")
+local EffectiveTier = require("../../logic/EffectiveTier")
+local Onboarding = require("../../logic/Onboarding")
+local Daily = require("../../logic/Daily")
+local Progression = require("../../logic/Progression")
+local Gauntlet = require("../authority/Gauntlet")
+local RewardPipeline = require("../combat/RewardPipeline")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type PlayerData = Schema.PlayerData
