@@ -196,4 +196,31 @@ Enums.DecorKind = table.freeze({
 	framing = "framing" :: DecorKind, -- per-trophy plaque/frame/mount-quality upgrade
 })
 
+-- Step 13: LiveOps event taxonomy (SYS_liveops_calendar §2 — the four KINDS of scheduled event content).
+-- LiveOps owns the SCHEDULE of each; it owns the MECHANISM of none. A closed set.
+export type EventKind = "conditionWindow" | "seasonal" | "limitedTime" | "destinationDrop"
+Enums.EventKind = table.freeze({
+	conditionWindow = "conditionWindow" :: EventKind, -- §3.1 a scheduled period a rare's spawn condition is active
+	seasonal = "seasonal" :: EventKind, -- §3.2 real-season tie-ins (salmon run) at calendar scale
+	limitedTime = "limitedTime" :: EventKind, -- §3.3 a manufactured moment (the spectacle / Winter Freeze)
+	destinationDrop = "destinationDrop" :: EventKind, -- §3.4 a new region as a scheduled launch event (post-launch)
+})
+
+-- Step 13: the RD1 scarcity-discipline declaration kinds. An event may (a) schedule a window for an EXISTING
+-- rare at its unchanged 1-in-N, or (b) introduce a GENUINELY-NEW permanently-scarce artifact. Never dilute.
+export type NewScarcityKind = "referenceWindow" | "mintNew"
+Enums.NewScarcityKind = table.freeze({
+	referenceWindow = "referenceWindow" :: NewScarcityKind, -- RD1a: open a window for an existing rare (rate untouched)
+	mintNew = "mintNew" :: NewScarcityKind, -- RD1b: a genuinely-new event-exclusive rare (its own permanent scarcity)
+})
+
+-- Step 13: daily-quest loop assignment (SYS_liveops §5). The cross-loop pair needs ≥1 Hunting + ≥1 Fishing;
+-- `either` is the flexible third. (Distinct from the closed two-loop `Loop` because a quest may be loop-agnostic.)
+export type QuestLoop = "Hunting" | "Fishing" | "either"
+Enums.QuestLoop = table.freeze({
+	Hunting = "Hunting" :: QuestLoop,
+	Fishing = "Fishing" :: QuestLoop,
+	either = "either" :: QuestLoop,
+})
+
 return table.freeze(Enums)

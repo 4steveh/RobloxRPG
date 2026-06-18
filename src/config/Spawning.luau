@@ -80,6 +80,9 @@ local alaskaFishing: LoopSpawn = {
 		interior_river = { maxConcurrentTargets = 4, respawnIntervalSeconds = 45 }, -- grayling/dolly/sockeye (shore)
 		coastal_inlet = { maxConcurrentTargets = 4, respawnIntervalSeconds = 55 },  -- rockfish/lingcod/king (Boat)
 		open_gulf = { maxConcurrentTargets = 3, respawnIntervalSeconds = 60 },      -- halibut (Boat, apex)
+		-- Step 13: the seasonal Frozen Lake (Winter Freeze event, LOC_04 §8.4 "capped low" so the calmer
+		-- ice-fishing micro-activity is not an over-geared farming hole). Whitefish (routine) + burbot (rare).
+		frozen_lake = { maxConcurrentTargets = 2, respawnIntervalSeconds = 55 },
 	},
 }
 

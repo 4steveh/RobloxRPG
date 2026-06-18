@@ -9,6 +9,8 @@ local Util = require("@tests/util")
 local Catalog = require("@src/config/Catalog")
 local Fakes = require("@src/server/persistence/Fakes")
 local Fishing = require("@src/logic/Fishing")
+local LiveOps = require("@src/logic/LiveOps")
+local Spawner = require("@src/logic/Spawner")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local CatchHandler = require("@src/server/fishing/CatchHandler")
 
@@ -189,5 +191,85 @@ return function(t: Harness.T)
 		local interior = angler()
 		local rInterior = fire(interior, shot("bayou_bluegill", 0.7, landingAccum("bayou_bluegill")))
 		t.ok("a shore (interior) catch is unaffected by the Boat backstop", rInterior.ok)
+	end
+
+	t.section("CatchHandler — the Frozen-Lake DOUBLE gate (Step 13 §E: active window AND Ice-Fishing Kit)")
+	do
+		-- a T4 angler at maxed tackle, optionally holding the Ice-Fishing Kit commodity (bought ≠ equipped).
+		local function frozenAngler(withKit: boolean): any
+			local p = Util.mkProfile(Catalog, { rod = 4, reel = 4 })
+			for _, c in p.inventory.commodities do
+				c.intraLevel = 2
+			end
+			if withKit then
+				table.insert(p.inventory.commodities, { instanceId = "ci_kit", catalogId = "tackle_ice_fishing_kit", intraLevel = 0, equipped = false })
+			end
+			return p
+		end
+		local frozenHandler = CatchHandler.new({ idGen = Fakes.newIdGenerator(), telemetry = Fakes.newTelemetry() })
+		local function frozenAuth(p: any, targetId: string, now: number): (boolean, string?)
+			return frozenHandler.authority({ profile = p, config = Catalog, payload = { targetId = targetId, biteActive = true, owner = "u1" }, now = now } :: any)
+		end
+		local wf = Catalog.liveOps.events.winter_freeze
+		local inWindow = math.floor((wf.startTime + wf.endTime) / 2)
+		local outWindow = wf.endTime + 1000000
+
+		-- the item-ownership helper (mirrors ownsBoatForWater; the Kit is a commodity, not fungible bait).
+		t.ok("a bare angler does NOT own the Ice-Fishing Kit", Fishing.ownsRequiredItem(frozenAngler(false), Catalog, "tackle_ice_fishing_kit") == false)
+		t.ok("an angler with the Kit owns it", Fishing.ownsRequiredItem(frozenAngler(true), Catalog, "tackle_ice_fishing_kit"))
+
+		-- closed out-of-window REGARDLESS of the Kit (the event-active backstop fires first).
+		local okOut, reasonOut = frozenAuth(frozenAngler(true), "alaska_burbot", outWindow)
+		t.ok("out-of-window the burbot is denied even WITH the Kit", okOut == false)
+		t.eq("…with event_inactive (closed regardless of the Kit)", reasonOut, "event_inactive")
+
+		-- in-window without the Kit → denied (no Kit → denied even in-window).
+		local okNoKit, reasonNoKit = frozenAuth(frozenAngler(false), "alaska_burbot", inWindow)
+		t.ok("in-window without the Kit the burbot is denied", okNoKit == false)
+		t.eq("…with missing_ice_fishing_kit (the item-ownership gate, NOT canAccessZone)", reasonNoKit, "missing_ice_fishing_kit")
+
+		-- in-window WITH the Kit → BOTH gates pass.
+		local okBoth, reasonBoth = frozenAuth(frozenAngler(true), "alaska_burbot", inWindow)
+		t.ok("in-window with the Kit BOTH gates pass (authority true)", okBoth == true and reasonBoth == nil)
+
+		-- regression: a non-Kit fish (king salmon) is NOT touched by the Frozen-Lake gate (its event-gating
+		-- stays at the spawn-predicate level — the requiresItem-scoped backstop does not reach it).
+		local _, reasonKing = frozenAuth(coastalAngler(true), "alaska_king_salmon", outWindow)
+		t.ok("a non-Kit fish is NOT denied by the Frozen-Lake gate", reasonKing ~= "event_inactive" and reasonKing ~= "missing_ice_fishing_kit")
+
+		-- the event-exclusive rare mints an artifact and writes NO Cash (RD2 — value is trade/Trophy-Hall, not
+		-- the faucet). A full in-window catch with the Kit lands the Legendary burbot through the whole pipeline.
+		local catcher = frozenAngler(true)
+		local reelDrain = Fishing.reelDrainMax(Catalog, 4, "maxed")
+		local stamina = Fishing.staminaToLand(Catalog, Catalog.fish.alaska_burbot)
+		local burbotShot = {
+			targetId = "alaska_burbot",
+			biteActive = true,
+			E = 0.7,
+			claimedDrain = reelDrain * 0.7,
+			accumulatedStaminaBefore = stamina - reelDrain * 0.7,
+			owner = "u1",
+		}
+		local burbotDeps: Gauntlet.Deps = {
+			config = Catalog,
+			now = inWindow,
+			saveFn = function()
+				return true
+			end,
+			markDirty = function() end,
+			telemetry = Fakes.newTelemetry(),
+		}
+		local rBurbot = Gauntlet.handle(newReg(), { intent = "catch", playerId = 1, payload = burbotShot }, { playerId = 1, profile = catcher, live = true }, burbotDeps)
+		t.ok("the in-window burbot catch (with the Kit) lands", rBurbot.ok)
+		t.eq("the event rare writes NO Cash at mint (RD2)", #catcher.cash.tail, 0)
+		t.ok("an artifact was minted (its value flows to trade/Trophy Hall)", next(catcher.artifacts) ~= nil)
+	end
+
+	t.section("Spawner — the Frozen Lake window is the PRIMARY gate (closed out-of-window)")
+	do
+		local wf = Catalog.liveOps.events.winter_freeze
+		local burbot = Catalog.fish.alaska_burbot
+		t.ok("the burbot is NOT spawn-eligible out of window", Spawner.rareSpawnEligible(burbot, LiveOps.worldStateAt(Catalog, wf.endTime + 1000000)) == false)
+		t.ok("the burbot IS spawn-eligible in the Winter Freeze window", Spawner.rareSpawnEligible(burbot, LiveOps.worldStateAt(Catalog, math.floor((wf.startTime + wf.endTime) / 2))))
 	end
 end

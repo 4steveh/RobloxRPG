@@ -587,7 +587,10 @@ local rows: { Creature } = {
 		minWeaponTierToKill = 5,
 		minArmorTierToSurvive = 5,
 		coop = Co.party,
-		conditions = { time = "low light", season = "salmon run", event = "Salmon Run" },
+		-- Step 13: season cased "Salmon Run" to match the salmon-run fish + the LiveOps Salmon Run event's
+		-- imposed world.season (a single world.season satisfies only one casing). LOC_04 §9: the run "draws
+		-- grizzlies to Salmon Falls … the co-op apex becomes live" — so the seasonal event genuinely revives it.
+		conditions = { time = "low light", season = "Salmon Run", event = "Salmon Run" },
 		rare = rareFields(2500, "the pale-gold giant rearing at the falls in the run — the marquee co-op kill"),
 		spawnLocation = "Salmon Falls",
 		spawnZones = { "salmon_falls" }, -- Alaska shell zone (Task 2.4, LOC_04 §3)

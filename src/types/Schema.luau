@@ -20,10 +20,14 @@ type ArtifactKind = Enums.ArtifactKind
 type FunnelBeat = Enums.FunnelBeat
 type RealMoneyKind = Enums.RealMoneyKind
 type DecorKind = Enums.DecorKind
+type EventKind = Enums.EventKind
+type NewScarcityKind = Enums.NewScarcityKind
+type QuestLoop = Enums.QuestLoop
 type DestinationId = Ids.DestinationId
 type TargetId = Ids.TargetId
 type ItemId = Ids.ItemId
 type ArtifactId = Ids.ArtifactId
+type EventId = Ids.EventId
 
 local Schema = {}
 
@@ -145,6 +149,11 @@ export type Fish = {
 	minRodTier: number,
 	minReelTier: number,
 	baitRequired: string?,
+	-- Step 13: a COMMODITY (e.g. tackle_ice_fishing_kit) the angler must OWN to attempt this catch. The
+	-- generalization of `baitRequired` to durable typed-owned gear: baitRequired reads inventory.fungible,
+	-- requiresItem reads inventory.commodities (the same item-ownership gate the Frozen Lake uses, NOT
+	-- canAccessZone — the Kit is tackle, owned, never a vehicle and never a tier input). nil = no item gate.
+	requiresItem: ItemId?,
 	waterType: WaterType,
 	-- Step-5 placement: the structured Step-3 water zones the live bite spawner places this fish into
 	-- (the Fish equivalent of Creature.spawnZones; fish carry no prose location).
@@ -311,6 +320,42 @@ export type DailyState = {
 }
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- LiveOps event framework (Step 13 — SYS_liveops_calendar §A/§7). A new event/season is a CONFIG RECORD
+-- the live game loads — no code per event (RD4). The scheduler (logic/LiveOps) recomputes which events are
+-- live from SERVER TIME every tick and drives the WorldState `event` clause the spawn predicate already reads.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- The RD1 new-scarcity declaration: an event may (a) open a window for an EXISTING rare at its UNCHANGED
+-- 1-in-N (referenceWindow), or (b) introduce a GENUINELY-NEW event-exclusive rare (mintNew). It may NEVER
+-- edit an existing artifact's rarity/1-in-N (structurally absent here) nor clone one under a colliding id
+-- (the scarcity guard rejects both — Validation.assertEventConfig / assertNewScarcityId).
+export type NewScarcityDecl = { kind: NewScarcityKind, targetId: TargetId }
+-- What the event IMPOSES on the spawner's WorldState while live. `event` is the single spawn-gating clause
+-- (one event at a time, equality-matched — Spawner.WorldState). nil fields impose nothing.
+export type ImposedWorld = { event: string?, season: string?, weather: string?, time: string? }
+export type EventConfig = {
+	id: EventId,
+	name: string,
+	kind: EventKind,
+	startTime: number, -- server-time absolute (inclusive); the activation window's open
+	endTime: number, -- server-time absolute (inclusive); reverts AFTER this on the per-tick recompute
+	imposes: ImposedWorld, -- the WorldState the event drives while live (imposes.event = the spawn-gating clause)
+	cashBudget: number, -- per-window thin participation Cash cap (≤ tuning.economy.eventPayoutBudgetCeiling)
+	-- RD1b: the GENUINELY-NEW fish this event INTRODUCES (authored here, NOT in the base Fish catalog). The
+	-- Catalog merges these into config.fish with a clone-evasion collision check (a minted id must not pre-
+	-- exist in ANY catalog — that is what makes "genuinely new" structural, not a forgeable spawn-clause edit).
+	-- A `mintNew` newScarcity decl MUST name a member of this list; a `referenceWindow` decl names an EXISTING
+	-- rare. OPTIONAL — most events (conditionWindow / seasonal) introduce no new fish (nil = none).
+	mintsFish: { Fish }?,
+	newScarcity: { NewScarcityDecl }, -- the RD1 declaration (audited + guarded at load)
+	notes: string,
+}
+export type EventCatalog = { [EventId]: EventConfig }
+-- A daily-quest pool entry (Step 13 §F). MECHANICAL, not narrative ("Catch 5 trout"). Liveops authors WHICH
+-- quests; economy owns the reward SCALE (Economy.dailyQuestReward, scaled by T_current — an open economy call).
+export type Quest = { id: string, loop: QuestLoop, objective: string, themedFor: EventId? }
+export type LiveOpsConfig = { events: EventCatalog, dailyQuestPool: { Quest } }
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Destination SHELL (Step 3 — the navigable place). Pure DATA: positions are plain {x,y,z} tables (not
 -- Roblox Vector3) so the shell is headless. The world blockout converts to Vector3 at runtime. Keyed by
 -- DestinationId so a second Destination (Appalachia, Step 10) reuses the framework with new data.
@@ -369,6 +414,7 @@ export type Config = {
 	destinations: DestinationCatalog,
 	rankPerks: { RankPerk },
 	decor: DecorCatalog,
+	liveOps: LiveOpsConfig, -- Step 13: the event calendar + daily-quest pool (config-not-code, RD4)
 	targetIndex: { [TargetId]: TargetIndexEntry },
 }
 

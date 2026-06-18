@@ -13,6 +13,7 @@ local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 local Combat = require("@src/logic/Combat")
 local Fishing = require("@src/logic/Fishing")
+local LiveOps = require("@src/logic/LiveOps")
 
 type EquipmentItem = Schema.EquipmentItem
 type Creature = Schema.Creature
@@ -155,6 +156,16 @@ function V.assertFish(f: Fish)
 	end
 end
 
+-- Step 13: a fish's requiresItem (the Frozen-Lake item-ownership gate) must resolve to a real equipment
+-- item — else a typo silently makes the fish permanently uncatchable (no player can own a non-existent
+-- item, so the gate denies forever). Cross-reference check (needs the catalog), mirrors the gate-access-item
+-- resolution. (baitRequired stays free-form: bait ids have no backing fungible-item catalog.)
+function V.assertFishItemRefs(f: Fish, config: Config)
+	if f.requiresItem ~= nil then
+		assert(config.equipment[f.requiresItem] ~= nil, f.id .. ": requiresItem '" .. f.requiresItem .. "' must resolve to an equipment item")
+	end
+end
+
 -- Re-skin integrity: tier ≥ origin's AND behavior reuses the origin's template (progression §6).
 -- A re-skin may always be a calmer flee/passive 'find' variant of an aggressive/pack origin (LOC §5 —
 -- e.g. alaska_spirit_moose is `flees` while its origin alaska_bull_moose is `aggressive`).
@@ -166,6 +177,139 @@ function V.assertCreatureReskin(c: Creature, config: Config)
 	-- calmer flee/passive 'find' variant of an aggressive/pack origin (LOC §5 — e.g. the Spirit Moose).
 	local reusesTemplate = c.behavior == source.behavior or c.behavior == "flees" or c.behavior == "passive"
 	assert(reusesTemplate, c.id .. ": a re-skin must reuse its origin's behavior template (progression §6)")
+end
+
+-- ── Step 13: the LiveOps scarcity-discipline guard (SYS_liveops_calendar RD1 — THE moat-structural piece).
+-- A build-time schema error, the same class as assertDecorItem/assertFish. Events are precisely where the
+-- pressure to dilute a rare's scarcity arrives; a single dilutive re-release collapses the trade moat, so the
+-- discipline is a PROPERTY OF THE SCHEMA, not a thing someone remembers under pressure. ──────────────────
+
+-- A new-scarcity id MUST be genuinely new — not present in ANY existing catalog (the clone evasion: a config
+-- "introducing a new entry" whose id collides with an existing rare overwrites/clones it). RD1.
+function V.assertNewScarcityId(proposedId: string, config: Config)
+	local collides = config.equipment[proposedId] ~= nil
+		or config.creatures[proposedId] ~= nil
+		or config.fish[proposedId] ~= nil
+		or config.decor[proposedId] ~= nil
+		or config.destinations[proposedId] ~= nil
+	assert(not collides, "new-scarcity id '" .. proposedId .. "' collides with an existing catalog id — a new entry must be genuinely new (RD1 clone-evasion guard)")
+end
+
+-- An event config obeys RD1/RD2: budget within the (economy-owned) ceiling; a well-formed window; and each
+-- new-scarcity declaration is legal —
+--   • referenceWindow (RD1a): names an EXISTING rare (its 1-in-N untouched; the event carries no rate, so
+--     dilution is structurally absent). May NOT also be minted by this event.
+--   • mintNew (RD1b): names a fish this event INTRODUCES (∈ event.mintsFish). The Catalog merge already
+--     proved every minted id is genuinely new (∉ ANY base catalog — assertNewScarcityId), so a re-release of
+--     an existing rare is structurally impossible: a standing rare's id is NOT in mintsFish, and putting it
+--     there collides at merge. This is the fix for the forgeable-spawn-clause re-release the review found.
+-- Plus: every fish the event MINTS must be gated by THIS event (event-exclusive), and every minted RARE must
+-- be declared as a mintNew (no undeclared MINTED scarcity — the RD1 audit on introduced content). NOTE: this
+-- guard is the STRUCTURAL floor (no rate edit, no clone, no re-release, no undeclared mint). It does NOT also
+-- require an event to file a referenceWindow for every EXISTING rare its imposed clause happens to window —
+-- opening a window at an UNCHANGED 1-in-N is the explicitly-permitted RD1(a) behavior, and the completeness
+-- of windowing declarations is the OPERATIONAL scarcity-mint approval gate the spec leaves to live-ops
+-- (SYS_liveops_calendar Open Questions), not the schema guard.
+function V.assertEventConfig(event: Schema.EventConfig, config: Config)
+	assert(event.startTime < event.endTime, event.id .. ": event window start must be < end")
+	assert(event.cashBudget >= 0, event.id .. ": cashBudget must be ≥ 0")
+	assert(event.cashBudget <= config.tuning.economy.eventPayoutBudgetCeiling,
+		event.id .. ": cashBudget exceeds eventPayoutBudgetCeiling (economy owns the per-event Cash bound — SYS_liveops §6)")
+
+	local mintsFish = event.mintsFish or {}
+	local mintedIds: { [string]: boolean } = {}
+	for _, mf in mintsFish do
+		mintedIds[mf.id] = true
+	end
+
+	local declaredMintNew: { [string]: boolean } = {}
+	for _, decl in event.newScarcity do
+		if decl.kind == Enums.NewScarcityKind.mintNew then
+			declaredMintNew[decl.targetId] = true
+			-- RD1b: a mintNew names a genuinely-new fish this event INTRODUCES (∈ mintsFish). A standing rare's
+			-- id is not in mintsFish (and can't be added — the Catalog merge rejects an id colliding with base).
+			assert(mintedIds[decl.targetId],
+				event.id .. ": mintNew '" .. decl.targetId .. "' must be a fish this event INTRODUCES (in mintsFish) — re-releasing an existing rare is forbidden (RD1)")
+			local idx = config.targetIndex[decl.targetId]
+			assert(idx ~= nil and V.isRareOrAbove(idx.rarity),
+				event.id .. ": mintNew '" .. decl.targetId .. "' must be rare-and-above (RD1 governs scarcity)")
+		else
+			-- RD1a: referenceWindow names an EXISTING rare (not one this event introduces).
+			local idx = config.targetIndex[decl.targetId]
+			assert(idx ~= nil, event.id .. ": referenceWindow target '" .. decl.targetId .. "' must resolve to a catalog target")
+			assert(V.isRareOrAbove(idx.rarity),
+				event.id .. ": referenceWindow target '" .. decl.targetId .. "' must be a rare — RD1 governs SCARCITY (rare-and-above) only")
+			assert(not mintedIds[decl.targetId],
+				event.id .. ": referenceWindow target '" .. decl.targetId .. "' cannot also be minted by this event")
+		end
+	end
+
+	for _, mf in mintsFish do
+		local cond = mf.spawn.conditions
+		local gating = cond ~= nil and cond.event or nil
+		assert(event.imposes.event ~= nil and gating == event.imposes.event,
+			event.id .. ": minted fish '" .. mf.id .. "' must be gated by this event's spawn clause (event-exclusive)")
+		if V.isRareOrAbove(mf.rarity) then
+			assert(declaredMintNew[mf.id],
+				event.id .. ": minted RARE '" .. mf.id .. "' must be declared as a mintNew newScarcity entry (the RD1 audit)")
+		end
+	end
+end
+
+-- A daily-quest pool entry is mechanical (not narrative), carries a legal loop, and any theming resolves.
+function V.assertQuest(q: Schema.Quest, config: Config)
+	assert(q.objective ~= "", q.id .. ": quest objective must be set (mechanical content)")
+	assert(q.loop == Enums.QuestLoop.Hunting or q.loop == Enums.QuestLoop.Fishing or q.loop == Enums.QuestLoop.either,
+		q.id .. ": illegal quest loop '" .. tostring(q.loop) .. "'")
+	if q.themedFor ~= nil then
+		assert(config.liveOps.events[q.themedFor] ~= nil, q.id .. ": themedFor '" .. q.themedFor .. "' must resolve to an event")
+	end
+end
+
+-- Whole-LiveOps validation: per-event guard; the daily pool can form the cross-loop pair; the aggregate
+-- concurrent Cash faucet stays within the (economy-owned) PEAK ceiling; and at most ONE spawn-gating event
+-- is ever live at a time (world.event is a single string, equality-matched).
+function V.validateLiveOps(config: Config)
+	local lo = config.liveOps
+	for id, e in lo.events do
+		assert(e.id == id, "liveOps event key '" .. id .. "' must match its id '" .. e.id .. "'")
+		V.assertEventConfig(e, config)
+	end
+
+	-- The cross-loop pair must be formable on ANY day — including days with no active event, when themed
+	-- quests are excluded. So count only the ALWAYS-ELIGIBLE (non-themed) quests toward the pair guarantee.
+	local hasHunt, hasFish = false, false
+	for _, q in lo.dailyQuestPool do
+		V.assertQuest(q, config)
+		if q.themedFor == nil then
+			if q.loop == Enums.QuestLoop.Hunting then
+				hasHunt = true
+			elseif q.loop == Enums.QuestLoop.Fishing then
+				hasFish = true
+			end
+		end
+	end
+	if #lo.dailyQuestPool > 0 then
+		assert(hasHunt, "daily-quest pool must contain ≥1 NON-THEMED Hunting quest (the cross-loop pair must be formable every day)")
+		assert(hasFish, "daily-quest pool must contain ≥1 NON-THEMED Fishing quest (the cross-loop pair must be formable every day)")
+	end
+
+	assert(LiveOps.peakConcurrentCashBudget(config) <= config.tuning.economy.aggregateEventFaucetCeiling,
+		"concurrent event Cash faucets exceed aggregateEventFaucetCeiling (the PEAK instantaneous sum — SYS_liveops §6)")
+
+	local gating: { Schema.EventConfig } = {}
+	for _, e in lo.events do
+		if e.imposes.event ~= nil then
+			table.insert(gating, e)
+		end
+	end
+	for i = 1, #gating do
+		for j = i + 1, #gating do
+			local a, b = gating[i], gating[j]
+			assert(not (a.startTime <= b.endTime and b.startTime <= a.endTime),
+				"spawn-gating events '" .. a.id .. "' and '" .. b.id .. "' overlap — only one spawn-gating event at a time (world.event is a single string)")
+		end
+	end
 end
 
 -- Whole-catalog validation: per-row checks + cross-reference integrity (the seams that only show up
@@ -210,6 +354,7 @@ function V.validateConfig(config: Config)
 	end
 	for _, f in config.fish do
 		V.assertFish(f)
+		V.assertFishItemRefs(f, config) -- Step 13: requiresItem (the Frozen-Lake kit) must resolve
 		-- Step-5/10 (SYS_fishing §3): min rod/reel tiers are DERIVED. Bayou: assert derived==authored for
 		-- the ROUTINE band (rares excluded per RD5 — the Leviathan's colossal weight intentionally exceeds
 		-- the T1 fight model). Appalachia/Alaska: cross-tier equality is unachievable — assert sufficiency
@@ -299,6 +444,9 @@ function V.validateConfig(config: Config)
 		assert(hasMilestone(Enums.Loop.Hunting, dId), dId .. ": missing a designated hunting milestone target")
 		assert(hasMilestone(Enums.Loop.Fishing, dId), dId .. ": missing a designated fishing milestone target")
 	end
+
+	-- Step 13: the LiveOps event calendar + daily-quest pool self-validate on load (the scarcity guard).
+	V.validateLiveOps(config)
 end
 
 return V

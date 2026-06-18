@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–10)
+# Wild World — Build (Steps 1–13)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -127,6 +127,10 @@ src/
            Catalog (self-validates) · Shells (Step 3 — the Bayou shell; +Step-10 Appalachia/Alaska shells; self-validates + placement check)
            · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing; +Step-10 Appalachia/Alaska caps)
            · Decor (Step 8 — the starter MVL decor/theme/framing catalog; Cash-priced, balance-free, tradeable=false; self-validates)
+           · LiveOps (Step 13 — the event calendar: Winter Freeze + Salmon Run records + the daily-quest pool; Winter Freeze's `mintsFish` INTRODUCES the genuinely-new Frozen-Lake catches [alaska_burbot Legendary RD1b + alaska_lake_whitefish], merged into config.fish by Catalog with a clone-evasion collision check; config-not-code, self-validates)
+           · FishBuilder (Step 13 — the shared XOR-enforcing fish() + rareFields() builder, used by both Fish and LiveOps mintsFish)
+           · Validation (+Step-13 the RD1 scarcity-discipline guard: assertEventConfig/assertNewScarcityId/assertFishItemRefs/validateLiveOps — build-time rejection of rate-edit/clone/re-release [mintNew must be ∈ mintsFish, ∉ base catalog]; PEAK aggregate ceiling; one spawn-gating event at a time)
+           · Fish (+Step-13 the requiresItem item-ownership field; builder extracted to FishBuilder) · Spawning (+Step-13 frozen_lake area, capped low)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
@@ -139,6 +143,8 @@ src/
            · TrophyHall (Step 8 — the VIEW: filter(artifacts, DISPLAYED); plaque from provenance; slot usage; NO parallel store)
            · Economy (+ Step-8 slotExpansionPrice: the escalating/uncapped evergreen-sink slot price)
            · Progression (Step 9 — commitUnlocks: the persisted-truth unlock set; worldMapPins/passportCounts: the Passport surface; CALLS evaluateGate, never re-derives)
+           · Fishing (+ Step-13 ownsRequiredItem: the commodity item-ownership check behind the Frozen-Lake gate — mirrors ownsBoatForWater, NOT canAccessZone)
+           · LiveOps (Step 13 — PURE scheduler/budget/rotation/alarm: server-time activation [reverts after end] + world.event driver + server-time entitlements + PEAK-concurrent budget sweep + capped eventPayout + dailyQuestSet [cross-loop pair + theming] + Cash-priced decor quota + evergreenSinkAlarm)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -156,6 +162,8 @@ src/
       LodgeShopHandler.luau   (Step 8) "buySlot"/"buyDecor" (the evergreen Cash sink, evergreen-tagged) + "placeDecor" (cosmetic layout)
     progression/
       WorldMapHandler.luau    (Step 9) the "openWorldMap" intent — completes the WORLD_MAP reveal beat + the commitUnlocks catch-all (critical)
+    liveops/
+      EventRewardHandler.luau (Step 13) the "claimEventReward" intent — budget-capped event-faucet ledger entry (type=eventReward, loop=none), per-window server-time-entitlement idempotency (critical)
     idle/Idle.luau          (+ Step-6 economyAmount: the real idle amount at T_idle = max(EHT, EFT))
     world/WorldServer.server.luau   ⌂ STUDIO-ONLY (Step 8) — THE ONE login owner: one SessionService + one shared gauntlet registry (every handler), Bayou + Lodge build, both spawners + flows, kind-aware arrival
   client/CharacterController.client.luau   ⌂ STUDIO-ONLY — mobile camera/controls (→ StarterPlayerScripts)
@@ -185,7 +193,9 @@ tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Val
          Step 7: Onboarding/Daily/ClaimDailyHandler;
          Step 8: Lodge/TrophyHall/SalvageHandler/DisplayHandler/LodgeShopHandler;
          Step 9: Progression/Travel/WorldMapHandler;
-         Step 10: CrossTier assertions — sufficiency/role-band/co-op-wall/co-op-soluble for Appalachia+Alaska) · negative/ (MUST fail analysis)
+         Step 10: CrossTier assertions — sufficiency/role-band/co-op-wall/co-op-soluble for Appalachia+Alaska;
+         Step 11: VendorHandler; Step 12: PairTransaction/TradeSwap/TradeService;
+         Step 13: LiveOps [scheduler/budgets/guard/rotation/alarm] + EventRewardHandler [faucet/idempotency]) · negative/ (MUST fail analysis)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -825,6 +835,88 @@ Design-time scarcity becomes runtime scarcity: rares trade, and **cannot be dupe
 
 **Deferrals (named):** cross-server trading / MemoryStore broker → post-launch; auction house / order book / matching → post-launch; raw Cash transfer → never (the `≥ 1 artifact` rule is the structural block); the rare-dog artifact-mint hook → a future wire.
 
+## Step 13 — LiveOps Calendar & Event Framework (the ongoing-content engine; the bar is split, honestly)
+
+The system that turns "ship content weekly" from aspiration into a **config drop, not a code deploy** — and
+carries the **inflation-control SLA** that keeps Cash earned forever (economy §9). **This step composes; it
+does not rebuild** — the `event` spawn-predicate clause (`Spawner.WorldState`/`rareSpawnEligible`), the
+commodity-ownership gate pattern (`Fishing.ownsBoatForWater`), the `Daily` cross-loop skeleton, the
+`Catalog`/`Validation` self-validate-on-load pattern, the `Ledger`/`Economy` faucet, and the
+`Entitlement`/`activeEntitlements` server-time substrate were all **inherited**.
+
+- **The event-config schema (built FIRST — everything is records in it).** `Schema.EventConfig`
+  (`id`/`kind`/`startTime`/`endTime` against **server time**/`imposes` [the WorldState clauses it drives]/
+  `cashBudget`/`newScarcity`), `Quest`, `LiveOpsConfig` (joined into `Config.liveOps`). A new event is a
+  `config/LiveOps.luau` record — **no code per event** (RD4); any kind needing code per instance would
+  downgrade the cadence (flagged).
+- **The scarcity-discipline guard (RD1 — the one moat-structural piece; a BUILD-TIME error).**
+  `Validation.assertEventConfig` / `assertNewScarcityId` / `validateLiveOps`, run at `Catalog` require time
+  (a malformed event config **fails the require**). An event INTRODUCES genuinely-new scarcity via
+  `mintsFish` (fish authored in the event, **not** the base catalog); `Catalog` merges them only after
+  `assertNewScarcityId` proves each id is **∉ any base catalog** (the **clone evasion** — "editing scarcity"
+  and "cloning under a colliding id" are the same mechanism). A `mintNew` declaration must name a member of
+  `mintsFish`, so **re-releasing an existing rare is structurally impossible** (a standing rare isn't in
+  `mintsFish`, and putting it there collides at merge — the fix for the forgeable-spawn-clause re-release the
+  adversarial review surfaced). It also rejects: a `referenceWindow` to a non-existent/non-rare target; a
+  `cashBudget` over the ceiling; a minted fish not gated by its own event. It **accepts** a `referenceWindow`
+  to an existing rare (window at **unchanged 1-in-N**, RD1a) and a genuinely-new event-exclusive `mintNew`
+  (RD1b). All directions — including the same-clause re-release attack — are asserted in `LiveOps.spec`.
+  *Dilution is unrepresentable, not remembered.*
+- **The scheduler / activation (server-authoritative, server-time).** `logic/LiveOps` is **pure**:
+  `isEventActive`/`activeWorldEvent`/`worldStateAt` recompute liveness from `serverTime ∈ [start,end]` **every
+  tick**, so `world.event` goes active at `start` and **reverts after `end`** — never latched, never
+  client-asserted. `world.event` is a single string (one spawn-gating event at a time; the guard forbids
+  overlapping spawn-gating windows). Window-bounded **entitlements are server-time absolute** (offline counts;
+  logging off banks nothing). The Studio `WorldServer` tick feeds `LiveOps.worldStateAt(Catalog, os.time())`
+  into the spawner's WorldState (the inherited `event` predicate does the rest).
+- **The payout budgets (three layers; reuse the ledger).** **Structural:** event value is scarce/identity —
+  a rare mint writes **no Cash** (proven by a full burbot catch: an artifact mints, the cash tail grows by 0).
+  **Per-event:** `EventRewardHandler` (`claimEventReward`) writes a **budget-capped, atomic, event-faucet-
+  tagged** ledger entry (`type=eventReward`, `loop="none"` → reconciliation untouched), idempotent per window
+  via a server-time entitlement. **Aggregate:** `peakConcurrentCashBudget` is the **PEAK instantaneous
+  concurrent sum** (a sweep-line — *not* a naive sum-of-touching), bounded by `aggregateEventFaucetCeiling`.
+- **Winter Freeze + the Frozen Lake (the MVL's one concrete event, end to end).** A `limitedTime` event that
+  opens the Frozen Lake — **doubly gated**: (a) the active window (the `event` spawn clause, driven by the
+  scheduler — the **PRIMARY** gate, closed out-of-window) **and** (b) ownership of `tackle_ice_fishing_kit`
+  (the **item-ownership** gate in `CatchHandler` authority — a commodity in `inventory.commodities`, **NOT**
+  `canAccessZone`; the Kit is tackle, owned, never a tier input). No Kit → denied even in-window; closed
+  out-of-window regardless of the Kit. Its scarcity is **RD1b**: a genuinely-new Legendary `alaska_burbot`
+  (new artifact, permanently scarce after the window). Salmon Run ships alongside as the `seasonal`
+  `referenceWindow` example (Tyee King + Glacier Grizzly at unchanged rate — reviving the run rares the
+  scheduler now actually drives).
+- **The daily-quest rotation (content on the inherited skeleton).** `LiveOps.dailyQuestSet` is a deterministic
+  per-server-day selection (~3) that **always preserves the cross-loop pair** (≥1 Hunting + ≥1 Fishing) and
+  **themes** to an active beat; quests are **mechanical** ("Catch 5 trout"). The reward **scale** stays
+  economy's (`ClaimDailyHandler` → `Economy.dailyQuestReward`, unchanged) — liveops authors *which* quests,
+  not *how much Cash*.
+- **The evergreen-sink alarm + decor cadence (the inflation SLA — the mechanism, not the art).**
+  `LiveOps.cashPricedDecorCount`/`meetsDecorReplenishQuota` count **Cash-priced SKUs only** (a game-pass
+  cosmetic is revenue, not ballast, and does not satisfy the quota); `evergreenSinkAlarm` is the trigger
+  (below `evergreenSinkShareAlarmThreshold` → pull an out-of-band decor drop forward). The decision functions
+  are headless + tested; the live-share feed + the drop are the ops/Studio seam.
+- **Telemetry — wired vs enumerated.** `liveops.eventFaucet:<id>` + `liveops.eventParticipation` fire from
+  `EventRewardHandler`; the evergreen-sink share, rare-price trend, daily-claim-by-day (esp. session 2),
+  reactivation, and cadence-adherence are enumerated as ops/dashboard seams (the telemetry sink forwards to
+  AnalyticsService — playtest/ops-pending).
+- **The `T_current`-basis seam is FLAGGED, not papered over.** Daily + event Cash scale off
+  `T_current = max(EHT, EFT)` (the existing `ClaimDailyHandler` choice). Under the OR-gate a player has two
+  effective tiers; `T_current` is an **open economy call** (`max(EHT,EFT)` vs highest-conquered vs a blend),
+  inherited here and echoed, never re-resolved.
+
+**Studio / telemetry (NOT headless — playtest-pending, all unchecked):**
+- [ ] The event UI (the "event live" banner, the countdown, the competitive-event leaderboard display).
+- [ ] The Frozen-Lake geometry/traversal + the Alaska **live spawner** (Step 10 built Alaska *geometry*; its
+      runtime spawner — and thus the burbot actually appearing in-world — is the playtest wire); the daily-board UI; the seasonal-theming visuals.
+- [ ] Telemetry populates: evergreen-sink share + the alarm, rare-price trend, event participation +
+      faucet share, daily claim rate (esp. session 2), lapsed-player reactivation, cadence-adherence.
+
+**Deferrals (named with their owning step):** the **Rockies** region + the Destination-drop *pipeline
+execution* → **post-launch** (the framework's *slot* concept is generic; the region/launch-wrapper are not
+built); the decor **SKU art** + the actual cadence batches → content drops (the art is EQUIPMENT_MASTER's;
+Step 13 built the quota + alarm *mechanism*); **premium bait + game-pass Boat tiers + real-money cosmetics**
+→ **Step 14** (monetization); an event-specific mint/dupe/Cash path → **never** (event rares reuse the
+single-mint artifact + ledger wholesale); the marketplace/auction house → post-launch.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -838,13 +930,13 @@ Design-time scarcity becomes runtime scarcity: rares trade, and **cannot be dupe
 | **Ambush** archetype (RD-C) + **projectile** weapon classes (bows/shotguns, RD-D) | post-MVL |
 | ~~MVL **T2→T4 difficulty check**~~ — **DONE (Step 10)**: cross-tier floor/ceiling semantics (sufficiency + role band + co-op-wall + co-op-soluble) replace strict `derived==authored` (proven unachievable cross-tier; user-confirmed). Two derivation defects fixed; two stat defects caught and corrected. | ✅ Step 10 |
 | ~~**dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters)~~ — **DONE (Step 6/10)**: `routineHourSum` = `Income(T)` both loops, all destinations (Bayou/Appalachia/Alaska) | ✅ Step 6 + Step 10 |
-| Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
+| ~~Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4)~~ — **DONE (Step 13)**: `logic/LiveOps` server-time scheduler drives `world.event` (per-tick recompute, reverts after end); the RD1 scarcity guard + per-event/aggregate-PEAK budgets; Winter Freeze + Salmon Run config records; the Frozen-Lake item-ownership double-gate; the daily rotation + the evergreen-sink alarm mechanism | ✅ Step 13 |
 | ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; ~~trading's escrow/swap~~ — **DONE (Step 12)** | ✅ Steps 8 + 12 |
-| ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
+| ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **the replenishment cadence quota + the evergreen-sink alarm mechanism DONE (Step 13)** (Cash-priced-only); the **SKU art / cadence batches** (EQUIPMENT_MASTER) + **real-money** decor + the **auto-sell** pass | Step 13 mechanism / Step 14 / content |
 | ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; ~~the `TeleportService` execution beyond Lodge/Bayou~~ — the headless arrival-resolver seam (`ArrivalService.resolveDestinationArrival`) is **DONE + headless-tested**; the Studio fast-travel **EXECUTION** (within-place `PivotTo`) is written but **playtest-pending / not headless-verified** (see Step 10 Studio checklist); remaining: the map UI | Studio / later |
 | ~~**Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones)~~ — **DONE (Step 11)**: enforced (zone-access + catch backstop), vended, guardrailed; the fishing resolution takes no vehicle (access-not-power, structural) | ✅ Step 11 |
 | ~~**Dogs / Mounts** (Pointer/Husky; Horse/Snowmobile; Kennel & Stable + Boat Dealer fixtures built)~~ — **DONE (Step 11)**: vended as Cash sinks (the rare Redbone is trade-routed → Step 12); the never-gate/never-power guardrail holds; the detection/tracking + traversal *effects* are Studio | ✅ Step 11 |
-| **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content | post-launch |
+| **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content. Step 13 built the event framework's generic *slot* concept (a `destinationDrop` EventKind); the **region + the Destination-drop pipeline execution** (the config-not-code acceptance test) are post-launch | post-launch |
 | Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
 | Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |
 | ~~Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback~~ — **DONE (Step 12)**: `TradeService` state machine + version-bound double-confirm + escrow lifecycle; `TradeSwap` over the new `PairTransaction` + `ArtifactStore.transferOwnership` (live-to-new + tombstone-not-erase); `tradepay-out/in/tradetax` triple; the 8 checks headless-proven. Remaining: the Trading Post UI + the **reconcile-on-reload** consumer of the trade record (the two-key crash window) | ✅ Step 12 / ops |
@@ -901,6 +993,21 @@ Design-time scarcity becomes runtime scarcity: rares trade, and **cannot be dupe
     party lands it (FightTime 18.3 ≤ LandWindow 37.2). `recordWeightKg = 230` and `minReelTier = 5` are
     intact (the record weight and reel requirement are part of the authored design, not the representative
     fight weight).
+14. **Event-payout budget ceilings echoed from economy, not authored here** (Step 13). SYS_economy owns the
+    per-event Cash bound and leaves it a Tuning knob co-set with SYS_liveops. `Tuning.economy.
+    eventPayoutBudgetCeiling`/`aggregateEventFaucetCeiling` are illustrative defaults (≈ ½hr / 1hr of T1
+    income); `Validation.assertEventConfig` rejects a `cashBudget` over the ceiling at load and
+    `validateLiveOps` rejects a **PEAK concurrent** faucet over the aggregate ceiling — no magnitude is
+    hardcoded in logic. Event Cash is a **separate tagged faucet** (`type=eventReward`, `loop="none"`), so
+    the routine-hour reconciliation is untouched (it is not routine income).
+15. **`alaska_glacier_grizzly` season cased `"Salmon Run"`** (Step 13). The grizzly's `conditions.season`
+    was `"salmon run"` (lowercase) while all three run *fish* use `"Salmon Run"`; a single `world.season`
+    can satisfy only one casing. Aligned to `"Salmon Run"` so the Salmon Run event's imposed `world.season`
+    drives both the fish and the apex — LOC_04 §9 ("the run draws grizzlies to Salmon Falls … the co-op apex
+    becomes live") made real. **The Frozen-Lake catch gate is requiresItem-scoped**: only kit-gated seasonal
+    fish get the in-handler event-active backstop; standing seasonal fish (salmon) stay gated by the spawn
+    predicate (the primary `world.event` mechanism, now actually driven by the scheduler) — so the King
+    Salmon milestone is not newly hard-gated at the handler.
 
 ## Definition of Done — status
 
@@ -994,8 +1101,27 @@ worlds render within mobile budget; fast-travel executes to the right anchor (cl
 Alaska coastal vs interior read distinct; co-op apex fightable-by-party/infeasible-solo; telemetry hooks
 populate. Step 10 **calls** the existing KillWindow/Spawner/Shell/Economy machinery — it rebuilds none.
 
-**892 assertions pass headless; both negative fixtures fail analysis as required; `rojo build` produces a
-place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not headless-green.
+**Step 13:** ✅ (headless) the event-config schema (`EventConfig`/`Quest`/`LiveOpsConfig` → `Config.liveOps`,
+config-not-code); the **RD1 scarcity-discipline guard** (build-time, both directions: reject rate-edit/clone-
+id/re-release/non-rare-window/over-budget; accept `referenceWindow` to an existing rare + genuinely-new
+`mintNew`); the **server-time scheduler** (`isEventActive`/`activeWorldEvent`/`worldStateAt` — active iff
+`serverTime ∈ [start,end]`, reverts after end on a per-tick recompute; one spawn-gating event at a time);
+**server-time entitlements** (offline counts); the **budgets** (per-event cap + the **PEAK** concurrent
+sweep ≤ aggregate ceiling; event payouts are atomic `eventReward`/`loop="none"` ledger entries; an
+event-minted rare writes **no Cash** — proven by a full burbot catch); **Winter Freeze + the Frozen Lake**
+(doubly gated — active window **and** `tackle_ice_fishing_kit` ownership, the item-ownership gate not
+`canAccessZone`; the genuinely-new Legendary burbot, RD1b); the **daily rotation** (≥1 hunt + 1 fish
+preserved, deterministic, themed; reward scale = economy's, unchanged); the **Cash-priced-only decor quota +
+the evergreen-sink alarm** mechanism. ⌂ (Studio/telemetry, unchecked above) the event UI/banner/countdown/
+leaderboard; the Frozen-Lake geometry + the Alaska live spawner; the daily-board + seasonal-theming visuals;
+the telemetry dashboards (evergreen-sink share + alarm, rare-price trend, participation + faucet share, daily
+claim by day esp. session 2, reactivation, cadence-adherence). The `T_current = max(EHT,EFT)` basis is
+flagged (economy's open call), not re-resolved. Step 13 **calls** the inherited spawn predicate / ledger /
+entitlement / Daily substrate — it rebuilds none.
+
+**1135 assertions pass headless (Steps 1–13); both negative fixtures fail analysis as required; `rojo build`
+produces a place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not
+headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
 ```

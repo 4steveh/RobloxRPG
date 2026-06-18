@@ -6,78 +6,17 @@
 local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 local Ids = require("@src/types/Ids")
+local FishBuilder = require("@src/config/FishBuilder")
 
 type Fish = Schema.Fish
-type Reward = Schema.Reward
-type RareFields = Schema.RareFields
 
 local D = Ids.Destination
 local W = Enums.WaterType
 local Ra = Enums.Rarity
 
-local function isRareOrAbove(rarity: Enums.Rarity): boolean
-	return Enums.RarityRank[rarity] >= Enums.RARE_AND_ABOVE_RANK
-end
-
-type FishInput = {
-	id: string,
-	destinationId: Ids.DestinationId,
-	name: string,
-	tier: number,
-	rarity: Enums.Rarity,
-	typicalWeightKg: { min: number, max: number },
-	recordWeightKg: number,
-	fightDifficulty: number,
-	minRodTier: number,
-	minReelTier: number,
-	waterType: Enums.WaterType,
-	baitRequired: string?,
-	spawnZones: { string }?, -- structured Step-3 water zones (Step 5 prerequisite)
-	conditions: Schema.SpawnConditions?,
-	isMilestoneTarget: boolean?,
-	cash: { min: number, max: number }?,
-	rare: RareFields?,
-}
-
-local function fish(i: FishInput): Fish
-	local reward: Reward
-	if isRareOrAbove(i.rarity) then
-		local r = assert(i.rare, i.id .. ": Rare-and-above must carry Template-E rare fields")
-		reward = { kind = "artifact", artifact = { tradeable = r.tradeable, displayableInLodge = r.displayableInLodge } }
-	else
-		local c = assert(i.cash, i.id .. ": Common/Uncommon must carry a cash range")
-		reward = { kind = "cash", cash = c }
-	end
-	return {
-		id = i.id,
-		destinationId = i.destinationId,
-		name = i.name,
-		tier = i.tier,
-		rarity = i.rarity,
-		typicalWeightKg = i.typicalWeightKg,
-		recordWeightKg = i.recordWeightKg,
-		fightDifficulty = i.fightDifficulty,
-		minRodTier = i.minRodTier,
-		minReelTier = i.minReelTier,
-		baitRequired = i.baitRequired,
-		waterType = i.waterType,
-		spawnZones = i.spawnZones,
-		reward = reward,
-		spawn = { conditions = i.conditions },
-		rare = i.rare,
-		isMilestoneTarget = i.isMilestoneTarget,
-	}
-end
-
-local function rareFields(spawnRate: number, moment: string): RareFields
-	return {
-		spawnRate = spawnRate,
-		tradeable = true,
-		displayableInLodge = true,
-		reReleasePolicy = "NEVER",
-		intendedContentMoment = moment,
-	}
-end
+-- The XOR-enforcing builder is SHARED (FishBuilder) so LiveOps event-introduced fish build the same way.
+local fish = FishBuilder.fish
+local rareFields = FishBuilder.rareFields
 
 local rows: { Fish } = {
 	-- ───────────────────────── BAYOU (Tier 1) ─────────────────────────
@@ -452,6 +391,10 @@ local rows: { Fish } = {
 		conditions = { weather = "storm" },
 		rare = rareFields(9000, "the colossal halibut surfacing in a storm-tossed Gulf as a party hauls together"),
 	}),
+
+	-- NOTE: the FROZEN LAKE catches (alaska_lake_whitefish + alaska_burbot) are NOT in the base catalog — they
+	-- are GENUINELY-NEW scarcity INTRODUCED by the Winter Freeze event (config/LiveOps.luau `mintsFish`, RD1b),
+	-- merged into config.fish by Catalog with a clone-evasion collision check (a new id must not pre-exist here).
 
 	-- ───────────────────────── DEEP SEA (Tier 7 — fishing-only fixture) ─────────────────────────
 	fish({
