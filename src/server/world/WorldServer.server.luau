@@ -51,6 +51,8 @@ local DestinationService = require("@src/server/DestinationService")
 local SessionService = require("@src/server/SessionService")
 local ArrivalService = require("@src/server/ArrivalService")
 local Adapters = require("@src/server/RobloxAdapters")
+local Economy = require("@src/logic/Economy") -- S1: in-game shop pricing (the amount the buy handler debits)
+local Replication = require("@src/server/authority/Replication") -- S1: read-only projection for shop "open"
 
 local BAYOU = "bayou"
 local shell = Shells.byDestination[BAYOU]
@@ -803,6 +805,87 @@ travelRequest.OnServerEvent:Connect(function(plr, action, destinationId)
 		else
 			travelRequest:FireClient(plr, "denied", destinationId, result.reason)
 		end
+	end
+end)
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- THE IN-GAME CASH SHOP — Outfitter / Tackle Shop buy + equip + upgrade (S1 client-layer glue).
+-- ADDITIVE WIRE ONLY: the gauntlet already owns buy/upgrade (ShopHandler) + equip (EquipHandler), registered
+-- on the shared registry above but with NO RemoteEvent. This block is that wire. It does NOT touch the spawn
+-- loops, the fire/raycast handler, or the existing gauntlet routing. The client asserts nothing: it sends an
+-- itemId / instanceId + the vendor; the server PRICES via Economy, validates + debits inside the gauntlet,
+-- and replies with a fresh read-only projection + a rebuilt listing. (PurchaseRequest above is REAL MONEY —
+-- a different path; this is the Cash shop.)
+local VENDOR_CATEGORIES: { [string]: { [string]: boolean } } = {
+	Outfitter = { weapon = true, armor = true },
+	TackleShop = { rod = true, reel = true },
+}
+
+local function buildShopListing(profile, vendor)
+	local cats = VENDOR_CATEGORIES[vendor]
+	local forSale = {}
+	if cats ~= nil then
+		for id, item in Catalog.equipment do
+			if item.tierInput and item.availableAt == vendor and item.tier >= 2 then
+				local alreadyOwned = false
+				for _, c in profile.inventory.commodities do
+					if c.catalogId == id then
+						alreadyOwned = true
+						break
+					end
+				end
+				table.insert(forSale, {
+					itemId = id, name = item.name, tier = item.tier,
+					price = Economy.gearCostSlot(Catalog, item.tier), owned = alreadyOwned,
+				})
+			end
+		end
+	end
+	local owned = {}
+	for _, c in profile.inventory.commodities do
+		local item = Catalog.equipment[c.catalogId]
+		if item ~= nil and item.tierInput and cats ~= nil and cats[item.category] then
+			table.insert(owned, {
+				instanceId = c.instanceId, catalogId = c.catalogId, name = item.name,
+				tier = item.tier, intraLevel = c.intraLevel, equipped = c.equipped,
+			})
+		end
+	end
+	return { vendor = vendor, forSale = forSale, owned = owned }
+end
+
+local shopRequest = Instance.new("RemoteEvent")
+shopRequest.Name = "ShopRequest"
+shopRequest.Parent = ReplicatedStorage
+
+local SHOP_INTENT = { buy = "buy", equip = "equip", upgrade = "upgrade" }
+
+shopRequest.OnServerEvent:Connect(function(plr, action, arg1, arg2)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil then
+		return
+	end
+	if action == "open" then
+		if VENDOR_CATEGORIES[arg1] == nil then
+			return
+		end
+		shopRequest:FireClient(plr, "listing", arg1, buildShopListing(session.profile, arg1), Replication.buildProjection(session.profile, Catalog))
+		return
+	end
+	local intent = SHOP_INTENT[action]
+	if intent == nil then
+		return
+	end
+	local vendor = arg2
+	local payload = if intent == "buy" then { itemId = arg1 } else { commodityInstanceId = arg1 }
+	local r = Gauntlet.handle(registry, { intent = intent, playerId = plr.UserId, payload = payload }, session, gauntletDeps(plr))
+	if r.ok then
+		shopRequest:FireClient(plr, "result", action, true, nil)
+		if VENDOR_CATEGORIES[vendor] ~= nil then
+			shopRequest:FireClient(plr, "listing", vendor, buildShopListing(session.profile, vendor), r.projection)
+		end
+	else
+		shopRequest:FireClient(plr, "result", action, false, r.reason)
 	end
 end)
 
