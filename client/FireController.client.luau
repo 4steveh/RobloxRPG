@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 local player = Players.LocalPlayer
 local Net = require(script.Parent:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Hud"))
+local Feel = require(script.Parent:WaitForChild("HuntingFeel")) -- S2 game-feel: muzzle/tracer/recoil + hit/kill FX
 
 local FIRE_COOLDOWN = 0.15 -- client-side anti-spam only; the server enforces the authoritative fire rate
 local lastFire = 0
@@ -27,6 +28,7 @@ local function aimAndFire()
 	local vp = cam.ViewportSize
 	local ray = cam:ViewportPointToRay(vp.X / 2, vp.Y / 2)
 	Net.fire:FireServer(ray.Origin, ray.Direction.Unit)
+	Feel.onFire(ray) -- predicted muzzle flash + tracer + recoil
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -50,7 +52,9 @@ Net.fire.OnClientEvent:Connect(function(kind, targetId, extra)
 	if kind == "kill" then
 		Hud.applyProjection(extra) -- extra = projection (carries the new balance → payout-delta toast)
 		Hud.toast("Down!", Color3.fromRGB(150, 230, 140))
+		Feel.onKill(extra)
 	elseif kind == "hit" then
 		Hud.toast("hit " .. tostring(extra), Color3.fromRGB(230, 220, 140)) -- extra = per-shot damage
+		Feel.onHit()
 	end
 end)
