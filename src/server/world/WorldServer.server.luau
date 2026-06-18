@@ -576,12 +576,22 @@ local function buildCreatureModel(creatureId, originCFrame)
 	return model
 end
 
+-- STUDIO FEEL: per-archetype wander speed (studs/sec). Gators slow, rabbits quick.
+local MOVE_SPEED = { reptile = 3, small_mammal = 7, bird = 6 }
+local function creatureSpeed(creatureId)
+	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
+	return MOVE_SPEED[arch.kind] or 5
+end
+
 local function spawnTarget(creatureId, zoneId)
 	local zone = shell.zones[zoneId]
 	local pos = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
 	local model = buildCreatureModel(creatureId, CFrame.new(pos))
 	model.Parent = targetsFolder
-	liveTargets[model] = { creatureId = creatureId, health = Catalog.creatures[creatureId].health, accumulated = 0, zoneId = zoneId }
+	liveTargets[model] = {
+		creatureId = creatureId, health = Catalog.creatures[creatureId].health, accumulated = 0, zoneId = zoneId,
+		mode = "wander", target = nil, fleeUntil = 0, fleeFrom = nil, speed = creatureSpeed(creatureId),
+	}
 	return model
 end
 
@@ -637,6 +647,74 @@ for zoneId, area in huntingSpawn.areas do
 	end
 end
 
+-- ── STUDIO FEEL: creature movement (wander + face direction; flee when shot at) ──────────────────────
+-- SERVER-AUTHORITATIVE so the fire raycast always hits the live position (moving targets). A throttled
+-- Heartbeat walks each creature toward a wander point in its zone, or away from a recent shot. Anchored-
+-- part PivotTo replicates to all clients. The loop never yields, so it can't interleave with despawn.
+local function zoneRandomPoint(zoneId)
+	local z = shell.zones[zoneId]
+	return vec(z.center) + Vector3.new((math.random() - 0.5) * z.size.x * 0.8, 0, (math.random() - 0.5) * z.size.z * 0.8)
+end
+
+local function moveCreatures(dt)
+	local now = os.clock()
+	for model, state in liveTargets do
+		if model.PrimaryPart ~= nil then
+			local pos = model:GetPivot().Position
+			local z = shell.zones[state.zoneId]
+			local center = vec(z.center)
+			local speed = state.speed or 5
+			local dir
+			if state.mode == "flee" and now < state.fleeUntil then
+				local from = state.fleeFrom or pos
+				dir = Vector3.new(pos.X - from.X, 0, pos.Z - from.Z)
+				speed = speed * 2.4
+			else
+				if state.mode == "flee" then
+					state.mode = "wander"
+					state.target = nil
+				end
+				if state.target == nil or (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(state.target.X, 0, state.target.Z)).Magnitude < 2 then
+					state.target = zoneRandomPoint(state.zoneId)
+				end
+				dir = Vector3.new(state.target.X - pos.X, 0, state.target.Z - pos.Z)
+			end
+			if dir.Magnitude > 0.15 then
+				dir = dir.Unit
+				local newPos = pos + dir * speed * dt
+				newPos = Vector3.new(
+					math.clamp(newPos.X, center.X - z.size.x / 2, center.X + z.size.x / 2),
+					pos.Y,
+					math.clamp(newPos.Z, center.Z - z.size.z / 2, center.Z + z.size.z / 2)
+				)
+				model:PivotTo(CFrame.lookAt(newPos, newPos + dir))
+			end
+		end
+	end
+end
+
+-- spook creatures within `radius` of a shot impact (called from the fire handler on every shot)
+local function spookNear(impactPos, radius, fromPos)
+	for model, state in liveTargets do
+		if (model:GetPivot().Position - impactPos).Magnitude <= radius then
+			state.mode = "flee"
+			state.fleeUntil = os.clock() + 3
+			state.fleeFrom = fromPos or impactPos
+			state.target = nil
+		end
+	end
+end
+
+local moveAccum = 0
+game:GetService("RunService").Heartbeat:Connect(function(dt)
+	moveAccum += dt
+	if moveAccum < 0.1 then
+		return
+	end
+	moveCreatures(moveAccum)
+	moveAccum = 0
+end)
+
 -- Step 13: the per-tick server-time recompute of the calendar's WorldState. LiveOps.worldStateAt reads the
 -- ACTIVE event (server time ∈ [start,end]) and returns the clauses it imposes (event/season/…); because this
 -- is recomputed every tick (the spawn loops below call it each cycle), world.event goes active at the event's
@@ -685,6 +763,7 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	local origin = char.PrimaryPart.Position
 	local result = workspace:Raycast(origin, aimDirection.Unit * 500, params)
+	spookNear(if result ~= nil then result.Position else origin + aimDirection.Unit * 60, 22, origin) -- STUDIO FEEL: shots scatter nearby game
 	local now = os.time()
 	local rayHitTargetId, distance, zone, model = nil, math.huge, "body", nil
 	if result ~= nil then
