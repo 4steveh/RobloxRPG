@@ -32,6 +32,8 @@ type FishInput = {
 	minReelTier: number,
 	waterType: Enums.WaterType,
 	baitRequired: string?,
+	requiresItem: string?, -- Step 13: a COMMODITY the angler must OWN (e.g. tackle_ice_fishing_kit), the
+	-- item-ownership gate the Frozen Lake uses (CatchHandler reads inventory.commodities — NOT canAccessZone).
 	spawnZones: { string }?, -- structured Step-3 water zones (Step 5 prerequisite)
 	conditions: Schema.SpawnConditions?,
 	isMilestoneTarget: boolean?,
@@ -60,6 +62,7 @@ local function fish(i: FishInput): Fish
 		minRodTier = i.minRodTier,
 		minReelTier = i.minReelTier,
 		baitRequired = i.baitRequired,
+		requiresItem = i.requiresItem,
 		waterType = i.waterType,
 		spawnZones = i.spawnZones,
 		reward = reward,
@@ -451,6 +454,48 @@ local rows: { Fish } = {
 		spawnZones = { "open_gulf" },
 		conditions = { weather = "storm" },
 		rare = rareFields(9000, "the colossal halibut surfacing in a storm-tossed Gulf as a party hauls together"),
+	}),
+
+	-- ── FROZEN LAKE (Alaska seasonal sub-zone — the Winter Freeze event, LOC_04 §2.2/§6/§9) ──
+	-- A calmer SEATED counter-tempo to the coastal fight. DOUBLY gated: (a) the Winter Freeze event must be
+	-- active (the `event` spawn clause, driven by the scheduler) AND (b) the angler must OWN the Ice-Fishing
+	-- Kit (requiresItem — the item-ownership gate, the same required-tackle pattern as cut bait/fly, NOT
+	-- canAccessZone; the Kit is tackle, never a tier input). Closed out-of-window regardless of the Kit; in
+	-- window a Kit-less angler is denied. Bite density is capped low (Spawning.alaskaFishing.frozen_lake, §8.4).
+	fish({
+		id = "alaska_lake_whitefish",
+		destinationId = D.Alaska,
+		name = "Lake Whitefish (through the ice)",
+		tier = 4,
+		rarity = Ra.Common, -- the routine Frozen-Lake catch (Cash); the calmer seated ice-jig
+		typicalWeightKg = { min = 0.5, max = 2 },
+		recordWeightKg = 4,
+		fightDifficulty = 40, -- low: a calm seated jig, not the coastal fight (landable at the interior T3 rod/reel)
+		minRodTier = 3,
+		minReelTier = 3,
+		waterType = W.lake, -- the interior lake (frozen during the event); same water type as a still pond
+		requiresItem = "tackle_ice_fishing_kit", -- the seasonal required-item gate (LOC_04 §6)
+		spawnZones = { "frozen_lake" },
+		cash = { min = 200, max = 250 }, -- Alaska floor wage (illustrative, economy's band)
+		conditions = { event = "Winter Freeze" }, -- the lake only opens during the Winter Freeze event
+	}),
+	fish({
+		id = "alaska_burbot",
+		destinationId = D.Alaska,
+		name = "Burbot (the Eelpout King)",
+		tier = 4,
+		rarity = Ra.Legendary, -- the GENUINELY-NEW event-exclusive winter scarcity (RD1b): a new artifact, no
+		-- Cash at mint, permanently scarce after the window. NOT a re-release/dilution of any existing rare.
+		typicalWeightKg = { min = 3, max = 8 },
+		recordWeightKg = 12,
+		fightDifficulty = 62,
+		minRodTier = 4,
+		minReelTier = 4,
+		waterType = W.lake,
+		requiresItem = "tackle_ice_fishing_kit",
+		spawnZones = { "frozen_lake" },
+		conditions = { event = "Winter Freeze" }, -- event-exclusive: gated by THIS event's spawn clause (the guard checks it)
+		rare = rareFields(1800, "the ghost-pale eelpout hauled up through the ice — the Winter Freeze exclusive trophy"),
 	}),
 
 	-- ───────────────────────── DEEP SEA (Tier 7 — fishing-only fixture) ─────────────────────────

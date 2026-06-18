@@ -203,6 +203,19 @@ function M.ownsBoatForWater(profile: PlayerData, config: Config, waterType: stri
 	return false
 end
 
+-- ── Step 13: the item-ownership check behind the Frozen-Lake gate (SYS_liveops §E). The generalization of
+-- the boat check to ANY required commodity (e.g. tackle_ice_fishing_kit): owning it = holding a commodity
+-- whose catalogId IS that item id. This is tackle OWNED in inventory.commodities — NOT canAccessZone (the
+-- vehicle accessGrant path), and never a tier input (the Kit is convenience+identity, EQUIPMENT_MASTER §4.8). ──
+function M.ownsRequiredItem(profile: PlayerData, config: Config, itemId: string): boolean
+	for _, c in profile.inventory.commodities do
+		if c.catalogId == itemId then
+			return true
+		end
+	end
+	return false
+end
+
 -- ── §9 co-op assist (generic; the Bayou has no apex → first does real work at Step 10). A second angler
 -- adds NetDrain sublinearly, capped — the fishing analog of combat's co-op EffectiveHealth, using the
 -- SHARED co-op constants (Tuning.combat.coop), not a fork. ──

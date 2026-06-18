@@ -269,4 +269,41 @@ return function(t: Harness.T)
 			}))
 		end)
 	end
+
+	t.section("LiveOps real config — Winter Freeze + Salmon Run + Frozen Lake content (end to end)")
+	do
+		-- The real Catalog already self-validated under the guard at require time (a malformed config would
+		-- have failed the require). These assert the live records + the genuinely-new Frozen Lake scarcity.
+		local wf = Catalog.liveOps.events.winter_freeze
+		local sr = Catalog.liveOps.events.salmon_run
+		t.ok("Winter Freeze event exists", wf ~= nil)
+		t.ok("Salmon Run event exists", sr ~= nil)
+		t.eq("Winter Freeze drives world.event = 'Winter Freeze'", wf.imposes.event, "Winter Freeze")
+		t.ok("Winter Freeze mints genuinely-new scarcity (mintNew)", wf.newScarcity[1] ~= nil and wf.newScarcity[1].kind == "mintNew")
+
+		-- The new winter catch: a genuinely-new permanently-scarce Legendary artifact, kit-gated, event-gated.
+		local burbot = Catalog.fish["alaska_burbot"]
+		t.ok("the genuinely-new winter catch exists", burbot ~= nil)
+		t.eq("the winter catch is rare-and-above (artifact mint, no Cash)", burbot.reward.kind, "artifact")
+		t.eq("the winter catch is gated by the Winter Freeze event clause", (burbot.spawn.conditions :: any).event, "Winter Freeze")
+		t.eq("the winter catch requires the Ice-Fishing Kit (item-ownership gate)", burbot.requiresItem, "tackle_ice_fishing_kit")
+
+		-- The whitefish: the calmer routine Frozen-Lake catch (Cash), also kit + event gated.
+		local whitefish = Catalog.fish["alaska_lake_whitefish"]
+		t.ok("the routine Frozen-Lake catch exists", whitefish ~= nil)
+		t.eq("the routine catch pays Cash (Common)", whitefish.reward.kind, "cash")
+		t.eq("the routine catch also requires the Kit", whitefish.requiresItem, "tackle_ice_fishing_kit")
+
+		-- Server-time activation on the REAL config: active in-window, reverts after.
+		local wfMid = math.floor((wf.startTime + wf.endTime) / 2)
+		local srMid = math.floor((sr.startTime + sr.endTime) / 2)
+		t.eq("the real scheduler drives Winter Freeze in its window", LiveOps.activeWorldEvent(Catalog, wfMid), "Winter Freeze")
+		t.eq("the real scheduler drives Salmon Run in its window", LiveOps.activeWorldEvent(Catalog, srMid), "Salmon Run")
+		t.eq("the real scheduler reverts to nil after Winter Freeze", LiveOps.activeWorldEvent(Catalog, wf.endTime + 1000000), nil)
+
+		-- The guard ACCEPTS the real mintNew (the burbot is genuinely-new + event-exclusive).
+		t.test("the real Winter Freeze config passes the scarcity guard", function()
+			Validation.assertEventConfig(wf, Catalog)
+		end)
+	end
 end

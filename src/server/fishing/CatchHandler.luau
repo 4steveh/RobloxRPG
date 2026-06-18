@@ -17,6 +17,7 @@
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Fishing = require("@src/logic/Fishing")
+local LiveOps = require("@src/logic/LiveOps")
 local EffectiveTier = require("@src/logic/EffectiveTier")
 local Onboarding = require("@src/logic/Onboarding")
 local Daily = require("@src/logic/Daily")
@@ -80,6 +81,22 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 			end
 			if fish.baitRequired ~= nil and (ctx.profile.inventory.fungible[fish.baitRequired] or 0) <= 0 then
 				return false, "missing_bait" -- basic required-item yes/no gate (never a timer; auto-restocked, Step 6)
+			end
+			-- Step 13: the Frozen-Lake DOUBLE gate (SYS_liveops §E) for a seasonal kit-gated catch
+			-- (fish.requiresItem). Layer 1 — the event-active BACKSTOP: the gating event must be live at server
+			-- time (the spawn predicate is the PRIMARY window gate; this defends against a spoofed bite, mirroring
+			-- the Step-11 Boat backstop). Closed out-of-window regardless of the Kit, so it is checked FIRST.
+			-- Layer 2 — the item-ownership gate: the angler must OWN the required item (inventory.commodities —
+			-- NOT canAccessZone; the Kit is tackle, owned, never a tier input). Scoped to requiresItem so standing
+			-- seasonal fish (salmon) stay gated by the spawn predicate alone.
+			if fish.requiresItem ~= nil then
+				local cond = fish.spawn.conditions
+				if cond ~= nil and cond.event ~= nil and LiveOps.activeWorldEvent(ctx.config, ctx.now) ~= cond.event then
+					return false, "event_inactive" -- the seasonal window is closed (client: "The Frozen Lake is closed")
+				end
+				if not Fishing.ownsRequiredItem(ctx.profile, ctx.config, fish.requiresItem) then
+					return false, "missing_ice_fishing_kit" -- actionable: "Requires the Ice-Fishing Kit"
+				end
 			end
 			return true, nil
 		end,
