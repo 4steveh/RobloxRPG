@@ -109,7 +109,7 @@ function M.exitFishing()
 end
 
 -- ── tackle state + helpers ───────────────────────────────────────────────────────────────────────────
-local activeBobber, activeLine, activeFish = nil, nil, nil
+local activeBobber, activeLine, activeFish, activeBobTween = nil, nil, nil, nil
 
 local function rodTip()
 	local char = player.Character
@@ -138,7 +138,15 @@ local function nearestBite()
 	return best
 end
 
+local function stopBob()
+	if activeBobTween then
+		activeBobTween:Cancel()
+		activeBobTween = nil
+	end
+end
+
 local function clearTackle()
+	stopBob()
 	for _, inst in ipairs({ activeLine, activeBobber, activeFish }) do
 		if inst then
 			inst:Destroy()
@@ -232,6 +240,8 @@ function M.onCast()
 	att.Name = "BobAtt"
 	att.Parent = bob
 	activeBobber = bob
+	activeBobTween = TweenService:Create(bob, TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { CFrame = bob.CFrame + Vector3.new(0, 0.22, 0) })
+	activeBobTween:Play()
 	splash(bpos)
 	local tip = rodTip()
 	if tip then
@@ -252,6 +262,7 @@ function M.onBite()
 	if activeBobber == nil then
 		return
 	end
+	stopBob()
 	local base = activeBobber.CFrame
 	splash(base.Position)
 	TweenService:Create(activeBobber, TweenInfo.new(0.12, Enum.EasingStyle.Quad), { CFrame = base - Vector3.new(0, 0.7, 0) }):Play()
@@ -267,6 +278,7 @@ function M.onReel(_progress)
 	if activeBobber == nil then
 		return
 	end
+	stopBob()
 	local char = player.Character
 	local hrp = char and char.PrimaryPart
 	if hrp == nil then
@@ -283,6 +295,7 @@ function M.onReel(_progress)
 end
 
 function M.onLanded(fishId, _projection)
+	stopBob()
 	playSound("land", 0.55)
 	playSound("cash", 0.5)
 	local bob = activeBobber
