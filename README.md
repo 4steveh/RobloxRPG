@@ -442,9 +442,11 @@ the 6 Bayou fish are placed in `channel_banks`/`catfish_hole`.
 - [ ] The physical bite spawner + spot-depletion (rotate spots / read fresh water) behaves on a phone.
 
 **Named stubs (owning step):** the real **`Payout`** → Step 6 (reuses `RewardPipeline.stubPayout`); the
-**bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) → Step 6/7 (grant bait manually
-for the Step-5 playtest); **premium bait** (paid `TimeToBite` accelerator) → Step 14 (stub; assert
-rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible, no Boat gating built).
+**bait shop** → Step 6/7 (the **starter-bait grant is now wired** — `freshProfile` seeds every basic bait the
+catalog requires, since basic bait is a never-consumed yes/no gate — so fishing is playable from spawn without
+the shop; verified live: cast → land bluegill → +Cash/+Angler XP); **premium bait** (paid `TimeToBite`
+accelerator) → Step 14 (stub; assert rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible,
+no Boat gating built).
 
 ~~**Owed at Step 10**: Alaska's king-salmon milestone + the coastal Boat gate + the halibut apex, and the
 dual-loop reconciliation/drift check~~ — **DISCHARGED (Step 10)**. King Salmon is confirmed coastal/Boat-

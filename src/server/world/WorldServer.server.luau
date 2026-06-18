@@ -778,13 +778,20 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 		return
 	end
 	if action == "cast" then
-		local nearest = nil
+		-- Pick the NEAREST live bite to the caster (not an arbitrary hash-order one), so a player hooks a
+		-- fish in the water they are standing by — never a far-zone, gear-inappropriate fish. Falls back to
+		-- the first bite if the character is not yet present (no position to measure from).
+		local origin = plr.Character and plr.Character.PrimaryPart
+		local nearest, bestDist = nil, math.huge
 		for marker in liveBites do
-			activeFight[plr.UserId] = { marker = marker, accumulated = 0 }
-			nearest = marker
-			break
+			local d = if origin ~= nil then (marker.Position - origin.Position).Magnitude else 0
+			if d < bestDist then
+				bestDist = d
+				nearest = marker
+			end
 		end
 		if nearest ~= nil then
+			activeFight[plr.UserId] = { marker = nearest, accumulated = 0 }
 			castRequest:FireClient(plr, "bite", liveBites[nearest].fishId)
 		end
 	end
