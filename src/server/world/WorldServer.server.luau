@@ -505,23 +505,83 @@ targetsFolder.Name = "HuntingTargets"
 targetsFolder.Parent = workspace
 local liveTargets = {}
 
-local function spawnTarget(creatureId, zoneId)
+-- ── STUDIO FEEL: procedural creature silhouettes (replaces the single-box target). Each creature reads as a
+-- distinct animal: a body + a VITAL head + archetype limbs. The hitZone tags make the existing headshot
+-- multiplier (Combat.zoneMultiplier, via zoneOfHit) live. All parts anchored + non-colliding; PrimaryPart =
+-- torso. maxHealth/currentHealth attrs drive the client health bar (CreatureLabels) + the death anim.
+local CREATURE_ARCHETYPES = {
+	bayou_american_alligator = { kind = "reptile", scale = 1.6, color = Color3.fromRGB(70, 92, 64) },
+	bayou_swamp_rabbit       = { kind = "small_mammal", scale = 0.6, color = Color3.fromRGB(150, 140, 120) },
+	bayou_nutria             = { kind = "small_mammal", scale = 0.95, color = Color3.fromRGB(110, 86, 64) },
+	bayou_wood_duck          = { kind = "bird", scale = 0.8, color = Color3.fromRGB(96, 120, 150) },
+}
+local DEFAULT_ARCHETYPE = { kind = "small_mammal", scale = 1.0, color = Color3.fromRGB(120, 110, 100) }
+
+local function fxPart(fxName, size, color, hitZone, parent)
+	local pt = Instance.new("Part")
+	pt.Name = fxName
+	pt.Size = size
+	pt.Color = color
+	pt.Anchored = true
+	pt.CanCollide = false
+	pt.CanQuery = true -- the fire raycast must hit it
+	pt.Material = Enum.Material.SmoothPlastic
+	if hitZone ~= nil then
+		pt:SetAttribute("hitZone", hitZone)
+	end
+	pt.Parent = parent
+	return pt
+end
+
+local function buildBody(model, arch)
+	local s, c = arch.scale, arch.color
+	local headC = c:Lerp(Color3.new(1, 1, 1), 0.12)
+	if arch.kind == "reptile" then
+		local torso = fxPart("Torso", Vector3.new(2.2 * s, 1.1 * s, 5.0 * s), c, "body", model)
+		fxPart("Head", Vector3.new(1.2 * s, 1.0 * s, 1.8 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.1 * s, -3.0 * s)
+		fxPart("Tail", Vector3.new(1.0 * s, 0.7 * s, 3.0 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 0, 3.4 * s)
+		for _, dx in ipairs({ -1.2 * s, 1.2 * s }) do
+			for _, dz in ipairs({ -1.6 * s, 1.6 * s }) do
+				fxPart("Leg", Vector3.new(0.5 * s, 1.0 * s, 0.5 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, -0.9 * s, dz)
+			end
+		end
+		return torso
+	elseif arch.kind == "bird" then
+		local torso = fxPart("Torso", Vector3.new(1.4 * s, 1.4 * s, 2.2 * s), c, "body", model)
+		fxPart("Head", Vector3.new(0.9 * s, 0.9 * s, 0.9 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.9 * s, -1.2 * s)
+		for _, dx in ipairs({ -1.0 * s, 1.0 * s }) do
+			fxPart("Wing", Vector3.new(0.3 * s, 0.9 * s, 1.6 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, 0.2 * s, 0)
+		end
+		return torso
+	else
+		local torso = fxPart("Torso", Vector3.new(1.6 * s, 1.5 * s, 2.6 * s), c, "body", model)
+		fxPart("Head", Vector3.new(1.1 * s, 1.1 * s, 1.1 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.7 * s, -1.5 * s)
+		fxPart("Ear", Vector3.new(0.3 * s, 1.1 * s, 0.3 * s), headC, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 1.6 * s, -1.5 * s)
+		return torso
+	end
+end
+
+local function buildCreatureModel(creatureId, originCFrame)
 	local creature = Catalog.creatures[creatureId]
-	local zone = shell.zones[zoneId]
+	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
 	local model = Instance.new("Model")
 	model.Name = creature.name
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(3, 3, 4)
-	root.Anchored = true
-	root.Color = creature.behavior == "aggressive" and Color3.fromRGB(120, 70, 60) or Color3.fromRGB(150, 130, 90)
-	root.Position = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
-	root.Parent = model
-	model.PrimaryPart = root
+	local torso = buildBody(model, arch)
+	model.PrimaryPart = torso
+	model:PivotTo(originCFrame + Vector3.new(0, 1.2 * arch.scale, 0))
 	model:SetAttribute("creatureId", creatureId)
 	model:SetAttribute("targetId", creatureId)
+	model:SetAttribute("maxHealth", creature.health)
+	model:SetAttribute("currentHealth", creature.health)
+	return model
+end
+
+local function spawnTarget(creatureId, zoneId)
+	local zone = shell.zones[zoneId]
+	local pos = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
+	local model = buildCreatureModel(creatureId, CFrame.new(pos))
 	model.Parent = targetsFolder
-	liveTargets[model] = { creatureId = creatureId, health = creature.health, accumulated = 0, zoneId = zoneId }
+	liveTargets[model] = { creatureId = creatureId, health = Catalog.creatures[creatureId].health, accumulated = 0, zoneId = zoneId }
 	return model
 end
 
