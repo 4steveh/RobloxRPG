@@ -72,6 +72,16 @@ function M.buyHandler(deps: ShopDeps): Gauntlet.IntentHandler
 			if item.tier < 2 then
 				return false, "free_starter" -- Tier-1 gating gear is the free starter loadout
 			end
+			-- Idempotency / single-slot ownership: gating gear is owned-or-not (EHT/EFT derive from the ONE
+			-- equipped instance; intra-tier climbs go through `upgrade`, not duplicate buys). Reject a buy of an
+			-- already-owned catalogId — the server-authoritative guard against a double-click or replayed packet
+			-- double-debiting Cash + minting a duplicate commodity (buy commit has no idempotency key, and the
+			-- debit+mint complete synchronously before saveFn yields).
+			for _, c in ctx.profile.inventory.commodities do
+				if c.catalogId == ctx.payload.itemId then
+					return false, "already_owned"
+				end
+			end
 			if Ledger.balanceOf(ctx.profile.cash) < Economy.gearCostSlot(ctx.config, item.tier) then
 				return false, "insufficient_funds"
 			end

@@ -48,6 +48,21 @@ return function(t: Harness.T)
 		t.ok("the new T2 weapon is NOT equipped (buy ≠ equip) → EHT still 1 until equipped", EHT.effectiveHuntingTier(p, Catalog) == 1)
 	end
 
+	t.section("ShopHandler — buy rejects an already-owned slot (idempotency: no double-debit, no duplicate mint)")
+	do
+		-- 9000 Cash affords TWO buys (2x3000), so the second is rejected on OWNERSHIP, not funds — this is the
+		-- guard against a double-click / replayed packet double-debiting + minting a duplicate gating commodity.
+		local p = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1, ledger = { 9000 } })
+		local first = handle(p, "buy", { itemId = "weapon_lever_action_rifle" }, true)
+		t.ok("the first buy succeeds", first.ok)
+		local ownedAfterFirst = #p.inventory.commodities
+		local balanceAfterFirst = Ledger.balanceOf(p.cash)
+		local second = handle(p, "buy", { itemId = "weapon_lever_action_rifle" }, true)
+		t.ok("a second buy of the SAME slot is rejected: already_owned", second.ok == false and second.reason == "already_owned")
+		t.eq("no second debit (a double-tap / replay cannot drain Cash)", Ledger.balanceOf(p.cash), balanceAfterFirst)
+		t.eq("no duplicate commodity minted", #p.inventory.commodities, ownedAfterFirst)
+	end
+
 	t.section("ShopHandler — insufficient funds rejects with NO partial state")
 	do
 		local p = Util.mkProfile(Catalog, { weapon = 1, rod = 1, reel = 1, ledger = { 100 } })
