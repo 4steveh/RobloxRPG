@@ -1096,20 +1096,19 @@ Studio-only and outside the analyzer, but `rojo build` packages them and the syn
       server-side (the client already sends the origin).
 - [ ] The aesthetic geometry pass (the functional coordinate-aligned blockout already exists procedurally).
 
-**⚑ FLAGGED — pre-existing server defects surfaced by the S1 adversarial review (NOT patched, per the build
-rule "if a handler seems wrong, flag it; don't quietly patch it"):**
-- **Fire-rate is not enforced on damage *accumulation*.** In `WorldServer.server.luau` (the fire handler,
-  ~L611–628) `Combat.fireRateOk` gates only whether `lastShotAt` updates; the non-lethal `state.accumulated +=
-  shotDmg` + `"hit"` reply run **regardless**. Only the *killing* blow is routed through the gauntlet (which
-  re-validates fire-rate/damage/range), so rapid clicking accumulates damage **outside** the gauntlet's
-  headless-tested validators — corrupting combat pacing (kills feel too fast under spam). Fix when approved:
-  gate the whole shot — `if not Combat.fireRateOk(...) then return end`, and move the `lastShotAt` update out
-  of the conditional, before the lethal/non-lethal branch.
-- **A gauntlet-rejected shot/catch gives the client no feedback.** The fire handler's lethal path is
-  `if r.ok then … end` with no `else` (a rejected kill shot leaves the target silently alive); the fishing
-  path sends nothing on a rejected catch. Normal play with adequate gear never hits these, but they leave the
-  player without feedback. (The S1 fishing client now self-recovers via a watchdog; the fire-side silence is
-  the existing handler — flagged.)
+**Server defects surfaced by the S1 adversarial review (flagged first, per the build rule; fixed with owner
+approval):**
+- **FIXED — fire-rate is now enforced on the whole shot.** Previously `Combat.fireRateOk` in the fire handler
+  (`WorldServer.server.luau`) gated only the `lastShotAt` bookkeeping while the non-lethal
+  `state.accumulated += shotDmg` + `"hit"` reply ran **regardless** — so rapid clicking accumulated damage
+  **outside** the gauntlet's per-shot validators (only the killing blow is gauntlet-checked), corrupting combat
+  pacing. The handler now rejects any shot that violates the weapon cycle time
+  (`if not Combat.fireRateOk(...) then return end`, with the `lastShotAt` update moved before the
+  lethal/non-lethal branch — consistent with the gauntlet's own fire-rate check on the lethal blow).
+- **Minor / remaining — a gauntlet-rejected *lethal* shot gives the client no feedback** (the fire path's
+  `if r.ok then … end` has no `else`, so a rejected kill leaves the target silently alive). Normal play with
+  adequate gear never hits this. (The S1 fishing client self-recovers via a watchdog; the fire-side silence is
+  the existing handler — left as a minor known gap.)
 
 ## Deferred — who owns what
 

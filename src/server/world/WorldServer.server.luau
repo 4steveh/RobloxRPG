@@ -610,9 +610,15 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 	local tlvl, lvl = equippedTierLevel()
 	local shotDmg = Combat.shotDamage(Combat.weaponDamage(Catalog, tlvl, lvl), Combat.zoneMultiplier(Catalog, zone), Combat.rangeFalloff(Catalog, tlvl, distance))
 	payload.claimedDamage = shotDmg
-	if Combat.fireRateOk(Catalog, payload.lastShotAt, now, Combat.cycleTime(Catalog, tlvl)) then
-		lastShotAt[plr.UserId] = now
+	-- S1 review fix: enforce fire-rate on the WHOLE shot, not just the lastShotAt bookkeeping. Previously the
+	-- non-lethal accumulation (the else branch below) ran REGARDLESS of fireRateOk, so rapid fire accumulated
+	-- damage OUTSIDE the gauntlet's per-shot validators (only the killing blow is gauntlet-checked). A shot that
+	-- violates the weapon's cycle time is now rejected entirely — no accumulation, no "hit", consistent with the
+	-- gauntlet's own fire-rate check on the lethal blow (which reads the same payload.lastShotAt).
+	if not Combat.fireRateOk(Catalog, payload.lastShotAt, now, Combat.cycleTime(Catalog, tlvl)) then
+		return
 	end
+	lastShotAt[plr.UserId] = now
 	if (state.accumulated + shotDmg) >= Catalog.creatures[state.creatureId].health then
 		local deps = gauntletDeps(plr)
 		deps.now = now
