@@ -8,8 +8,10 @@
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
 local Spawner = require("@src/logic/Spawner")
+local EffectiveTier = require("@src/logic/EffectiveTier")
 
 type Config = Schema.Config
+type PlayerData = Schema.PlayerData
 type Loop = Enums.Loop
 type Rarity = Enums.Rarity
 
@@ -23,6 +25,27 @@ end
 function M.income(config: Config, tier: number): number
 	local e = config.tuning.economy
 	return e.B * e.g ^ (tier - 1)
+end
+
+-- ── Step 15: T_current — THE SINGLE DEFINITION of "current tier" (SYS_economy §6 Open Question, resolved).
+-- Under the OR-gate a player has two effective tiers (EHT, EFT), so "current tier" is not one number; this
+-- function is the SOLE basis, called by every faucet that needs it AND the analytics current-tier metric, so
+-- the two can never drift.
+--   • loop GIVEN  → that LOOP's effective tier (EffectiveTier.effectiveTier — EHT for Hunting, EFT for
+--     Fishing). Loop-ATTRIBUTABLE faucets (daily quests) pass their loop: a fishing daily scales to EFT, so a
+--     maxed hunter's fishing daily pays EFT-tier, NOT max-tier — closing the low-tier-farming vector a single
+--     blind max() would open. This ALIGNS with the established stance (EffectiveTier/Gate: "NEVER a blind
+--     max(EHT,EFT)" — the gate is per-loop).
+--   • loop OMITTED → max(EHT, EFT), the player's peak earning power. The DELIBERATE exception for the one
+--     loop-AGNOSTIC faucet (idle/AFK — it compensates for the peak active income foregone) + event rewards.
+-- (Payouts are per-target already — Economy.payout uses the target's displayed tier — and don't call this.)
+-- FLAGGED for Steve: this is the binding resolution of a long-deferred seam; override the per-loop/max split
+-- here if a different basis is wanted before it locks.
+function M.currentTier(profile: PlayerData, config: Config, loop: Loop?): number
+	if loop ~= nil then
+		return EffectiveTier.effectiveTier(profile, config, loop)
+	end
+	return math.max(EffectiveTier.effectiveHuntingTier(profile, config), EffectiveTier.effectiveFishingTier(profile, config))
 end
 
 -- §3 tier axis (gates Destinations): GearCostSlot(T) = c·Income(T−1), T≥2; Tier 1 gating gear is the free starter.

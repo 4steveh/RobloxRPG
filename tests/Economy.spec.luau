@@ -4,6 +4,7 @@
 -- gear-Cash jump. All headless-pure. The shop UI + the LIVE (measured) reconciliation are Studio/telemetry.
 
 local Harness = require("@tests/harness")
+local Util = require("@tests/util")
 local Catalog = require("@src/config/Catalog")
 local Economy = require("@src/logic/Economy")
 local Spawner = require("@src/logic/Spawner")
@@ -91,5 +92,18 @@ return function(t: Harness.T)
 		t.eq("rounds to integer Cash", Economy.tradeTax(Catalog, 999), 50) -- 999*0.05=49.95 → 50
 		t.ok("the rate is LOW (≤ 10%)", Catalog.tuning.economy.tradeTaxRate <= 0.10)
 		t.ok("commitSettleSeconds is a small positive freeze", Catalog.tuning.persistence.commitSettleSeconds > 0 and Catalog.tuning.persistence.commitSettleSeconds <= 10)
+	end
+
+	t.section("Economy — Step 15: currentTier is the ONE T_current basis (per-loop, or max when loop-agnostic)")
+	do
+		local H, F = Enums.Loop.Hunting, Enums.Loop.Fishing
+		-- a maxed hunter (EHT 4) who never fished (EFT 1): the per-loop basis must DIFFER per loop.
+		local p = Util.mkProfile(Catalog, { weapon = 4, armor = 4, rod = 1, reel = 1 })
+		t.eq("currentTier(Hunting) = EHT", Economy.currentTier(p, Catalog, H), 4)
+		t.eq("currentTier(Fishing) = EFT (NOT max — the farming-vector closure)", Economy.currentTier(p, Catalog, F), 1)
+		t.eq("currentTier() omitted = max(EHT,EFT) — the loop-agnostic idle basis", Economy.currentTier(p, Catalog), 4)
+		-- at parity the three coincide (no surprise where the loops are balanced).
+		local q = Util.mkProfile(Catalog, { weapon = 2, armor = 2, rod = 2, reel = 2 })
+		t.ok("at parity, per-loop == per-loop == max", Economy.currentTier(q, Catalog, H) == 2 and Economy.currentTier(q, Catalog, F) == 2 and Economy.currentTier(q, Catalog) == 2)
 	end
 end

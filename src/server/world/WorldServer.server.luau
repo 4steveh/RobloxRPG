@@ -46,6 +46,7 @@ local PurchaseService = require("@src/server/monetization/PurchaseService") -- S
 local RewardedAdHandler = require("@src/server/monetization/RewardedAdHandler")
 local TradeService = require("@src/server/trading/TradeService")
 local Progression = require("@src/logic/Progression")
+local Analytics = require("@src/logic/Analytics") -- Step 15: the session/funnel/retention emits + the metric defs
 local DestinationService = require("@src/server/DestinationService")
 local SessionService = require("@src/server/SessionService")
 local ArrivalService = require("@src/server/ArrivalService")
@@ -100,6 +101,18 @@ local telemetry = Adapters.telemetry(function(metric, value)
 	--                                     (built from economy.evergreenSink:* vs income); FEEDS the alarm below.
 	--   trading.rarePriceTrend          — the corroborating inflation canary (Trading Post rare prices)
 	--   daily.claim by day / session-2  — the D1→D7 bridge; reactivation on a marquee beat; cadence-adherence
+	--
+	-- STEP-15 (Analytics) telemetry — WIRED (these fire from the handlers/session boundaries):
+	--   session.start / session.end / session.retention:dN  — the retention substrate (Analytics.recordSession*)
+	--   funnel.beat_dwell:<beat> / funnel.beat_abandoned:<beat>  — the funnel drop-off (Analytics.recordSessionEnd)
+	-- STEP-15 telemetry — TODO (the AnalyticsService aggregation / metric SECOND-operands, not headless):
+	--   analytics.activeSeconds:Hunting|Fishing  — the per-loop ACTIVE-TIME attribution (NEW instrumentation):
+	--     accumulate wall-clock seconds the player is actively in each loop (hunting vs fishing), and emit per
+	--     session. This is the second operand of the MEASURED per-loop balance ratio: realized loop Cash (read
+	--     from the ledger's kill/catch faucets — Analytics.realizedLoopCash) ÷ realized active seconds. The pure
+	--     ratio (Analytics.perLoopBalanceRatio) is headless + has teeth; THIS wall-clock accumulator is Studio.
+	--   the D1/D7/D30 cohort rollups, the funnel-viz, ARPU/ARPPU, the canary dashboards + alarm paging
+	--     (Analytics.healthReport defines the verdicts; populating its inputs + paging is the AnalyticsService).
 end)
 
 -- STEP-13: the evergreen-sink alarm — a telemetry-driven scheduler trigger (SYS_liveops §4/§G). When the
@@ -848,6 +861,9 @@ Players.PlayerAdded:Connect(function(plr)
 	if session ~= nil then
 		Progression.commitUnlocks(session.profile, Catalog)
 		grantOwnedGamePasses(plr) -- Step 14: grant owned game-pass entitlements (idempotent; marks dirty)
+		-- Step 15: the session-start boundary + the retention-day classification (server-time; firstSeenAt was
+		-- stamped inside SessionService.login). The cohort rollup over players is the AnalyticsService (ops).
+		Analytics.recordSessionStart(telemetry, Catalog, session.profile, os.time())
 	end
 	plr.CharacterAdded:Connect(function(char)
 		local hum = char:WaitForChild("Humanoid")
@@ -860,12 +876,22 @@ Players.PlayerAdded:Connect(function(plr)
 end)
 Players.PlayerRemoving:Connect(function(plr)
 	activeFight[plr.UserId] = nil
+	-- Step 15: the session-end boundary + the funnel ABANDON signal (a session ending below COMPLETE → the
+	-- beat it stalled on + the dwell), emitted BEFORE logout while the profile is still live. Server-derived.
+	local session = sessionService.sessions[plr.UserId]
+	if session ~= nil then
+		Analytics.recordSessionEnd(telemetry, session.profile, os.time())
+	end
 	pcall(function()
 		SessionService.logout(sessionService, plr.UserId)
 	end)
 end)
 game:BindToClose(function()
 	for _, plr in Players:GetPlayers() do
+		local session = sessionService.sessions[plr.UserId]
+		if session ~= nil then
+			Analytics.recordSessionEnd(telemetry, session.profile, os.time())
+		end
 		pcall(function()
 			SessionService.logout(sessionService, plr.UserId)
 		end)
@@ -878,4 +904,4 @@ print("[WildWorld] WorldServer online — ONE login owner; handlers:", (function
 		n += 1
 	end
 	return n
-end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live · LiveOps event clock driving world.event (Step 13) · monetization wired: ProcessReceipt + game-pass + rewarded-ad seams (Step 14)")
+end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live · LiveOps event clock driving world.event (Step 13) · monetization wired: ProcessReceipt + game-pass + rewarded-ad seams (Step 14) · analytics: session/funnel/retention emits + the T_current resolution (Step 15 — MVL feature-complete)")

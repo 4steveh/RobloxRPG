@@ -64,6 +64,8 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/Monetization.spec"),
 	require("@tests/PurchaseService.spec"),
 	require("@tests/RewardedAdHandler.spec"),
+	-- Step 15 (Analytics — taxonomy, retention, funnel, the measured per-loop balance, canaries, T_current)
+	require("@tests/Analytics.spec"),
 }
 
 for _, spec in specs do

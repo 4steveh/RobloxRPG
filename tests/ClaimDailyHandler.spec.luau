@@ -41,13 +41,36 @@ return function(t: Harness.T)
 		p.onboarding.funnelBeat = "DAILY_INTRO"
 		local r = claim(p, true)
 		t.ok("the claim succeeds", r.ok)
-		local expected = Economy.dailyQuestReward(Catalog, 1) + Economy.crossLoopBonus(Catalog, 1) -- 250 + 500
-		t.eq("both faucets credited (daily faucet + cross-loop bonus)", Ledger.balanceOf(p.cash), expected)
+		-- Step 15: the pair pays the hunting daily @EHT + the fishing daily @EFT + the breadth bonus @max.
+		-- At EHT=EFT=1 that is dailyQuestReward(1) + dailyQuestReward(1) + crossLoopBonus(1).
+		local expected = 2 * Economy.dailyQuestReward(Catalog, 1) + Economy.crossLoopBonus(Catalog, 1)
+		t.eq("per-loop dailies + cross-loop bonus credited", Ledger.balanceOf(p.cash), expected)
 		t.ok("marked claimed", p.daily.claimed == true)
 		t.eq("the funnel handed off and COMPLETED", p.onboarding.funnelBeat, "COMPLETE")
 		local r2 = claim(p, true)
 		t.ok("a second claim the same day is rejected (idempotent per window)", r2.ok == false)
 		t.eq("balance unchanged on the rejected re-claim", Ledger.balanceOf(p.cash), expected)
+	end
+
+	t.section("ClaimDaily — the T_current resolution: a maxed hunter's FISHING daily pays EFT-tier, not max")
+	do
+		-- EHT 4 (weapon+armor T4), EFT 1 (rod+reel T1): the per-loop basis closes the low-tier-farming vector —
+		-- the fishing daily must pay dailyQuestReward(EFT=1), NOT dailyQuestReward(max=4).
+		local p = Util.mkProfile(Catalog, { weapon = 4, armor = 4, rod = 1, reel = 1 })
+		p.daily.huntDone = true
+		p.daily.fishDone = true
+		t.ok("the claim succeeds", claim(p, true).ok)
+		local huntAmt, fishAmt = 0, 0
+		for _, e in p.cash.tail do
+			if string.find(e.validatingEventId, "dailyQuest:Hunting", 1, true) then
+				huntAmt = e.amount
+			elseif string.find(e.validatingEventId, "dailyQuest:Fishing", 1, true) then
+				fishAmt = e.amount
+			end
+		end
+		t.eq("the hunting daily pays EHT-tier (4)", huntAmt, Economy.dailyQuestReward(Catalog, 4))
+		t.eq("the FISHING daily pays EFT-tier (1), NOT max-tier (the farming-vector closure)", fishAmt, Economy.dailyQuestReward(Catalog, 1))
+		t.ok("EFT-tier ≠ max-tier here (the vector would otherwise be open)", Economy.dailyQuestReward(Catalog, 1) ~= Economy.dailyQuestReward(Catalog, 4))
 	end
 
 	t.section("ClaimDaily — rejects when a loop objective is missing (breadth required, never penalized)")

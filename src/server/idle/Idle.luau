@@ -6,8 +6,7 @@
 
 local Schema = require("@src/types/Schema")
 local Ledger = require("@src/server/ledger/Ledger")
-local Economy = require("@src/logic/Economy")
-local EffectiveTier = require("@src/logic/EffectiveTier")
+local Economy = require("@src/logic/Economy") -- Step 15: T_current (max EHT/EFT for the loop-agnostic idle faucet)
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -24,7 +23,9 @@ export type IdleAmountFn = (profile: PlayerData, config: Config, hours: number) 
 --   [Step 6's resolution of the Step-2 / SYS_economy open "current tier" question — flagged to ratify;
 --    the alternatives (highest-conquered, last-location) are viable, this is the simplest principled default.]
 function M.economyAmount(profile: PlayerData, config: Config, hours: number): number
-	local tIdle = math.max(EffectiveTier.effectiveHuntingTier(profile, config), EffectiveTier.effectiveFishingTier(profile, config))
+	-- Step 15: idle is the loop-AGNOSTIC faucet → T_current with no loop = max(EHT, EFT), the player's peak
+	-- earning power (Economy.currentTier — the single definition, shared with the dailies + the analytics metric).
+	local tIdle = Economy.currentTier(profile, config)
 	-- FLOOR (not round): idle under-credits by design — over-crediting mints Cash; the safe direction (§6).
 	return math.floor(config.tuning.economy.idleFraction * Economy.income(config, tIdle) * hours)
 end

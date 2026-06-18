@@ -241,6 +241,27 @@ Tuning.vehicles = table.freeze({
 	dogMultiplier = 1.6,
 })
 
+-- §analytics (Step 15 — 00 §0 / SYS_economy §6/§9). The measurement layer's targets + canary thresholds.
+-- Every magnitude is an ILLUSTRATIVE DEFAULT (a launch/ops calibration knob). The METRIC DEFINITIONS (the
+-- rolling-window rule, the realized-ratio, the structural pay-proof = 0) are NOT knobs — these are the dials
+-- a breach is measured against, so each canary alarm is DEFINED, not eyeballed.
+Tuning.analytics = table.freeze({
+	-- 00 §0 the launch-gate retention targets (D1 is THE north-star; below the floor the loop/onboarding is broken).
+	d1TargetRate = 0.25, -- D1 > 25% target
+	d1FloorRate = 0.15, -- below ~15% → ship-blocker
+	-- D1/D7/D30 = PINNED rolling-24h windows from firstSeenAt (server time, timezone-free — one definition).
+	retentionWindowSeconds = 86400,
+	retentionDaysTracked = table.freeze({ 1, 7, 30 }),
+	-- The consolidated canary thresholds (§F — each breach is a defined alarm). The evergreen-sink share reuses
+	-- Tuning.liveops.evergreenSinkShareAlarmThreshold (the §9 canary — do NOT duplicate the number).
+	canary = table.freeze({
+		payProofMaxCount = 0, -- §14 any purchase path touching conquest state — structurally 0 (a nonzero is the alarm)
+		swapPreconditionMaxCount = 0, -- §12 swap-precondition failures (a dupe attempt/bug) — should be 0
+		persistFailedMaxRate = 0.01, -- gauntlet.persist_failed ÷ handled commits — an anomaly signal above this
+		balanceRatioTolerance = 0.15, -- §D |huntCashPerHr / fishCashPerHr − 1| ≤ this when the dual loop is balanced
+	}),
+})
+
 -- Progression knob (progression §1 / tuning): the tier at which an empty armor slot becomes Tier 0
 -- instead of Tier 1. Below it, armorless = Tier 1 (Bayou); at/above it, armorless = Tier 0.
 Tuning.progression = table.freeze({

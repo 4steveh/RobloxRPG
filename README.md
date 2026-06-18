@@ -1,4 +1,4 @@
-# Wild World — Build (Steps 1–14)
+# Wild World — Build (Steps 1–15 · MVL feature-complete)
 
 A Roblox/Luau hunting-and-fishing RPG. This repo holds the design corpus (the `*.md` specs) and the
 implementation, built step-by-step per `03_BUILD_PLAN.md` Phase 4. The **headless-verifiable** code (data,
@@ -149,6 +149,8 @@ src/
            · Fishing (+ Step-13 ownsRequiredItem: the commodity item-ownership check behind the Frozen-Lake gate — mirrors ownsBoatForWater, NOT canAccessZone)
            · LiveOps (Step 13 — PURE scheduler/budget/rotation/alarm: server-time activation [reverts after end] + world.event driver + server-time entitlements + PEAK-concurrent budget sweep + capped eventPayout + dailyQuestSet [cross-loop pair + theming] + Cash-priced decor quota + evergreenSinkAlarm)
            · Monetization (Step 14 — PURE: activeCashMultiplier [server-time, multiplicative stack, §7 ceiling] + boostBonus · the premium bait/ammo effect [TimeToBite/LandWindow/CycleTime] + the STRUCTURAL ≤Uncommon cap [premiumRoutineWeight rejects Rare] · the bounded adReward · multiplier-entitlement encode/expiry)
+           · Economy (+Step-15 currentTier: THE single T_current basis — per-loop EHT/EFT when a loop is given [dailies], max(EHT,EFT) when omitted [idle/event]; called by the faucets AND the analytics metric)
+           · Analytics (Step 15 — PURE measurement layer: the typed Category taxonomy + categoryOf [consolidates the ~30 hooks]; retentionDay/isRetainedOnDay [pinned rolling-24h D1/D7/D30]; funnelDropoff [lastBeat/dwell/abandon]; realizedLoopCash + perLoopBalanceRatio [the MEASURED dual-loop balance, realized÷realized — teeth]; healthReport [the canary layer]; server-values-only emit helpers; Event carries NO PII)
   server/
     ArrivalService.luau   (Step 3) login→Bayou arrival resolver (the gate-less root; returning→Lodge is Step 8)
     combat/
@@ -191,7 +193,7 @@ src/
       Replication.luau    read-only server-computed projection (balance/EHT/EFT/gates) from the pure fns
       handlers/EquipHandler.luau   the ONE reference intent handler (equip Y)
     idle/Idle.luau        idle integrity mechanism (clamp, single entry, idempotent, hard-crash fallback, idle-proof); amount stub
-    SessionService.luau   orchestration: login (lock+load/fresh+idle+write-through) / logout (flush+logoutTimestamp+release) / autosave
+    SessionService.luau   orchestration: login (lock+load/fresh+idle+write-through) / logout (flush+logoutTimestamp+release) / autosave (+Step-15: stamps firstSeenAt once + lastSeenAt every login — the retention substrate)
     DestinationService.luau  teleport registry + canTravel preview + travelTo (Step 9: gated fast-travel ENFORCEMENT — validates the persisted unlocked set, resolves teleportTarget)
     RobloxAdapters.luau   thin injection-based Roblox adapters (Studio-only binding; strict-clean headless)
 tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Validation; Step 2:
@@ -203,7 +205,8 @@ tests/   harness + specs (Step 1: Catalog/EffectiveTier/Gate/Balance/Profile/Val
          Step 10: CrossTier assertions — sufficiency/role-band/co-op-wall/co-op-soluble for Appalachia+Alaska;
          Step 11: VendorHandler; Step 12: PairTransaction/TradeSwap/TradeService;
          Step 13: LiveOps [scheduler/budgets/guard/rotation/alarm] + EventRewardHandler [faucet/idempotency];
-         Step 14: Monetization [multiplier stack/cap, the multiplier hits the active grant + NOT idle/daily/salvage/milestone, premium-bait cap + never-mandatory, ad bound] + PurchaseService [currency-pack idempotency, boost/item/cosmetic/VIP grants, pay-proof no-conquest] + RewardedAdHandler [bounded/cooldown] + Validation [assertProduct rejections]) · negative/ (MUST fail analysis — incl. pay_to_win_grant)
+         Step 14: Monetization [multiplier stack/cap, the multiplier hits the active grant + NOT idle/daily/salvage/milestone, premium-bait cap + never-mandatory, ad bound] + PurchaseService [currency-pack idempotency, boost/item/cosmetic/VIP grants, pay-proof no-conquest] + RewardedAdHandler [bounded/cooldown] + Validation [assertProduct rejections];
+         Step 15: Analytics [taxonomy totality, retention rolling-windows + the SessionService substrate, funnel drop-off, the measured balance ratio WITH TEETH, the canary layer, measurement-integrity, no-PII] + Economy currentTier [per-loop / max] + ClaimDailyHandler [the farming-vector closure]) · negative/ (MUST fail analysis — incl. pay_to_win_grant, analytics_pii)
 docs/superpowers/plans/   the implementation plans
 ```
 
@@ -1004,6 +1007,66 @@ Cash shop were all **inherited**.
       (`currencypack`/`boostBonus`/`ad`), the premium-bait **rare-trend watch-knob**, ad adoption, ARPU/ARPPU,
       and the **pay-proof canary** (= 0 — structurally, since no grant path touches conquest state).
 
+## Step 15 — Analytics instrumentation + the `T_current` resolution (FINAL Phase-4 step; the bar is split, honestly)
+
+The measurement layer — and the **final** MVL build step. **Rigor-critical on measurement integrity** (the
+metrics drive the launch decision: D1 > 25% target / ~15% floor — 00 §0), not transactional atomicity. **This
+step consolidates; it does not re-instrument** — the `telemetry` sink + the ~30 `incr` hooks, the
+`Onboarding` beats + `beatStartedAt`, the `Economy` §6 by-construction reconciliation, the `Ledger` tagged
+entries, and the `gauntlet.*`/swap/pay-proof/evergreen canaries were all **inherited**.
+
+- **`T_current` resolved — ONE function (the binding decision; FLAGGED for Steve).** `Economy.currentTier
+  (profile, config, loop?)` is the **sole** definition: `loop` given → that loop's effective tier
+  (`EffectiveTier.effectiveTier`); omitted → `max(EHT, EFT)`. **Loop-attributable** faucets pass their loop —
+  the daily cross-loop pair now pays a **hunting daily at EHT + a fishing daily at EFT** + the breadth bonus
+  at `max`; so a maxed hunter's *fishing* daily pays **EFT-tier**, NOT max-tier (the low-tier-farming vector a
+  single `max` would open is **closed**, asserted). **Loop-agnostic** faucets omit it — **idle** + event
+  rewards scale to `max(EHT, EFT)`. Payouts are per-target (unchanged). `Idle`, `ClaimDailyHandler`,
+  `EventRewardHandler`, **and** the analytics current-tier metric all call the same function — no parallel
+  basis can drift. The per-loop choice **aligns with the established stance** (`EffectiveTier`/`Gate`: "NEVER
+  a blind `max(EHT,EFT)`"); `max` is the deliberate exception for the one loop-agnostic faucet.
+  **FLAGGED**: the at-parity daily total rises by one `dailyQuestReward` vs the old single-entry skeleton (the
+  Step-7 daily amounts were always "economy's to ratify"); Steve can re-tune `dailyQuestFraction` or collapse
+  the pair to one per-loop-min entry before it locks.
+- **The retention substrate (D1/D7/D30 — the missing timestamps + the PINNED definition).** `PlayerData` gains
+  `firstSeenAt`/`lastSeenAt` (server time); `SessionService.login` stamps `firstSeenAt` **once** (on the fresh
+  profile) + `lastSeenAt` every login (a client can't fake a return). **D/N is PINNED**: a session in the
+  rolling-24h window `[N·24h, (N+1)·24h)` after `firstSeenAt` (`Analytics.retentionDay`/`isRetainedOnDay` —
+  timezone-free, one definition for the launch gate). The cohort rollup over players is the AnalyticsService.
+- **The typed event taxonomy (consolidate the ~30 hooks).** `Analytics.Category` (session / gameplay /
+  economy / funnel / monetization / trade / integrity) + `categoryOf` — a prefix registry that maps **every**
+  emitted metric (the inherited hooks + the new session/funnel/retention events) to a category (the totality
+  test asserts no orphan escapes). The existing hooks **map onto** it; nothing is re-emitted.
+- **The funnel drop-off (from the beats + dwell).** `Analytics.funnelDropoff` — the last beat reached, the
+  **dwell** (`now − beatStartedAt`), and the **abandon** (a session ending below COMPLETE → the stalled beat),
+  emitted at the session boundary. *The* first-five-minutes D1 diagnostic.
+- **The per-loop balance as a MEASURED metric (the rigor piece — avoids the tautology).** Not the modeled
+  rate (which sums to `Income(T)` **by construction** → always 1.0, catches nothing) but **realized ÷
+  realized**: `realizedLoopCash` sums the **actual** kill/catch faucet grants from the ledger (idle/daily/boost
+  excluded by type), and `perLoopBalanceRatio` divides by **realized per-loop active seconds**. The ratio is
+  ≈1.0 when balanced and a **forced imbalance moves it** (teeth, proven) — it catches a band regression the
+  by-construction proof can't see once real play diverges from the model. (The per-loop active-seconds
+  accumulator is NEW session instrumentation — wall-clock, Studio; the pure ratio is headless + fed it.)
+- **The consolidated canary layer (with thresholds).** `Analytics.healthReport` — pay-proof (=0, structural),
+  swap-precondition (≈0), persist-failed rate, evergreen-sink share (reuses the §9 floor), and the balance
+  ratio (≈1.0) — each vs a documented `Tuning.analytics` threshold, so a breach is a **defined** alarm.
+- **Measurement integrity + privacy (the guarantees).** Every emit derives from the **server-validated
+  RESULT** — the emit helpers take server values, with **no client-payload/count parameter**, so a
+  client-supplied number cannot move a metric (proven: N validated kills → N events). And the `Analytics.Event`
+  record carries **no PII** (category/name/value + loop/tier only — behavioral, keyed by an opaque id; the
+  negative fixture `analytics_pii.luau` proves a PII read is unrepresentable).
+
+**Studio / ops (NOT headless — enumerate honestly, all unchecked):**
+- [ ] The AnalyticsService aggregation (the cohort D1/D7/D30 rollups, the funnel-viz, ARPU/ARPPU), the
+      dashboards, the external analytics pipeline, the live alarm/paging wiring.
+- [ ] The per-loop **active-seconds** wall-clock accumulator + its emission (`analytics.activeSeconds:<loop>`)
+      — the second operand of the measured balance ratio (the pure ratio + the realized Cash are headless).
+
+**This is the final Phase-4 step — the MVL build is feature-complete (Steps 1–15).** What remains is the
+**Studio/ops layer** (the finished geometry/art, every UI surface, the platform integration — MarketplaceService /
+TeleportService / DataStore / analytics pipeline — and the dashboards) and **playtest tuning** (the game-feel
+bars enumerated in each step's Studio checklist + the live economy/retention calibration).
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -1025,7 +1088,8 @@ Cash shop were all **inherited**.
 | ~~**Dogs / Mounts** (Pointer/Husky; Horse/Snowmobile; Kennel & Stable + Boat Dealer fixtures built)~~ — **DONE (Step 11)**: vended as Cash sinks (the rare Redbone is trade-routed → Step 12); the never-gate/never-power guardrail holds; the detection/tracking + traversal *effects* are Studio | ✅ Step 11 |
 | **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content. Step 13 built the event framework's generic *slot* concept (a `destinationDrop` EventKind); the **region + the Destination-drop pipeline execution** (the config-not-code acceptance test) are post-launch | post-launch |
 | Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
-| Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |
+| ~~Analytics LAYER (the typed event taxonomy, retention D1/D7/D30, the funnel drop-off, the **measured** per-loop balance, the canary thresholds) + the **`T_current`** seam (idle/daily/event basis)~~ — **DONE (Step 15)**: `logic/Analytics` (taxonomy/categoryOf, `retentionDay`, `funnelDropoff`, `realizedLoopCash`+`perLoopBalanceRatio`, `healthReport`) + the `firstSeenAt`/`lastSeenAt` substrate + `Economy.currentTier` (per-loop dailies / `max` idle — the farming-vector closure); measurement-integrity + no-PII proven. Remaining: the AnalyticsService rollups/dashboards + the per-loop active-seconds wall-clock accumulator | ✅ Step 15 / ops |
+| Conquest/co-op telemetry EVENTS specifically (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — the taxonomy categorizes them (Step 15); the conquest/co-op event FIRING + the cohort rollups still need Studio events + the AnalyticsService | Studio iteration |
 | ~~Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback~~ — **DONE (Step 12)**: `TradeService` state machine + version-bound double-confirm + escrow lifecycle; `TradeSwap` over the new `PairTransaction` + `ArtifactStore.transferOwnership` (live-to-new + tombstone-not-erase); `tradepay-out/in/tradetax` triple; the 8 checks headless-proven. Remaining: the Trading Post UI + the **reconcile-on-reload** consumer of the trade record (the two-key crash window) | ✅ Step 12 / ops |
 | ~~Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`)~~ — **DONE (Step 14)**: `PurchaseService` (currency-pack idempotent inject via `attemptRealMoneyCredit`; boost/item/cosmetic/VIP grants; game-pass ownership idempotency) + the pay-proof `ProductGrant` union + `Validation.assertProduct` + the 2x/VIP active-payout multiplier; the MarketplaceService/`ProcessReceipt`/`UserOwnsGamePassAsync`/ad-SDK platform calls + the store UI + the real asset ids are the Studio seam | ✅ Step 14 / Studio |
 | `TODO(open)`: MemoryStore cross-server lock brokering · `TODO(ops)`: `auditLogDestination` choice, point-in-time rollback operation | ops/later |
@@ -1227,9 +1291,29 @@ prompts / boost-timer HUD; **the real Roblox asset ids** (placeholders shipped);
 **pay-proof canary = 0** — structurally). Step 14 **wires effects onto** the inherited enums / ledger
 idempotency / bait-free rare roll / play-only conquest set — it rebuilds none.
 
-**1228 assertions pass headless (Steps 1–14); all three negative fixtures (`reward_both`, `power_perk`,
-`pay_to_win_grant`) fail analysis as required; `rojo build` produces a place.** The Studio playtest checklists
-above are the honest bar for UI/feel/live-data — not headless-green.
+**Step 15:** ✅ (headless) **`T_current` resolved as ONE function** — `Economy.currentTier(profile, config,
+loop?)` is the sole basis (per-loop for the daily quests, `max` for idle/event, per-target payouts unchanged);
+the daily cross-loop pair now pays a hunting daily @EHT + a fishing daily @EFT (a maxed hunter's fishing
+daily pays **EFT-tier**, the farming-vector closure asserted) + breadth @max; idle/event route through the
+same function. The **retention substrate** (`firstSeenAt`/`lastSeenAt`, server-time; `SessionService` stamps
+firstSeenAt once + lastSeenAt every login) + the **PINNED** rolling-24h D1/D7/D30 definition. The **typed
+taxonomy** (`categoryOf` total over the ~30 inherited hooks + the new events — consolidate, not re-emit). The
+**funnel drop-off** (lastBeat/dwell/abandon). The **MEASURED** per-loop balance — realized kill/catch grants
+(`realizedLoopCash`) ÷ realized active seconds (`perLoopBalanceRatio`), NOT the by-construction tautology;
+≈1.0 balanced, a forced imbalance MOVES it (teeth). The **canary layer** (pay-proof=0 / swap / persist /
+evergreen / balance, each vs a threshold). **Measurement integrity** (events from the server RESULT; a client
+count can't move a metric — proven) + **no PII** (the `Event` carries no personal field — negative fixture).
+⌂ (Studio/ops, unchecked above) the AnalyticsService cohort rollups / funnel-viz / ARPU + the dashboards +
+the alarm paging; the per-loop active-seconds wall-clock accumulator + its emission. The `T_current` per-loop
+split is **FLAGGED** (the at-parity daily total rises by one `dailyQuestReward` — economy's to ratify). Step
+15 **consolidates** the inherited sink / hooks / beats / by-construction reconciliation / ledger tags — it
+re-instruments none.
+
+**1282 assertions pass headless (Steps 1–15); all four negative fixtures (`reward_both`, `power_perk`,
+`pay_to_win_grant`, `analytics_pii`) fail analysis as required; `rojo build` produces a place.** The MVL build
+is **feature-complete (Steps 1–15)**; what remains is the Studio/ops layer (geometry/art, UI, platform
+integration, dashboards) + playtest tuning — the Studio playtest checklists above are the honest bar for
+UI/feel/live-data, not headless-green.
 ```
 $ ./run-tests.sh   →   ALL GREEN ✓
 ```

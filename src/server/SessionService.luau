@@ -60,6 +60,12 @@ function M.login(self: SessionService, playerId: number): LoginResult
 	local idleFn = deps.idleAmountFn or Idle.economyAmount
 	Idle.creditOnLogin(profile, deps.config, now, idleFn) -- sets sessionOpen=true (+ maybe an idle entry)
 	profile.lastSaveTimestamp = now
+	-- Step 15 retention substrate: stamp firstSeenAt ONCE (the install/first-session anchor — the D1/D7/D30
+	-- cohort basis) and lastSeenAt every login (return detection). Server time, so a client can't fake a return.
+	if profile.firstSeenAt == 0 then
+		profile.firstSeenAt = now
+	end
+	profile.lastSeenAt = now
 
 	-- write-through the login state so a crash is detectable (sessionOpen) and idle isn't lost.
 	local saved = ProfileStore.save(deps.store, key, deps.serverId, profile, now, saveOpts(self))

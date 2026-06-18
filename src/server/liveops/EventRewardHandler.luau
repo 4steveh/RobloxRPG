@@ -10,25 +10,17 @@
 -- participation faucet — the bulk of an event's value never touches the Cash supply.
 
 local Schema = require("@src/types/Schema")
-local EffectiveTier = require("@src/logic/EffectiveTier")
+local Economy = require("@src/logic/Economy")
 local LiveOps = require("@src/logic/LiveOps")
 local Ledger = require("@src/server/ledger/Ledger")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local Types = require("@src/server/persistence/Types")
 
 type Ctx = Gauntlet.Ctx
-type PlayerData = Schema.PlayerData
-type Config = Schema.Config
 
 local M = {}
 
 export type EventRewardDeps = { telemetry: Types.Telemetry? }
-
--- T_current = max(EHT, EFT) — the same basis ClaimDailyHandler uses (an open economy call under the OR-gate;
--- inherited, not re-resolved here — SYS_liveops §5). The thin event Cash scales off the tier the player plays.
-local function currentTier(profile: PlayerData, config: Config): number
-	return math.max(EffectiveTier.effectiveHuntingTier(profile, config), EffectiveTier.effectiveFishingTier(profile, config))
-end
 
 -- The per-window claim marker (a server-time entitlement keyed by event id). One claim per window.
 local function claimKind(eventId: string): string
@@ -63,7 +55,7 @@ function M.new(deps: EventRewardDeps): Gauntlet.IntentHandler
 		commit = function(ctx: Ctx)
 			local eventId = ctx.payload.eventId
 			local event = ctx.config.liveOps.events[eventId]
-			local tier = currentTier(ctx.profile, ctx.config)
+			local tier = Economy.currentTier(ctx.profile, ctx.config) -- Step 15: loop-agnostic (max EHT/EFT), the one T_current fn
 			local amount = LiveOps.eventPayout(ctx.config, event, tier) -- already capped at the event budget
 			if amount > 0 then
 				Ledger.applyEntry(ctx.profile.cash, {

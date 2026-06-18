@@ -289,6 +289,11 @@ export type PlayerData = {
 	logoutTimestamp: number, -- written at CLEAN session-end (§6 idle input); Step 2 writes it
 	lastSaveTimestamp: number, -- written at every save; the §6 hard-crash idle fallback basis
 	sessionOpen: boolean, -- true while a live session holds the profile; a loaded `true` ⇒ prior session crashed (§6)
+	-- ── Step-15 retention substrate (server-time; the D1/D7/D30 basis — Analytics.retentionDay). NOT derivable
+	-- from the ledger/idle timestamps: firstSeenAt is the install/first-session anchor, set ONCE on the fresh
+	-- profile; lastSeenAt is updated every login. Cohort rollup is the AnalyticsService (ops). ──
+	firstSeenAt: number, -- server time of the FIRST session (0 = never seen; SessionService stamps it once)
+	lastSeenAt: number, -- server time of the most recent login (the return-detection input)
 	activeEntitlements: { Entitlement },
 	-- ── Step-7 onboarding funnel + daily-quest state (server-owned, in the session-locked profile) ──
 	onboarding: OnboardingState,

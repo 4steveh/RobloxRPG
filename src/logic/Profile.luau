@@ -79,6 +79,8 @@ function M.freshProfile(config: Config): PlayerData
 		logoutTimestamp = 0, -- Step 2 writes it at clean session-end
 		lastSaveTimestamp = 0,
 		sessionOpen = false,
+		firstSeenAt = 0, -- Step 15: unset until the first login stamps it (SessionService); the retention anchor
+		lastSeenAt = 0,
 		activeEntitlements = {},
 		-- Step 7: a first-time player begins the funnel at FIRST_HUNT (the grant above marks them new).
 		onboarding = { funnelBeat = Enums.FunnelBeat.FIRST_HUNT, beatStartedAt = 0, completedAt = nil, progress = 0 },

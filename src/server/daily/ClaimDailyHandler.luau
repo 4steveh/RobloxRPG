@@ -6,26 +6,19 @@
 -- `critical` → the credit + the claim flag + the beat advance commit atomically. Content/rotation is Step 13.
 
 local Schema = require("@src/types/Schema")
+local Enums = require("@src/types/Enums")
 local Economy = require("@src/logic/Economy")
 local Daily = require("@src/logic/Daily")
 local Onboarding = require("@src/logic/Onboarding")
-local EffectiveTier = require("@src/logic/EffectiveTier")
 local Ledger = require("@src/server/ledger/Ledger")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local Types = require("@src/server/persistence/Types")
 
 type Ctx = Gauntlet.Ctx
-type PlayerData = Schema.PlayerData
-type Config = Schema.Config
 
 local M = {}
 
 export type ClaimDeps = { telemetry: Types.Telemetry? }
-
--- T_current = max(EHT, EFT) — the idle resolution; the daily amounts scale off the tier the player can play.
-local function currentTier(profile: PlayerData, config: Config): number
-	return math.max(EffectiveTier.effectiveHuntingTier(profile, config), EffectiveTier.effectiveFishingTier(profile, config))
-end
 
 function M.new(deps: ClaimDeps): Gauntlet.IntentHandler
 	return {
@@ -39,21 +32,35 @@ function M.new(deps: ClaimDeps): Gauntlet.IntentHandler
 			return true, nil
 		end,
 		commit = function(ctx: Ctx)
-			local tier = currentTier(ctx.profile, ctx.config)
-			-- the daily faucet + the cross-loop breadth bonus, both server-validated atomic ledger entries
+			local basis = tostring(ctx.profile.daily.resetBasis)
+			-- Step 15 (the T_current resolution): the cross-loop pair pays each loop's daily at THAT LOOP's
+			-- effective tier (Economy.currentTier per-loop) — a hunting daily at EHT, a fishing daily at EFT. A
+			-- maxed hunter's fishing daily therefore pays EFT-tier Cash, NOT max-tier (the low-tier-farming vector
+			-- a single max-based basis would open is closed). The breadth bonus is the loop-AGNOSTIC kicker →
+			-- max(EHT,EFT). All three are server-validated atomic ledger entries.
+			local huntTier = Economy.currentTier(ctx.profile, ctx.config, Enums.Loop.Hunting)
+			local fishTier = Economy.currentTier(ctx.profile, ctx.config, Enums.Loop.Fishing)
 			Ledger.applyEntry(ctx.profile.cash, {
 				type = "dailyQuest",
-				amount = Economy.dailyQuestReward(ctx.config, tier),
-				tier = tier,
+				amount = Economy.dailyQuestReward(ctx.config, huntTier),
+				tier = huntTier,
 				loop = "none",
-				validatingEventId = "dailyQuest:" .. tostring(ctx.profile.daily.resetBasis),
+				validatingEventId = "dailyQuest:Hunting:" .. basis,
 			}, ctx.now)
 			Ledger.applyEntry(ctx.profile.cash, {
-				type = "crossLoopBonus",
-				amount = Economy.crossLoopBonus(ctx.config, tier),
-				tier = tier,
+				type = "dailyQuest",
+				amount = Economy.dailyQuestReward(ctx.config, fishTier),
+				tier = fishTier,
 				loop = "none",
-				validatingEventId = "crossLoopBonus:" .. tostring(ctx.profile.daily.resetBasis),
+				validatingEventId = "dailyQuest:Fishing:" .. basis,
+			}, ctx.now)
+			local breadthTier = Economy.currentTier(ctx.profile, ctx.config) -- loop-agnostic peak (max EHT/EFT)
+			Ledger.applyEntry(ctx.profile.cash, {
+				type = "crossLoopBonus",
+				amount = Economy.crossLoopBonus(ctx.config, breadthTier),
+				tier = breadthTier,
+				loop = "none",
+				validatingEventId = "crossLoopBonus:" .. basis,
 			}, ctx.now)
 			ctx.profile.daily.claimed = true -- idempotent per window (re-claim rejected at authority)
 			Onboarding.advance(ctx.profile, "dailyClaim", ctx.now) -- completes DAILY_INTRO → COMPLETE
