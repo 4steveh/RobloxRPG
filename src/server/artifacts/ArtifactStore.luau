@@ -4,10 +4,10 @@
 -- disposition transition, tombstone). The FLOWS that invoke specific transitions are deferred:
 -- display/salvage → Step 8; escrow/the two-sided swap + ownership transfer → Step 12.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Validation = require("@src/config/Validation")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Validation = require("../../config/Validation")
+local Types = require("../persistence/Types")
 
 type PlayerData = Schema.PlayerData
 type Artifact = Schema.Artifact

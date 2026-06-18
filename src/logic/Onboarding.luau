@@ -6,8 +6,8 @@
 -- idempotently. COMPLETE is one-shot — a returning player never re-enters. The felt FTUE (arrows, pings,
 -- "+Cash" juice, pacing, aim-assist) and every D1 metric are Studio/telemetry, NOT here.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

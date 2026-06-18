@@ -8,8 +8,8 @@
 -- (ProfileStore/Ledger/etc.) which ARE headless-tested. Anything risky here (yields, throttling, the
 -- 4 MB key limit, ProcessReceipt redelivery) is a Roblox reality the logic already accounts for.
 
-local Types = require("@src/server/persistence/Types")
-local Schema = require("@src/types/Schema")
+local Types = require("./persistence/Types")
+local Schema = require("../types/Schema")
 
 local M = {}
 

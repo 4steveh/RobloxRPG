@@ -9,12 +9,12 @@
 -- existing RewardPipeline + ArtifactStore and writes NO Cash (RD2). This handler is ONLY the thin
 -- participation faucet — the bulk of an event's value never touches the Cash supply.
 
-local Schema = require("@src/types/Schema")
-local Economy = require("@src/logic/Economy")
-local LiveOps = require("@src/logic/LiveOps")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Economy = require("../../logic/Economy")
+local LiveOps = require("../../logic/LiveOps")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 

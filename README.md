@@ -99,8 +99,11 @@ note per step.
 ```
 
 Toolchain on `PATH`: **`luau`** (run tests), **`luau-analyze`** (`--!strict`, config in `.luaurc`),
-**`rojo`** (`rojo build` → place file). Requires resolve by Luau require-by-string via `.luaurc` aliases
-(`@src/...`, `@tests/...`). `default.project.json` maps `src/` → `ServerScriptService.WildWorld`.
+**`rojo`** (`rojo build` → place file). Headless requires resolve by Luau require-by-string via `.luaurc`
+aliases (`@src/...`, `@tests/...`); **`src/` cross-module requires are RELATIVE (`./`, `../`)** so the same
+source resolves both headless and in the Roblox runtime — the `@src` **alias** does NOT resolve at runtime,
+only relative paths do (test specs under `tests/` keep the aliases since they are not synced to Studio).
+`default.project.json` maps `src/` → `ServerScriptService.WildWorld`.
 
 ## The rules of the codebase
 
@@ -298,8 +301,12 @@ navigable placeholder verified by the Studio playtest checklist below.
 - [ ] The arrival clearing **faces the Sunny Levee** and a channel bank is a few steps off (§2.6.1 feel).
 - [ ] You can **navigate by the Old Cypress** — it's visible from most of the map (§2.2 legibility).
 - [ ] On-foot movement feels right (not sluggish); the third-person camera works on touch.
-- [ ] `require`-by-string (`@src/...`) resolves at runtime in the target Roblox version (Rojo + Roblox
-      require-by-string); login→arrival places the character at the clearing.
+- [x] `require`-by-string resolves at runtime — **RESOLVED (S1 Studio).** The `@src` **alias** does NOT
+      resolve in the Roblox runtime (only relative `./`/`../` do), so `src/` was converted to relative
+      requires; the headless gate stays green. The world now boots in Studio (all RemoteEvents + the three
+      shells build, HUD renders). DataStore is also made resilient — an unpublished place falls back to an
+      EPHEMERAL in-memory store (publish + enable Studio API access for real persistence).
+- [ ] login→arrival places the character at the clearing (and the HUD `EHT/EFT` readout populates).
 
 **Placeholder note:** `BayouShell_Placeholder` is blockout geometry (coloured parts, flat-plane water,
 particle dragonflies). Finished art — cypress models, water shader, textures, sound — is the separate
@@ -435,9 +442,11 @@ the 6 Bayou fish are placed in `channel_banks`/`catfish_hole`.
 - [ ] The physical bite spawner + spot-depletion (rotate spots / read fresh water) behaves on a phone.
 
 **Named stubs (owning step):** the real **`Payout`** → Step 6 (reuses `RewardPipeline.stubPayout`); the
-**bait shop + starter-bait grant** (so "buy bait → catch" is end-to-end) → Step 6/7 (grant bait manually
-for the Step-5 playtest); **premium bait** (paid `TimeToBite` accelerator) → Step 14 (stub; assert
-rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible, no Boat gating built).
+**bait shop** → Step 6/7 (the **starter-bait grant is now wired** — `freshProfile` seeds every basic bait the
+catalog requires, since basic bait is a never-consumed yes/no gate — so fishing is playable from spawn without
+the shop; verified live: cast → land bluegill → +Cash/+Angler XP); **premium bait** (paid `TimeToBite`
+accelerator) → Step 14 (stub; assert rare-spawn takes no bait); **Boats** → Step 11 (Bayou is shore-accessible,
+no Boat gating built).
 
 ~~**Owed at Step 10**: Alaska's king-salmon milestone + the coastal Boat gate + the halibut apex, and the
 dual-loop reconciliation/drift check~~ — **DISCHARGED (Step 10)**. King Salmon is confirmed coastal/Boat-

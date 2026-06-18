@@ -8,10 +8,10 @@
 --     carries kind="lodge" + destinationId=nil; a Destination arrival carries kind="destination".
 -- This is the Step-8 routing branch the Step-3 TODO reserved.
 
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
-local Shell = require("@src/logic/Shell")
-local Onboarding = require("@src/logic/Onboarding")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
+local Shell = require("../logic/Shell")
+local Onboarding = require("../logic/Onboarding")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

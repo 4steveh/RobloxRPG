@@ -5,9 +5,9 @@
 -- event introduces genuinely-new scarcity by authoring a Fish here and listing it in its `mintsFish` — the
 -- Catalog merge then rejects any id that collides with an existing catalog id (the RD1 clone-evasion guard).
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
 
 type Fish = Schema.Fish
 type Reward = Schema.Reward

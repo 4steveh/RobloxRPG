@@ -4,9 +4,9 @@
 -- because it is intrinsic to the session lifecycle (logout timestamp written at end, read at login) and
 -- its idempotency is anti-dupe. Idle credits Cash ONLY — never Rank XP, never a conquest flag.
 
-local Schema = require("@src/types/Schema")
-local Ledger = require("@src/server/ledger/Ledger")
-local Economy = require("@src/logic/Economy") -- Step 15: T_current (max EHT/EFT for the loop-agnostic idle faucet)
+local Schema = require("../../types/Schema")
+local Ledger = require("../ledger/Ledger")
+local Economy = require("../../logic/Economy") -- Step 15: T_current (max EHT/EFT for the loop-agnostic idle faucet)
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

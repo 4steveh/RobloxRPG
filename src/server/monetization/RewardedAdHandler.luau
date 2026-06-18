@@ -10,12 +10,12 @@
 -- this handler owns. Mirrors EventRewardHandler (the thin faucet shape): server time owns the cap, offline
 -- counts, a reconnect cannot bypass the cooldown.
 
-local Schema = require("@src/types/Schema")
-local EffectiveTier = require("@src/logic/EffectiveTier")
-local Monetization = require("@src/logic/Monetization")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local EffectiveTier = require("../../logic/EffectiveTier")
+local Monetization = require("../../logic/Monetization")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type PlayerData = Schema.PlayerData

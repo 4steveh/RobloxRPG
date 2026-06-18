@@ -5,9 +5,9 @@
 -- ILLUSTRATIVE — computed from economy's band (Income(T)/ETPH × RarityMultiplier), not authored here;
 -- the authoritative payout is economy's Payout() (Step 6).
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
 
 type Creature = Schema.Creature
 type Reward = Schema.Reward

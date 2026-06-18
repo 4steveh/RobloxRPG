@@ -7,13 +7,13 @@
 -- is ever LIVE in two profiles; no item leaves one inventory until it enters the other. Trading INVOKES this;
 -- it never inlines the atomic logic.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Economy = require("@src/logic/Economy")
-local Ledger = require("@src/server/ledger/Ledger")
-local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
-local PairTransaction = require("@src/server/authority/PairTransaction")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Economy = require("../../logic/Economy")
+local Ledger = require("../ledger/Ledger")
+local ArtifactStore = require("../artifacts/ArtifactStore")
+local PairTransaction = require("../authority/PairTransaction")
+local Types = require("../persistence/Types")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

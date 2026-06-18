@@ -2,9 +2,9 @@
 -- The runtime SHAPES. Pure type definitions (erased at runtime) consumed by config + logic + tests.
 -- Source of truth: Templates B/C/D/E (02), SYS_data_integrity §1/§4, SYS_progression, the build prompt.
 
-local Enums = require("@src/types/Enums")
-local Ids = require("@src/types/Ids")
-local Tuning = require("@src/config/Tuning")
+local Enums = require("./Enums")
+local Ids = require("./Ids")
+local Tuning = require("../config/Tuning")
 
 type Rarity = Enums.Rarity
 type Category = Enums.Category

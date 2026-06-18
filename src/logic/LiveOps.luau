@@ -10,8 +10,8 @@
 -- string matched by equality, so one spawn-gating event at a time (sufficient for MVL; the build-time guard
 -- in Validation forbids overlapping spawn-gating windows so this is unambiguous).
 
-local Schema = require("@src/types/Schema")
-local Economy = require("@src/logic/Economy")
+local Schema = require("../types/Schema")
+local Economy = require("./Economy")
 
 type Config = Schema.Config
 type EventConfig = Schema.EventConfig

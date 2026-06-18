@@ -12,8 +12,8 @@
 -- validated handler RESULT, never a request). NO PII: the `Event` record is behavioral — category/name/value
 -- + the loop/tier dimensions, nothing personal; a PII read is unrepresentable (negative fixture).
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type Ledger = Schema.Ledger
 type OnboardingState = Schema.OnboardingState

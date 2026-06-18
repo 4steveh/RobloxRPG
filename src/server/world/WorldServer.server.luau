@@ -22,37 +22,38 @@ local Lighting = game:GetService("Lighting")
 local MarketplaceService = game:GetService("MarketplaceService") -- Step 14: the real-money platform boundary
 
 -- headless modules (require-by-string via .luaurc; Rojo + Roblox resolve at runtime)
-local Catalog = require("@src/config/Catalog")
-local Shells = require("@src/config/Shells")
-local Spawning = require("@src/config/Spawning")
-local Spawner = require("@src/logic/Spawner")
-local Combat = require("@src/logic/Combat")
-local Fishing = require("@src/logic/Fishing")
-local LiveOps = require("@src/logic/LiveOps")
-local Onboarding = require("@src/logic/Onboarding")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local FireHandler = require("@src/server/combat/FireHandler")
-local CatchHandler = require("@src/server/fishing/CatchHandler")
-local EquipHandler = require("@src/server/authority/handlers/EquipHandler")
-local ShopHandler = require("@src/server/shop/ShopHandler")
-local VendorHandler = require("@src/server/shop/VendorHandler")
-local ClaimDailyHandler = require("@src/server/daily/ClaimDailyHandler")
-local SalvageHandler = require("@src/server/lodge/SalvageHandler")
-local DisplayHandler = require("@src/server/lodge/DisplayHandler")
-local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
-local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
-local EventRewardHandler = require("@src/server/liveops/EventRewardHandler")
-local PurchaseService = require("@src/server/monetization/PurchaseService") -- Step 14: the headless grant logic
-local RewardedAdHandler = require("@src/server/monetization/RewardedAdHandler")
-local TradeService = require("@src/server/trading/TradeService")
-local Progression = require("@src/logic/Progression")
-local Analytics = require("@src/logic/Analytics") -- Step 15: the session/funnel/retention emits + the metric defs
-local DestinationService = require("@src/server/DestinationService")
-local SessionService = require("@src/server/SessionService")
-local ArrivalService = require("@src/server/ArrivalService")
-local Adapters = require("@src/server/RobloxAdapters")
-local Economy = require("@src/logic/Economy") -- S1: in-game shop pricing (the amount the buy handler debits)
-local Replication = require("@src/server/authority/Replication") -- S1: read-only projection for shop "open"
+local Catalog = require("../../config/Catalog")
+local Shells = require("../../config/Shells")
+local Spawning = require("../../config/Spawning")
+local Spawner = require("../../logic/Spawner")
+local Combat = require("../../logic/Combat")
+local Fishing = require("../../logic/Fishing")
+local LiveOps = require("../../logic/LiveOps")
+local Onboarding = require("../../logic/Onboarding")
+local Gauntlet = require("../authority/Gauntlet")
+local FireHandler = require("../combat/FireHandler")
+local CatchHandler = require("../fishing/CatchHandler")
+local EquipHandler = require("../authority/handlers/EquipHandler")
+local ShopHandler = require("../shop/ShopHandler")
+local VendorHandler = require("../shop/VendorHandler")
+local ClaimDailyHandler = require("../daily/ClaimDailyHandler")
+local SalvageHandler = require("../lodge/SalvageHandler")
+local DisplayHandler = require("../lodge/DisplayHandler")
+local LodgeShopHandler = require("../lodge/LodgeShopHandler")
+local WorldMapHandler = require("../progression/WorldMapHandler")
+local EventRewardHandler = require("../liveops/EventRewardHandler")
+local PurchaseService = require("../monetization/PurchaseService") -- Step 14: the headless grant logic
+local RewardedAdHandler = require("../monetization/RewardedAdHandler")
+local TradeService = require("../trading/TradeService")
+local Progression = require("../../logic/Progression")
+local Analytics = require("../../logic/Analytics") -- Step 15: the session/funnel/retention emits + the metric defs
+local DestinationService = require("../DestinationService")
+local SessionService = require("../SessionService")
+local ArrivalService = require("../ArrivalService")
+local Adapters = require("../RobloxAdapters")
+local Fakes = require("../persistence/Fakes") -- S1 Studio: in-memory store fallback when DataStore is unavailable (unpublished place / API access off)
+local Economy = require("../../logic/Economy") -- S1: in-game shop pricing (the amount the buy handler debits)
+local Replication = require("../authority/Replication") -- S1: read-only projection for shop "open"
 
 local BAYOU = "bayou"
 local shell = Shells.byDestination[BAYOU]
@@ -125,8 +126,27 @@ end)
 --   if LiveOps.evergreenSinkAlarm(currentEvergreenSinkShare, Catalog) then  -- fire the out-of-band decor drop
 --     <schedule/flag a pulled-forward Cash-priced decor batch ahead of the baseline cadence>
 --   end
+-- S1 Studio resilience: GetDataStore THROWS in an unpublished place / with Studio API access off
+-- ("You must publish this place to the web to access DataStore"). A thrown error here would kill the whole
+-- world bootstrap (no remotes, no geometry). Degrade gracefully to an EPHEMERAL in-memory store so the place
+-- still boots and is fully playable — profiles just do not persist across sessions. Publish the place AND
+-- enable Studio → Game Settings → Security → "Enable Studio Access to API Services" for real persistence.
+local profileStore
+do
+	local ok, robloxDataStore = pcall(function()
+		return DataStoreService:GetDataStore("WildWorld_Profiles_v1")
+	end)
+	if ok then
+		profileStore = Adapters.dataStore(robloxDataStore)
+	else
+		warn("[WildWorld] DataStore unavailable (" .. tostring(robloxDataStore) .. ") — using an EPHEMERAL in-memory store. "
+			.. "Profiles will NOT persist. Publish the place + enable Studio API access for real persistence.")
+		profileStore = (Fakes.newDataStore())
+	end
+end
+
 local sessionService = SessionService.new({
-	store = Adapters.dataStore(DataStoreService:GetDataStore("WildWorld_Profiles_v1")),
+	store = profileStore,
 	clock = Adapters.clock(),
 	config = Catalog,
 	serverId = (game.JobId ~= "" and game.JobId) or "studio",
@@ -485,30 +505,119 @@ targetsFolder.Name = "HuntingTargets"
 targetsFolder.Parent = workspace
 local liveTargets = {}
 
-local function spawnTarget(creatureId, zoneId)
+-- ── STUDIO FEEL: procedural creature silhouettes (replaces the single-box target). Each creature reads as a
+-- distinct animal: a body + a VITAL head + archetype limbs. The hitZone tags make the existing headshot
+-- multiplier (Combat.zoneMultiplier, via zoneOfHit) live. All parts anchored + non-colliding; PrimaryPart =
+-- torso. maxHealth/currentHealth attrs drive the client health bar (CreatureLabels) + the death anim.
+local CREATURE_ARCHETYPES = {
+	bayou_american_alligator = { kind = "reptile", scale = 1.6, color = Color3.fromRGB(70, 92, 64) },
+	bayou_swamp_rabbit       = { kind = "small_mammal", scale = 0.6, color = Color3.fromRGB(150, 140, 120) },
+	bayou_nutria             = { kind = "small_mammal", scale = 0.95, color = Color3.fromRGB(110, 86, 64) },
+	bayou_wood_duck          = { kind = "bird", scale = 0.8, color = Color3.fromRGB(96, 120, 150) },
+}
+local DEFAULT_ARCHETYPE = { kind = "small_mammal", scale = 1.0, color = Color3.fromRGB(120, 110, 100) }
+
+local function fxPart(fxName, size, color, hitZone, parent)
+	local pt = Instance.new("Part")
+	pt.Name = fxName
+	pt.Size = size
+	pt.Color = color
+	pt.Anchored = true
+	pt.CanCollide = false
+	pt.CanQuery = true -- the fire raycast must hit it
+	pt.Material = Enum.Material.SmoothPlastic
+	if hitZone ~= nil then
+		pt:SetAttribute("hitZone", hitZone)
+	end
+	pt.Parent = parent
+	return pt
+end
+
+local function buildBody(model, arch)
+	local s, c = arch.scale, arch.color
+	local headC = c:Lerp(Color3.new(1, 1, 1), 0.12)
+	if arch.kind == "reptile" then
+		local torso = fxPart("Torso", Vector3.new(2.2 * s, 1.1 * s, 5.0 * s), c, "body", model)
+		fxPart("Head", Vector3.new(1.2 * s, 1.0 * s, 1.8 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.1 * s, -3.0 * s)
+		fxPart("Tail", Vector3.new(1.0 * s, 0.7 * s, 3.0 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 0, 3.4 * s)
+		for _, dx in ipairs({ -1.2 * s, 1.2 * s }) do
+			for _, dz in ipairs({ -1.6 * s, 1.6 * s }) do
+				fxPart("Leg", Vector3.new(0.5 * s, 1.0 * s, 0.5 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, -0.9 * s, dz)
+			end
+		end
+		return torso
+	elseif arch.kind == "bird" then
+		local torso = fxPart("Torso", Vector3.new(1.4 * s, 1.4 * s, 2.2 * s), c, "body", model)
+		fxPart("Head", Vector3.new(0.9 * s, 0.9 * s, 0.9 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.9 * s, -1.2 * s)
+		for _, dx in ipairs({ -1.0 * s, 1.0 * s }) do
+			fxPart("Wing", Vector3.new(0.3 * s, 0.9 * s, 1.6 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, 0.2 * s, 0)
+		end
+		return torso
+	else
+		local torso = fxPart("Torso", Vector3.new(1.6 * s, 1.5 * s, 2.6 * s), c, "body", model)
+		fxPart("Head", Vector3.new(1.1 * s, 1.1 * s, 1.1 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.7 * s, -1.5 * s)
+		fxPart("Ear", Vector3.new(0.3 * s, 1.1 * s, 0.3 * s), headC, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 1.6 * s, -1.5 * s)
+		return torso
+	end
+end
+
+local function buildCreatureModel(creatureId, originCFrame)
 	local creature = Catalog.creatures[creatureId]
-	local zone = shell.zones[zoneId]
+	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
 	local model = Instance.new("Model")
 	model.Name = creature.name
-	local root = Instance.new("Part")
-	root.Name = "HumanoidRootPart"
-	root.Size = Vector3.new(3, 3, 4)
-	root.Anchored = true
-	root.Color = creature.behavior == "aggressive" and Color3.fromRGB(120, 70, 60) or Color3.fromRGB(150, 130, 90)
-	root.Position = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
-	root.Parent = model
-	model.PrimaryPart = root
+	local torso = buildBody(model, arch)
+	model.PrimaryPart = torso
+	model:PivotTo(originCFrame + Vector3.new(0, 1.2 * arch.scale, 0))
 	model:SetAttribute("creatureId", creatureId)
 	model:SetAttribute("targetId", creatureId)
-	model.Parent = targetsFolder
-	liveTargets[model] = { creatureId = creatureId, health = creature.health, accumulated = 0, zoneId = zoneId }
+	model:SetAttribute("maxHealth", creature.health)
+	model:SetAttribute("currentHealth", creature.health)
 	return model
+end
+
+local function spawnTarget(creatureId, zoneId)
+	local zone = shell.zones[zoneId]
+	local pos = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
+	local model = buildCreatureModel(creatureId, CFrame.new(pos))
+	model.Parent = targetsFolder
+	liveTargets[model] = { creatureId = creatureId, health = Catalog.creatures[creatureId].health, accumulated = 0, zoneId = zoneId }
+	return model
+end
+
+-- STUDIO FEEL: a brief server-driven death (tip over + sink + fade) so every client sees the creature go
+-- down, instead of an instant despawn. Animates in parallel with the respawn schedule, then destroys.
+local function playDeath(model)
+	local cf = model:GetPivot()
+	local goalCF = cf * CFrame.Angles(math.rad(80), 0, 0)
+	local parts = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+		end
+	end
+	model:SetAttribute("currentHealth", 0)
+	task.spawn(function()
+		local t0 = os.clock()
+		while true do
+			local a = (os.clock() - t0) / 0.6
+			if a >= 1 then
+				break
+			end
+			model:PivotTo(cf:Lerp(goalCF, a) + Vector3.new(0, -2 * a, 0))
+			for _, d in ipairs(parts) do
+				d.Transparency = a
+			end
+			task.wait()
+		end
+		model:Destroy()
+	end)
 end
 
 local function despawnTarget(model, respawnAfter)
 	local state = liveTargets[model]
 	liveTargets[model] = nil
-	model:Destroy()
+	playDeath(model)
 	if state ~= nil and respawnAfter ~= nil then
 		task.delay(respawnAfter, function()
 			local pool = Spawner.routineTargetsInZone(Catalog, BAYOU, state.zoneId)
@@ -632,6 +741,7 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 		end
 	else
 		state.accumulated += shotDmg
+		model:SetAttribute("currentHealth", math.max(0, Catalog.creatures[state.creatureId].health - state.accumulated))
 		fireRequest:FireClient(plr, "hit", rayHitTargetId, shotDmg)
 	end
 end)
@@ -758,13 +868,20 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 		return
 	end
 	if action == "cast" then
-		local nearest = nil
+		-- Pick the NEAREST live bite to the caster (not an arbitrary hash-order one), so a player hooks a
+		-- fish in the water they are standing by — never a far-zone, gear-inappropriate fish. Falls back to
+		-- the first bite if the character is not yet present (no position to measure from).
+		local origin = plr.Character and plr.Character.PrimaryPart
+		local nearest, bestDist = nil, math.huge
 		for marker in liveBites do
-			activeFight[plr.UserId] = { marker = marker, accumulated = 0 }
-			nearest = marker
-			break
+			local d = if origin ~= nil then (marker.Position - origin.Position).Magnitude else 0
+			if d < bestDist then
+				bestDist = d
+				nearest = marker
+			end
 		end
 		if nearest ~= nil then
+			activeFight[plr.UserId] = { marker = nearest, accumulated = 0 }
 			castRequest:FireClient(plr, "bite", liveBites[nearest].fishId)
 		end
 	end

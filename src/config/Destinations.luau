@@ -8,9 +8,9 @@
 -- gate is satisfied for the milestone half when one of them has been conquered on an offered loop.
 -- prerequisiteDestinations are the DAG edges (⊆ conqueredDestinations) — the field the Rockies test re-threads.
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
 
 type Destination = Schema.Destination
 

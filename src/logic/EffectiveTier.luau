@@ -3,8 +3,8 @@
 -- never stored. The weakest-required-slot rule: effective tier = MIN of the gating slots (not max/avg).
 -- Contains ZERO content literals — every value comes from `profile` (state) and `config` (data).
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

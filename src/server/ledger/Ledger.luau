@@ -5,8 +5,8 @@
 -- can never go negative and no concurrent debit double-spends. Faucet/sink OPERATIONS are Step 6 — they
 -- call applyEntry / attemptDebit. Real-money receipt wiring is Step 14 — it calls attemptRealMoneyCredit.
 
-local Schema = require("@src/types/Schema")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Types = require("../persistence/Types")
 
 type Ledger = Schema.Ledger
 type LedgerEntry = Schema.LedgerEntry

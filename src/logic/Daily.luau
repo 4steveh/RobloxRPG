@@ -5,8 +5,8 @@
 -- off the server clock (`now`), NEVER client-reported elapsed — the same anti-spoof discipline idle uses.
 -- Content / rotation / cadence is Step 13 (SYS_liveops_calendar); this is just the board-claim skeleton.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
 
 type DailyState = Schema.DailyState
 type Loop = Enums.Loop

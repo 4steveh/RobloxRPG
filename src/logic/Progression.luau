@@ -9,9 +9,9 @@
 -- action — so unlocking A never mechanically unlocks B; no cascade, no fixpoint). Pure: reads profile +
 -- config, mutates only profile.unlockedDestinations (the Onboarding.advance / Daily.recordAction pattern).
 
-local Schema = require("@src/types/Schema")
-local Gate = require("@src/logic/Gate")
-local Ids = require("@src/types/Ids")
+local Schema = require("../types/Schema")
+local Gate = require("./Gate")
+local Ids = require("../types/Ids")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

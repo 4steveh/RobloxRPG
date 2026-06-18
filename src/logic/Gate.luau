@@ -3,9 +3,9 @@
 -- of truth for "why can't I go yet"; its unmetReasons are actionable-noun strings the UI consumes
 -- directly (the UI never re-derives gate logic). Derived, never stored. Zero content literals.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local EffectiveTier = require("@src/logic/EffectiveTier")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local EffectiveTier = require("./EffectiveTier")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

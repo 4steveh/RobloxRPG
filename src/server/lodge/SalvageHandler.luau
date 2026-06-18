@@ -10,13 +10,13 @@
 --
 -- This handler CALLS the §4 CAS + the salvage-floor formula — it reimplements neither (SYS_lodge_trophy).
 
-local Schema = require("@src/types/Schema")
-local Economy = require("@src/logic/Economy")
-local Ledger = require("@src/server/ledger/Ledger")
-local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Enums = require("@src/types/Enums")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Economy = require("../../logic/Economy")
+local Ledger = require("../ledger/Ledger")
+local ArtifactStore = require("../artifacts/ArtifactStore")
+local Gauntlet = require("../authority/Gauntlet")
+local Enums = require("../../types/Enums")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type Artifact = Schema.Artifact

@@ -12,13 +12,13 @@
 -- upgrade NEVER changes EHT/EFT (RD1 — it gets you apex-capable with co-op; the milestone is still played).
 -- The shop UI and the felt "earned upgrade" pacing are Studio. Real-money packs/boosts are Step 14.
 
-local Schema = require("@src/types/Schema")
-local Economy = require("@src/logic/Economy")
-local Profile = require("@src/logic/Profile")
-local Onboarding = require("@src/logic/Onboarding")
-local Ledger = require("@src/server/ledger/Ledger")
-local Gauntlet = require("@src/server/authority/Gauntlet")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Economy = require("../../logic/Economy")
+local Profile = require("../../logic/Profile")
+local Onboarding = require("../../logic/Onboarding")
+local Ledger = require("../ledger/Ledger")
+local Gauntlet = require("../authority/Gauntlet")
+local Types = require("../persistence/Types")
 
 type Ctx = Gauntlet.Ctx
 type Commodity = Schema.Commodity
@@ -71,6 +71,16 @@ function M.buyHandler(deps: ShopDeps): Gauntlet.IntentHandler
 			end
 			if item.tier < 2 then
 				return false, "free_starter" -- Tier-1 gating gear is the free starter loadout
+			end
+			-- Idempotency / single-slot ownership: gating gear is owned-or-not (EHT/EFT derive from the ONE
+			-- equipped instance; intra-tier climbs go through `upgrade`, not duplicate buys). Reject a buy of an
+			-- already-owned catalogId — the server-authoritative guard against a double-click or replayed packet
+			-- double-debiting Cash + minting a duplicate commodity (buy commit has no idempotency key, and the
+			-- debit+mint complete synchronously before saveFn yields).
+			for _, c in ctx.profile.inventory.commodities do
+				if c.catalogId == ctx.payload.itemId then
+					return false, "already_owned"
+				end
 			end
 			if Ledger.balanceOf(ctx.profile.cash) < Economy.gearCostSlot(ctx.config, item.tier) then
 				return false, "insufficient_funds"

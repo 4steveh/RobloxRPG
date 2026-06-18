@@ -6,10 +6,10 @@
 -- in their owning steps (buy/sell → Step 6, salvage/display → Step 8, travel → Step 9, trade → Step 12).
 -- Step 3 (domain simulation) is a pluggable hook combat/fishing fill in Steps 4/5.
 
-local Schema = require("@src/types/Schema")
-local Types = require("@src/server/persistence/Types")
-local Replication = require("@src/server/authority/Replication")
-local Transaction = require("@src/server/authority/Transaction")
+local Schema = require("../../types/Schema")
+local Types = require("../persistence/Types")
+local Replication = require("./Replication")
+local Transaction = require("./Transaction")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

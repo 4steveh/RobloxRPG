@@ -12,15 +12,15 @@
 -- The Cash AMOUNT is economy's Payout (Step 6) — taken from a pluggable PayoutFn, stubbed here exactly as
 -- Idle stubs its amount. We do NOT read the catalog's illustrative cash:{min,max}.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Combat = require("@src/logic/Combat")
-local Fishing = require("@src/logic/Fishing")
-local Economy = require("@src/logic/Economy")
-local Monetization = require("@src/logic/Monetization")
-local Ledger = require("@src/server/ledger/Ledger")
-local ArtifactStore = require("@src/server/artifacts/ArtifactStore")
-local Types = require("@src/server/persistence/Types")
+local Schema = require("../../types/Schema")
+local Enums = require("../../types/Enums")
+local Combat = require("../../logic/Combat")
+local Fishing = require("../../logic/Fishing")
+local Economy = require("../../logic/Economy")
+local Monetization = require("../../logic/Monetization")
+local Ledger = require("../ledger/Ledger")
+local ArtifactStore = require("../artifacts/ArtifactStore")
+local Types = require("../persistence/Types")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

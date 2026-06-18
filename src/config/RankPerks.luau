@@ -4,8 +4,8 @@
 -- enforced both by the type system and by Validation.assertRankPerkCategory). Data-driven so LiveOps
 -- adds perks without code. Magnitudes (radii, bonuses) are Step-6/economy's; this is the registry shape.
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
 
 type RankPerk = Schema.RankPerk
 

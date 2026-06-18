@@ -9,11 +9,11 @@
 --   • gate milestone targets resolve, are loop-aligned, and live in a prerequisite Destination
 -- Catalog.luau calls validateConfig() on load, so a malformed catalog fails the require.
 
-local Enums = require("@src/types/Enums")
-local Schema = require("@src/types/Schema")
-local Combat = require("@src/logic/Combat")
-local Fishing = require("@src/logic/Fishing")
-local LiveOps = require("@src/logic/LiveOps")
+local Enums = require("../types/Enums")
+local Schema = require("../types/Schema")
+local Combat = require("../logic/Combat")
+local Fishing = require("../logic/Fishing")
+local LiveOps = require("../logic/LiveOps")
 
 type EquipmentItem = Schema.EquipmentItem
 type Creature = Schema.Creature

@@ -36,10 +36,23 @@ return function(t: Harness.T)
 		end
 		return true
 	end)())
-	t.ok("no entitlements, no artifacts, no fungibles", #p.activeEntitlements == 0 and next(p.artifacts) == nil and next(p.inventory.fungible) == nil)
+	t.ok("no entitlements, no artifacts", #p.activeEntitlements == 0 and next(p.artifacts) == nil)
 	t.ok("onboarding begins at FIRST_HUNT (Step 7)", p.onboarding ~= nil and p.onboarding.funnelBeat == "FIRST_HUNT")
 	t.ok("a fresh profile has not completed onboarding", p.onboarding ~= nil and p.onboarding.completedAt == nil)
 	t.ok("the daily state is zeroed (no objectives done, unclaimed)", p.daily ~= nil and p.daily.huntDone == false and p.daily.fishDone == false and p.daily.claimed == false)
+
+	t.section("freshProfile — the starter-bait grant (every basic-bait yes/no gate is pre-satisfied)")
+	-- Basic bait is a never-consumed yes/no gate (CatchHandler checks > 0; nothing decrements it). The bait
+	-- shop is deferred (Step 6/7), so a fresh profile SEEDS every basic bait — correct-by-construction over the
+	-- catalog — making fishing playable from spawn without the shop. (Premium bait stays a paid convenience.)
+	local missingBaits = {}
+	for _, f in Catalog.fish do
+		if f.baitRequired ~= nil and (p.inventory.fungible[f.baitRequired] or 0) <= 0 then
+			table.insert(missingBaits, f.baitRequired)
+		end
+	end
+	t.eq("every fish's basic bait is granted (none missing)", #missingBaits, 0)
+	t.ok("the Bayou starter baits are stocked", (p.inventory.fungible["cut bait"] or 0) > 0 and (p.inventory.fungible["worms"] or 0) > 0)
 
 	-- the equipped starter weapon resolves (by stable instanceId) to a Tier-1 catalog item
 	local weaponInstanceId = assert(p.equipped.weapon)

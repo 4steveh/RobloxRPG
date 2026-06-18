@@ -5,13 +5,13 @@
 -- the world blockout converts to Vector3. Coordinates are chosen to satisfy §2.6's measurable layout
 -- constraints (asserted in tests). Self-validates on load via Shell.validateShell.
 
-local Schema = require("@src/types/Schema")
-local Ids = require("@src/types/Ids")
-local Enums = require("@src/types/Enums")
-local Catalog = require("@src/config/Catalog")
-local Shell = require("@src/logic/Shell")
-local Spawner = require("@src/logic/Spawner")
-local Spawning = require("@src/config/Spawning")
+local Schema = require("../types/Schema")
+local Ids = require("../types/Ids")
+local Enums = require("../types/Enums")
+local Catalog = require("./Catalog")
+local Shell = require("../logic/Shell")
+local Spawner = require("../logic/Spawner")
+local Spawning = require("./Spawning")
 
 type Vec3 = Schema.Vec3
 local D = Ids.Destination

@@ -5,10 +5,10 @@
 -- equipped-ref key (carry-over fix #2): equip writes the commodity's instanceId into the slot.
 -- (Other intent handlers register in their owning steps — buy/sell → 6, salvage/display → 8, etc.)
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Progression = require("@src/logic/Progression")
-local Gauntlet = require("@src/server/authority/Gauntlet")
+local Schema = require("../../../types/Schema")
+local Enums = require("../../../types/Enums")
+local Progression = require("../../../logic/Progression")
+local Gauntlet = require("../Gauntlet")
 
 type Ctx = Gauntlet.Ctx
 type Commodity = Schema.Commodity

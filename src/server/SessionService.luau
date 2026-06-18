@@ -4,11 +4,11 @@
 -- write-through (persist sessionOpen + idle). logout = write logoutTimestamp + sessionOpen=false → final
 -- whole-profile flush → release lock cleanly. Provides the gauntlet's saveFn/markDirty per session.
 
-local Schema = require("@src/types/Schema")
-local Types = require("@src/server/persistence/Types")
-local ProfileStore = require("@src/server/persistence/ProfileStore")
-local Idle = require("@src/server/idle/Idle")
-local Profile = require("@src/logic/Profile")
+local Schema = require("../types/Schema")
+local Types = require("./persistence/Types")
+local ProfileStore = require("./persistence/ProfileStore")
+local Idle = require("./idle/Idle")
+local Profile = require("../logic/Profile")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config

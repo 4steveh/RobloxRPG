@@ -5,9 +5,9 @@
 -- and the starter Destination are DERIVED FROM CONFIG (items flagged availableAt=StarterLoadout; the
 -- Destination with requiredTier 0) — so this logic carries zero hardcoded content.
 
-local Schema = require("@src/types/Schema")
-local Enums = require("@src/types/Enums")
-local Validation = require("@src/config/Validation")
+local Schema = require("../types/Schema")
+local Enums = require("../types/Enums")
+local Validation = require("../config/Validation")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -55,13 +55,26 @@ function M.freshProfile(config: Config): PlayerData
 	local unlocked: { [string]: boolean } = {}
 	unlocked[starterId] = true
 
+	-- Starter-bait grant (stand-in for the deferred Step-6/7 bait shop). Basic bait is a never-consumed
+	-- yes/no gate — CatchHandler checks `fungible[baitRequired] > 0` and nothing ever decrements it — so seed
+	-- every basic bait the catalog requires. Derived from config.fish (correct-by-construction: a new fish's
+	-- bait is auto-seeded), this makes fishing playable from spawn in every destination. Premium bait (a paid
+	-- convenience) is separate and unaffected; when the real bait economy lands, this is its baseline stock.
+	local STARTER_BASIC_BAIT = 99
+	local starterBait: { [string]: number } = {}
+	for _, f in config.fish do
+		if f.baitRequired ~= nil then
+			starterBait[f.baitRequired] = STARTER_BASIC_BAIT
+		end
+	end
+
 	return {
 		unlockedDestinations = unlocked,
 		conqueredDestinations = {},
 		hunterRankXP = 0,
 		anglerRankXP = 0,
 		inventory = {
-			fungible = {},
+			fungible = starterBait,
 			commodities = commodities,
 			artifactIds = {},
 		},
