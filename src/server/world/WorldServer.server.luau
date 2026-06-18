@@ -585,10 +585,39 @@ local function spawnTarget(creatureId, zoneId)
 	return model
 end
 
+-- STUDIO FEEL: a brief server-driven death (tip over + sink + fade) so every client sees the creature go
+-- down, instead of an instant despawn. Animates in parallel with the respawn schedule, then destroys.
+local function playDeath(model)
+	local cf = model:GetPivot()
+	local goalCF = cf * CFrame.Angles(math.rad(80), 0, 0)
+	local parts = {}
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+		end
+	end
+	model:SetAttribute("currentHealth", 0)
+	task.spawn(function()
+		local t0 = os.clock()
+		while true do
+			local a = (os.clock() - t0) / 0.6
+			if a >= 1 then
+				break
+			end
+			model:PivotTo(cf:Lerp(goalCF, a) + Vector3.new(0, -2 * a, 0))
+			for _, d in ipairs(parts) do
+				d.Transparency = a
+			end
+			task.wait()
+		end
+		model:Destroy()
+	end)
+end
+
 local function despawnTarget(model, respawnAfter)
 	local state = liveTargets[model]
 	liveTargets[model] = nil
-	model:Destroy()
+	playDeath(model)
 	if state ~= nil and respawnAfter ~= nil then
 		task.delay(respawnAfter, function()
 			local pool = Spawner.routineTargetsInZone(Catalog, BAYOU, state.zoneId)
@@ -712,6 +741,7 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 		end
 	else
 		state.accumulated += shotDmg
+		model:SetAttribute("currentHealth", math.max(0, Catalog.creatures[state.creatureId].health - state.accumulated))
 		fireRequest:FireClient(plr, "hit", rayHitTargetId, shotDmg)
 	end
 end)
