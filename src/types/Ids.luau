@@ -21,4 +21,12 @@ export type TargetId = string -- a creature or fish id
 export type ItemId = string -- an equipment id
 export type ArtifactId = string -- a server-minted unique id (Step 2 mints these)
 
+-- Step 13: LiveOps events are keyed by a stable id (the config-not-code droppable unit, RD4). The registry
+-- holds the MVL canonical beats; a future event is a new config record, not a code change.
+export type EventId = string
+Ids.Event = table.freeze({
+	WinterFreeze = "winter_freeze" :: EventId, -- the MVL concrete event (Frozen Lake, LOC_04 §9)
+	SalmonRun = "salmon_run" :: EventId, -- the canonical Alaska seasonal window (LOC_04 §9)
+})
+
 return table.freeze(Ids)

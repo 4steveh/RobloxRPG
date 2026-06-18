@@ -10,6 +10,7 @@ local Fish = require("@src/config/Fish")
 local Destinations = require("@src/config/Destinations")
 local RankPerks = require("@src/config/RankPerks")
 local Decor = require("@src/config/Decor")
+local LiveOps = require("@src/config/LiveOps")
 local Validation = require("@src/config/Validation")
 local Schema = require("@src/types/Schema")
 local Enums = require("@src/types/Enums")
@@ -48,6 +49,7 @@ local Catalog: Config = {
 	destinations = Destinations,
 	rankPerks = RankPerks,
 	decor = Decor,
+	liveOps = LiveOps,
 	targetIndex = targetIndex,
 }
 
