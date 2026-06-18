@@ -27,6 +27,7 @@ local Spawning = require("@src/config/Spawning")
 local Spawner = require("@src/logic/Spawner")
 local Combat = require("@src/logic/Combat")
 local Fishing = require("@src/logic/Fishing")
+local LiveOps = require("@src/logic/LiveOps")
 local Onboarding = require("@src/logic/Onboarding")
 local Gauntlet = require("@src/server/authority/Gauntlet")
 local FireHandler = require("@src/server/combat/FireHandler")
@@ -39,6 +40,7 @@ local SalvageHandler = require("@src/server/lodge/SalvageHandler")
 local DisplayHandler = require("@src/server/lodge/DisplayHandler")
 local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
 local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
+local EventRewardHandler = require("@src/server/liveops/EventRewardHandler")
 local TradeService = require("@src/server/trading/TradeService")
 local Progression = require("@src/logic/Progression")
 local DestinationService = require("@src/server/DestinationService")
@@ -85,7 +87,26 @@ local telemetry = Adapters.telemetry(function(metric, value)
 	--                                             profile scan (idle player check) or session-end hook.
 	--   economy.destination_routine_income:<destinationId>  — per-session Cash earned in a Destination vs the
 	--                                                          EHT/EFT band; needs session-end flush with totals.
+	--
+	-- STEP-13 (LiveOps) telemetry — WIRED (these incr() calls fire from the handlers/flows):
+	--   liveops.eventFaucet:<eventId>   — event-faucet Cash share (did Cash stay in budget) — EventRewardHandler
+	--   liveops.eventParticipation      — event participation rate (did the event land) — EventRewardHandler
+	--   combat/fishing.rare_spawned:<id>— a windowed rare went live (the event/seasonal spawn fired)
+	-- STEP-13 telemetry — TODO (ops dashboards / session-end aggregates, not headless):
+	--   liveops.evergreenSinkShare      — the §9 canary: endgame Cash routed to decor/slots ÷ endgame Cash earned
+	--                                     (built from economy.evergreenSink:* vs income); FEEDS the alarm below.
+	--   trading.rarePriceTrend          — the corroborating inflation canary (Trading Post rare prices)
+	--   daily.claim by day / session-2  — the D1→D7 bridge; reactivation on a marquee beat; cadence-adherence
 end)
+
+-- STEP-13: the evergreen-sink alarm — a telemetry-driven scheduler trigger (SYS_liveops §4/§G). When the
+-- §9 canary (evergreen-sink share of endgame Cash) falls below the threshold, the catalog has saturated faster
+-- than the baseline decor cadence and an out-of-band decor/theme drop is pulled forward. The decision FUNCTION
+-- is headless + tested (LiveOps.evergreenSinkAlarm); feeding it the LIVE share is an ops/analytics aggregate
+-- (the telemetry sink above forwards to AnalyticsService — playtest/ops-pending), so the trigger is a seam:
+--   if LiveOps.evergreenSinkAlarm(currentEvergreenSinkShare, Catalog) then  -- fire the out-of-band decor drop
+--     <schedule/flag a pulled-forward Cash-priced decor batch ahead of the baseline cadence>
+--   end
 local sessionService = SessionService.new({
 	store = Adapters.dataStore(DataStoreService:GetDataStore("WildWorld_Profiles_v1")),
 	clock = Adapters.clock(),
@@ -110,6 +131,7 @@ Gauntlet.register(registry, LodgeShopHandler.buySlotHandler({ idGen = idGen, tel
 Gauntlet.register(registry, LodgeShopHandler.buyDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, LodgeShopHandler.placeDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, WorldMapHandler.new({ telemetry = telemetry }))
+Gauntlet.register(registry, EventRewardHandler.new({ telemetry = telemetry })) -- Step 13: the thin event participation faucet
 
 -- Step 12: the Trading Post — a SPECIAL two-session path (NOT a gauntlet handler; the gauntlet is single-
 -- profile). It reaches both traders' profiles via the one SessionService and runs the atomic swap (TradeSwap)
@@ -406,8 +428,17 @@ for zoneId, area in huntingSpawn.areas do
 	end
 end
 
+-- Step 13: the per-tick server-time recompute of the calendar's WorldState. LiveOps.worldStateAt reads the
+-- ACTIVE event (server time ∈ [start,end]) and returns the clauses it imposes (event/season/…); because this
+-- is recomputed every tick (the spawn loops below call it each cycle), world.event goes active at the event's
+-- start and REVERTS after its end — purely from server time, never latched. Ambient time/weather are the
+-- day-night + weather systems (Studio placeholders here); the calendar's clauses overlay them.
+local function liveOpsWorld()
+	return LiveOps.worldStateAt(Catalog, os.time())
+end
 local function huntWorldState()
-	return { time = "dawn or dusk", weather = "fog" } -- TODO(step-13): real time/weather/season/event
+	local w = liveOpsWorld()
+	return { time = w.time or "dawn or dusk", weather = w.weather or "fog", season = w.season, event = w.event }
 end
 task.spawn(function()
 	while true do
@@ -550,7 +581,8 @@ for zoneId, area in fishingSpawn.areas do
 end
 
 local function fishWorldState()
-	return { time = "night", weather = "storm" } -- TODO(step-13): real time/weather/season/event
+	local w = liveOpsWorld() -- Step 13: per-tick server-time recompute (drives the Frozen-Lake / Salmon-Run event clause)
+	return { time = w.time or "night", weather = w.weather or "storm", season = w.season, event = w.event }
 end
 task.spawn(function()
 	while true do
@@ -761,4 +793,4 @@ print("[WildWorld] WorldServer online — ONE login owner; handlers:", (function
 		n += 1
 	end
 	return n
-end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live")
+end)(), "· Bayou (inline) + Appalachia + Alaska (Step-10 geometry) + Lodge built · fast-travel execution live · LiveOps event clock driving world.event (Step 13)")
