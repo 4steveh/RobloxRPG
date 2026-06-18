@@ -156,6 +156,16 @@ function V.assertFish(f: Fish)
 	end
 end
 
+-- Step 13: a fish's requiresItem (the Frozen-Lake item-ownership gate) must resolve to a real equipment
+-- item — else a typo silently makes the fish permanently uncatchable (no player can own a non-existent
+-- item, so the gate denies forever). Cross-reference check (needs the catalog), mirrors the gate-access-item
+-- resolution. (baitRequired stays free-form: bait ids have no backing fungible-item catalog.)
+function V.assertFishItemRefs(f: Fish, config: Config)
+	if f.requiresItem ~= nil then
+		assert(config.equipment[f.requiresItem] ~= nil, f.id .. ": requiresItem '" .. f.requiresItem .. "' must resolve to an equipment item")
+	end
+end
+
 -- Re-skin integrity: tier ≥ origin's AND behavior reuses the origin's template (progression §6).
 -- A re-skin may always be a calmer flee/passive 'find' variant of an aggressive/pack origin (LOC §5 —
 -- e.g. alaska_spirit_moose is `flees` while its origin alaska_bull_moose is `aggressive`).
@@ -185,41 +195,58 @@ function V.assertNewScarcityId(proposedId: string, config: Config)
 	assert(not collides, "new-scarcity id '" .. proposedId .. "' collides with an existing catalog id — a new entry must be genuinely new (RD1 clone-evasion guard)")
 end
 
--- Resolve a newScarcity target to its index entry (existence + rarity) and its spawn conditions (the event
--- clause it is gated by). Fish and creatures both carry spawn.conditions; equipment/decor are not targets.
-local function targetConditions(config: Config, targetId: string): Schema.SpawnConditions?
-	local f = config.fish[targetId]
-	if f ~= nil then
-		return f.spawn.conditions
-	end
-	local c = config.creatures[targetId]
-	if c ~= nil then
-		return c.spawn.conditions
-	end
-	return nil
-end
-
 -- An event config obeys RD1/RD2: budget within the (economy-owned) ceiling; a well-formed window; and each
--- new-scarcity declaration is legal — referenceWindow names an EXISTING rare (its 1-in-N untouched; the
--- event carries no rate, so dilution is structurally absent), mintNew names a GENUINELY-NEW event-exclusive
--- rare (gated by THIS event — re-releasing an existing standing rare under a new event is rejected).
+-- new-scarcity declaration is legal —
+--   • referenceWindow (RD1a): names an EXISTING rare (its 1-in-N untouched; the event carries no rate, so
+--     dilution is structurally absent). May NOT also be minted by this event.
+--   • mintNew (RD1b): names a fish this event INTRODUCES (∈ event.mintsFish). The Catalog merge already
+--     proved every minted id is genuinely new (∉ ANY base catalog — assertNewScarcityId), so a re-release of
+--     an existing rare is structurally impossible: a standing rare's id is NOT in mintsFish, and putting it
+--     there collides at merge. This is the fix for the forgeable-spawn-clause re-release the review found.
+-- Plus: every fish the event MINTS must be gated by THIS event (event-exclusive), and every minted RARE must
+-- be declared as a mintNew (no undeclared scarcity rides the event — the RD1 audit).
 function V.assertEventConfig(event: Schema.EventConfig, config: Config)
 	assert(event.startTime < event.endTime, event.id .. ": event window start must be < end")
 	assert(event.cashBudget >= 0, event.id .. ": cashBudget must be ≥ 0")
 	assert(event.cashBudget <= config.tuning.economy.eventPayoutBudgetCeiling,
 		event.id .. ": cashBudget exceeds eventPayoutBudgetCeiling (economy owns the per-event Cash bound — SYS_liveops §6)")
+
+	local mintsFish = event.mintsFish or {}
+	local mintedIds: { [string]: boolean } = {}
+	for _, mf in mintsFish do
+		mintedIds[mf.id] = true
+	end
+
+	local declaredMintNew: { [string]: boolean } = {}
 	for _, decl in event.newScarcity do
-		local idx = config.targetIndex[decl.targetId]
-		assert(idx ~= nil, event.id .. ": newScarcity target '" .. decl.targetId .. "' must resolve to a catalog target")
-		assert(V.isRareOrAbove(idx.rarity),
-			event.id .. ": newScarcity target '" .. decl.targetId .. "' must be a rare — RD1 governs SCARCITY (rare-and-above) only")
 		if decl.kind == Enums.NewScarcityKind.mintNew then
-			-- A genuinely-new event-exclusive mint is gated by THIS event's imposed spawn clause. Naming an
-			-- existing standing rare (gated by another event/season, or ungated) is a re-release — forbidden (RD1).
-			local cond = targetConditions(config, decl.targetId)
-			local gating = cond ~= nil and cond.event or nil
-			assert(event.imposes.event ~= nil and gating == event.imposes.event,
-				event.id .. ": mintNew '" .. decl.targetId .. "' must be a genuinely-new event-exclusive rare gated by THIS event (re-releasing an existing rare dilutes its holders — RD1)")
+			declaredMintNew[decl.targetId] = true
+			-- RD1b: a mintNew names a genuinely-new fish this event INTRODUCES (∈ mintsFish). A standing rare's
+			-- id is not in mintsFish (and can't be added — the Catalog merge rejects an id colliding with base).
+			assert(mintedIds[decl.targetId],
+				event.id .. ": mintNew '" .. decl.targetId .. "' must be a fish this event INTRODUCES (in mintsFish) — re-releasing an existing rare is forbidden (RD1)")
+			local idx = config.targetIndex[decl.targetId]
+			assert(idx ~= nil and V.isRareOrAbove(idx.rarity),
+				event.id .. ": mintNew '" .. decl.targetId .. "' must be rare-and-above (RD1 governs scarcity)")
+		else
+			-- RD1a: referenceWindow names an EXISTING rare (not one this event introduces).
+			local idx = config.targetIndex[decl.targetId]
+			assert(idx ~= nil, event.id .. ": referenceWindow target '" .. decl.targetId .. "' must resolve to a catalog target")
+			assert(V.isRareOrAbove(idx.rarity),
+				event.id .. ": referenceWindow target '" .. decl.targetId .. "' must be a rare — RD1 governs SCARCITY (rare-and-above) only")
+			assert(not mintedIds[decl.targetId],
+				event.id .. ": referenceWindow target '" .. decl.targetId .. "' cannot also be minted by this event")
+		end
+	end
+
+	for _, mf in mintsFish do
+		local cond = mf.spawn.conditions
+		local gating = cond ~= nil and cond.event or nil
+		assert(event.imposes.event ~= nil and gating == event.imposes.event,
+			event.id .. ": minted fish '" .. mf.id .. "' must be gated by this event's spawn clause (event-exclusive)")
+		if V.isRareOrAbove(mf.rarity) then
+			assert(declaredMintNew[mf.id],
+				event.id .. ": minted RARE '" .. mf.id .. "' must be declared as a mintNew newScarcity entry (the RD1 audit)")
 		end
 	end
 end
@@ -244,18 +271,22 @@ function V.validateLiveOps(config: Config)
 		V.assertEventConfig(e, config)
 	end
 
+	-- The cross-loop pair must be formable on ANY day — including days with no active event, when themed
+	-- quests are excluded. So count only the ALWAYS-ELIGIBLE (non-themed) quests toward the pair guarantee.
 	local hasHunt, hasFish = false, false
 	for _, q in lo.dailyQuestPool do
 		V.assertQuest(q, config)
-		if q.loop == Enums.QuestLoop.Hunting then
-			hasHunt = true
-		elseif q.loop == Enums.QuestLoop.Fishing then
-			hasFish = true
+		if q.themedFor == nil then
+			if q.loop == Enums.QuestLoop.Hunting then
+				hasHunt = true
+			elseif q.loop == Enums.QuestLoop.Fishing then
+				hasFish = true
+			end
 		end
 	end
 	if #lo.dailyQuestPool > 0 then
-		assert(hasHunt, "daily-quest pool must contain ≥1 Hunting quest (the cross-loop pair must be formable)")
-		assert(hasFish, "daily-quest pool must contain ≥1 Fishing quest (the cross-loop pair must be formable)")
+		assert(hasHunt, "daily-quest pool must contain ≥1 NON-THEMED Hunting quest (the cross-loop pair must be formable every day)")
+		assert(hasFish, "daily-quest pool must contain ≥1 NON-THEMED Fishing quest (the cross-loop pair must be formable every day)")
 	end
 
 	assert(LiveOps.peakConcurrentCashBudget(config) <= config.tuning.economy.aggregateEventFaucetCeiling,
@@ -318,6 +349,7 @@ function V.validateConfig(config: Config)
 	end
 	for _, f in config.fish do
 		V.assertFish(f)
+		V.assertFishItemRefs(f, config) -- Step 13: requiresItem (the Frozen-Lake kit) must resolve
 		-- Step-5/10 (SYS_fishing §3): min rod/reel tiers are DERIVED. Bayou: assert derived==authored for
 		-- the ROUTINE band (rares excluded per RD5 — the Leviathan's colossal weight intentionally exceeds
 		-- the T1 fight model). Appalachia/Alaska: cross-tier equality is unachievable — assert sufficiency

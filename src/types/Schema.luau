@@ -340,6 +340,12 @@ export type EventConfig = {
 	endTime: number, -- server-time absolute (inclusive); reverts AFTER this on the per-tick recompute
 	imposes: ImposedWorld, -- the WorldState the event drives while live (imposes.event = the spawn-gating clause)
 	cashBudget: number, -- per-window thin participation Cash cap (≤ tuning.economy.eventPayoutBudgetCeiling)
+	-- RD1b: the GENUINELY-NEW fish this event INTRODUCES (authored here, NOT in the base Fish catalog). The
+	-- Catalog merges these into config.fish with a clone-evasion collision check (a minted id must not pre-
+	-- exist in ANY catalog — that is what makes "genuinely new" structural, not a forgeable spawn-clause edit).
+	-- A `mintNew` newScarcity decl MUST name a member of this list; a `referenceWindow` decl names an EXISTING
+	-- rare. OPTIONAL — most events (conditionWindow / seasonal) introduce no new fish (nil = none).
+	mintsFish: { Fish }?,
 	newScarcity: { NewScarcityDecl }, -- the RD1 declaration (audited + guarded at load)
 	notes: string,
 }

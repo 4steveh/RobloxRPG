@@ -128,13 +128,20 @@ function M.dailyQuestSet(config: Config, now: number, activeEvent: string?): { Q
 	local size = config.tuning.liveops.dailyQuestSetSize
 	local day = math.floor(now / DAY_SECONDS)
 
+	-- ELIGIBLE = the always-on quests (themedFor == nil) plus the active beat's themed quests. A themed quest
+	-- whose event is NOT live is EXCLUDED from every pick — surfacing it would put an uncompletable objective on
+	-- the board (its event-gated target cannot spawn off-window). Theming is opt-IN when active, never a leak.
+	local eligible: { Quest } = {}
 	local hunting: { Quest } = {}
 	local fishing: { Quest } = {}
 	for _, q in pool do
-		if q.loop == "Hunting" then
-			table.insert(hunting, q)
-		elseif q.loop == "Fishing" then
-			table.insert(fishing, q)
+		if q.themedFor == nil or q.themedFor == activeEvent then
+			table.insert(eligible, q)
+			if q.loop == "Hunting" then
+				table.insert(hunting, q)
+			elseif q.loop == "Fishing" then
+				table.insert(fishing, q)
+			end
 		end
 	end
 
@@ -172,14 +179,14 @@ function M.dailyQuestSet(config: Config, now: number, activeEvent: string?): { Q
 	takeOne(fishing, 0) -- force ≥1 Fishing (the cross-loop pair)
 	if activeEvent ~= nil then -- seasonal/event theming: prefer the active beat's themed quests
 		local themed: { Quest } = {}
-		for _, q in pool do
+		for _, q in eligible do
 			if q.themedFor == activeEvent then
 				table.insert(themed, q)
 			end
 		end
 		fill(themed, 0)
 	end
-	fill(pool, day) -- fill the rest, rotated by day
+	fill(eligible, day) -- fill the rest from the eligible set (no off-event themed leak), rotated by day
 	return set
 end
 

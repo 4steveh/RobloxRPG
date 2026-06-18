@@ -6,81 +6,17 @@
 local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 local Ids = require("@src/types/Ids")
+local FishBuilder = require("@src/config/FishBuilder")
 
 type Fish = Schema.Fish
-type Reward = Schema.Reward
-type RareFields = Schema.RareFields
 
 local D = Ids.Destination
 local W = Enums.WaterType
 local Ra = Enums.Rarity
 
-local function isRareOrAbove(rarity: Enums.Rarity): boolean
-	return Enums.RarityRank[rarity] >= Enums.RARE_AND_ABOVE_RANK
-end
-
-type FishInput = {
-	id: string,
-	destinationId: Ids.DestinationId,
-	name: string,
-	tier: number,
-	rarity: Enums.Rarity,
-	typicalWeightKg: { min: number, max: number },
-	recordWeightKg: number,
-	fightDifficulty: number,
-	minRodTier: number,
-	minReelTier: number,
-	waterType: Enums.WaterType,
-	baitRequired: string?,
-	requiresItem: string?, -- Step 13: a COMMODITY the angler must OWN (e.g. tackle_ice_fishing_kit), the
-	-- item-ownership gate the Frozen Lake uses (CatchHandler reads inventory.commodities — NOT canAccessZone).
-	spawnZones: { string }?, -- structured Step-3 water zones (Step 5 prerequisite)
-	conditions: Schema.SpawnConditions?,
-	isMilestoneTarget: boolean?,
-	cash: { min: number, max: number }?,
-	rare: RareFields?,
-}
-
-local function fish(i: FishInput): Fish
-	local reward: Reward
-	if isRareOrAbove(i.rarity) then
-		local r = assert(i.rare, i.id .. ": Rare-and-above must carry Template-E rare fields")
-		reward = { kind = "artifact", artifact = { tradeable = r.tradeable, displayableInLodge = r.displayableInLodge } }
-	else
-		local c = assert(i.cash, i.id .. ": Common/Uncommon must carry a cash range")
-		reward = { kind = "cash", cash = c }
-	end
-	return {
-		id = i.id,
-		destinationId = i.destinationId,
-		name = i.name,
-		tier = i.tier,
-		rarity = i.rarity,
-		typicalWeightKg = i.typicalWeightKg,
-		recordWeightKg = i.recordWeightKg,
-		fightDifficulty = i.fightDifficulty,
-		minRodTier = i.minRodTier,
-		minReelTier = i.minReelTier,
-		baitRequired = i.baitRequired,
-		requiresItem = i.requiresItem,
-		waterType = i.waterType,
-		spawnZones = i.spawnZones,
-		reward = reward,
-		spawn = { conditions = i.conditions },
-		rare = i.rare,
-		isMilestoneTarget = i.isMilestoneTarget,
-	}
-end
-
-local function rareFields(spawnRate: number, moment: string): RareFields
-	return {
-		spawnRate = spawnRate,
-		tradeable = true,
-		displayableInLodge = true,
-		reReleasePolicy = "NEVER",
-		intendedContentMoment = moment,
-	}
-end
+-- The XOR-enforcing builder is SHARED (FishBuilder) so LiveOps event-introduced fish build the same way.
+local fish = FishBuilder.fish
+local rareFields = FishBuilder.rareFields
 
 local rows: { Fish } = {
 	-- ───────────────────────── BAYOU (Tier 1) ─────────────────────────
@@ -456,47 +392,9 @@ local rows: { Fish } = {
 		rare = rareFields(9000, "the colossal halibut surfacing in a storm-tossed Gulf as a party hauls together"),
 	}),
 
-	-- ── FROZEN LAKE (Alaska seasonal sub-zone — the Winter Freeze event, LOC_04 §2.2/§6/§9) ──
-	-- A calmer SEATED counter-tempo to the coastal fight. DOUBLY gated: (a) the Winter Freeze event must be
-	-- active (the `event` spawn clause, driven by the scheduler) AND (b) the angler must OWN the Ice-Fishing
-	-- Kit (requiresItem — the item-ownership gate, the same required-tackle pattern as cut bait/fly, NOT
-	-- canAccessZone; the Kit is tackle, never a tier input). Closed out-of-window regardless of the Kit; in
-	-- window a Kit-less angler is denied. Bite density is capped low (Spawning.alaskaFishing.frozen_lake, §8.4).
-	fish({
-		id = "alaska_lake_whitefish",
-		destinationId = D.Alaska,
-		name = "Lake Whitefish (through the ice)",
-		tier = 4,
-		rarity = Ra.Common, -- the routine Frozen-Lake catch (Cash); the calmer seated ice-jig
-		typicalWeightKg = { min = 0.5, max = 2 },
-		recordWeightKg = 4,
-		fightDifficulty = 40, -- low: a calm seated jig, not the coastal fight (landable at the interior T3 rod/reel)
-		minRodTier = 3,
-		minReelTier = 3,
-		waterType = W.lake, -- the interior lake (frozen during the event); same water type as a still pond
-		requiresItem = "tackle_ice_fishing_kit", -- the seasonal required-item gate (LOC_04 §6)
-		spawnZones = { "frozen_lake" },
-		cash = { min = 200, max = 250 }, -- Alaska floor wage (illustrative, economy's band)
-		conditions = { event = "Winter Freeze" }, -- the lake only opens during the Winter Freeze event
-	}),
-	fish({
-		id = "alaska_burbot",
-		destinationId = D.Alaska,
-		name = "Burbot (the Eelpout King)",
-		tier = 4,
-		rarity = Ra.Legendary, -- the GENUINELY-NEW event-exclusive winter scarcity (RD1b): a new artifact, no
-		-- Cash at mint, permanently scarce after the window. NOT a re-release/dilution of any existing rare.
-		typicalWeightKg = { min = 3, max = 8 },
-		recordWeightKg = 12,
-		fightDifficulty = 62,
-		minRodTier = 4,
-		minReelTier = 4,
-		waterType = W.lake,
-		requiresItem = "tackle_ice_fishing_kit",
-		spawnZones = { "frozen_lake" },
-		conditions = { event = "Winter Freeze" }, -- event-exclusive: gated by THIS event's spawn clause (the guard checks it)
-		rare = rareFields(1800, "the ghost-pale eelpout hauled up through the ice — the Winter Freeze exclusive trophy"),
-	}),
+	-- NOTE: the FROZEN LAKE catches (alaska_lake_whitefish + alaska_burbot) are NOT in the base catalog — they
+	-- are GENUINELY-NEW scarcity INTRODUCED by the Winter Freeze event (config/LiveOps.luau `mintsFish`, RD1b),
+	-- merged into config.fish by Catalog with a clone-evasion collision check (a new id must not pre-exist here).
 
 	-- ───────────────────────── DEEP SEA (Tier 7 — fishing-only fixture) ─────────────────────────
 	fish({

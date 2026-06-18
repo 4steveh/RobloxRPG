@@ -146,6 +146,20 @@ return function(t: Harness.T)
 			if q.themedFor == "winter_freeze" then hasThemed = true end
 		end
 		t.ok("an active event themes the daily board", hasThemed)
+
+		-- An INACTIVE event's themed quests must NEVER leak onto the board (they'd be uncompletable off-window).
+		local function noThemedLeak(config: Schema.Config): boolean
+			for d = 0, 29 do
+				for _, q in LiveOps.dailyQuestSet(config, d * 86400, nil) do
+					if q.themedFor ~= nil then
+						return false
+					end
+				end
+			end
+			return true
+		end
+		t.ok("no themed quest leaks across 30 days when no event is active (synthetic pool)", noThemedLeak(cfg))
+		t.ok("no themed quest leaks across 30 days when no event is active (real config pool)", noThemedLeak(Catalog))
 	end
 
 	t.section("LiveOps inflation SLA — Cash-priced-only decor quota + the evergreen-sink alarm")
@@ -217,11 +231,23 @@ return function(t: Harness.T)
 		t.errs("a new-scarcity id colliding with an existing EQUIPMENT id is REJECTED", function()
 			Validation.assertNewScarcityId("tackle_ice_fishing_kit", Catalog)
 		end)
-		-- REJECT (re-release / dilution): mintNew naming an existing rare gated by ANOTHER event.
+		-- REJECT (re-release / dilution): mintNew naming an EXISTING standing rare (not in this event's mintsFish).
 		t.errs("mintNew naming an existing standing rare (re-release) is REJECTED", function()
 			Validation.assertEventConfig(
 				evt({
 					imposes = { event = "Test Event" },
+					newScarcity = { { kind = "mintNew", targetId = "alaska_tyee_king" } },
+				}),
+				Catalog
+			)
+		end)
+		-- REJECT (the review's same-clause attack): re-pointing/matching a standing rare's OWN spawn clause and
+		-- declaring mintNew. Rejected because tyee_king is NOT in this event's mintsFish (and can't be — the
+		-- Catalog merge rejects a minted id that collides with the base catalog). Genuine-newness is structural.
+		t.errs("mintNew re-releasing an existing rare under its own clause is REJECTED (same-clause attack)", function()
+			Validation.assertEventConfig(
+				evt({
+					imposes = { event = "Salmon Run" }, -- matches alaska_tyee_king's real spawn clause
 					newScarcity = { { kind = "mintNew", targetId = "alaska_tyee_king" } },
 				}),
 				Catalog
@@ -304,6 +330,21 @@ return function(t: Harness.T)
 		-- The guard ACCEPTS the real mintNew (the burbot is genuinely-new + event-exclusive).
 		t.test("the real Winter Freeze config passes the scarcity guard", function()
 			Validation.assertEventConfig(wf, Catalog)
+		end)
+	end
+
+	t.section("Validation — a fish's requiresItem must resolve to a real equipment item (typo guard)")
+	do
+		t.test("a resolving requiresItem is accepted", function()
+			Validation.assertFishItemRefs(Catalog.fish["alaska_burbot"], Catalog)
+		end)
+		t.errs("a requiresItem that does not resolve is rejected", function()
+			local bad = table.clone(Catalog.fish["alaska_burbot"])
+			bad.requiresItem = "tackle_does_not_exist"
+			Validation.assertFishItemRefs(bad, Catalog)
+		end)
+		t.test("a fish with no requiresItem is fine", function()
+			Validation.assertFishItemRefs(Catalog.fish["alaska_arctic_grayling"], Catalog)
 		end)
 	end
 end

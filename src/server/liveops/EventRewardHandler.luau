@@ -81,7 +81,12 @@ function M.new(deps: EventRewardDeps): Gauntlet.IntentHandler
 					table.insert(kept, ent)
 				end
 			end
-			table.insert(kept, { kind = claimKind(eventId), expiryTimestamp = event.endTime })
+			-- expiry = endTime + 1: the claim marker must outlast the INCLUSIVE window. isEventActive is inclusive
+			-- (now ≤ endTime) but entitlementActive is exclusive (now < expiry), so an expiry of endTime would read
+			-- EXPIRED at now == endTime while the event is still live → an unbounded re-claim drain at the boundary.
+			-- +1 makes `now < endTime+1` block through the whole [start,end] (no boundary hole), without shifting the
+			-- timed-boost/offline-entitlement semantics (entitlementActive stays `now < expiry`).
+			table.insert(kept, { kind = claimKind(eventId), expiryTimestamp = event.endTime + 1 })
 			ctx.profile.activeEntitlements = kept
 			if deps.telemetry ~= nil then
 				deps.telemetry.incr("liveops.eventFaucet:" .. eventId, amount) -- event-faucet Cash share (did Cash stay in budget)

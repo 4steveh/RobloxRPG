@@ -54,6 +54,15 @@ return function(t: Harness.T)
 		t.ok("a second claim in the SAME window is rejected", claim(p, inWindow + 5000).ok == false)
 		t.eq("…still exactly one ledger entry (no double-credit)", #p.cash.tail, 1)
 		t.ok("re-claim stays blocked right up to the window's end (server-time, not client elapsed)", claim(p, wf.endTime - 1).ok == false)
+		-- the inclusive-window BOUNDARY: the event is live at now==endTime, so the claim marker must also block
+		-- there (else the exclusive `now < expiry` check lets an unbounded re-claim drain the faucet at endTime).
+		t.ok("re-claim blocked at EXACTLY endTime (inclusive boundary)", claim(p, wf.endTime).ok == false)
+		t.eq("…still exactly one ledger entry at the boundary", #p.cash.tail, 1)
+		-- and on a fresh profile, the FIRST claim at endTime must self-block any second claim at endTime.
+		local q = Util.mkProfile(Catalog, { rod = 4, reel = 4 })
+		t.ok("first claim at endTime succeeds", claim(q, wf.endTime).ok)
+		t.ok("a second claim at endTime is rejected (no unbounded boundary drain)", claim(q, wf.endTime).ok == false)
+		t.eq("…exactly one entry at the boundary", #q.cash.tail, 1)
 	end
 
 	t.section("EventRewardHandler — server-authoritative window: an inactive event pays nothing")

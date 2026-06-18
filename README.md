@@ -127,9 +127,10 @@ src/
            Catalog (self-validates) · Shells (Step 3 — the Bayou shell; +Step-10 Appalachia/Alaska shells; self-validates + placement check)
            · Spawning (Step 4 — per-(destination,loop) caps + throughput ceiling; loop-agnostic; +Step-5 .fishing; +Step-10 Appalachia/Alaska caps)
            · Decor (Step 8 — the starter MVL decor/theme/framing catalog; Cash-priced, balance-free, tradeable=false; self-validates)
-           · LiveOps (Step 13 — the event calendar: Winter Freeze + Salmon Run records + the daily-quest pool; config-not-code, self-validates under the scarcity guard)
-           · Validation (+Step-13 the RD1 scarcity-discipline guard: assertEventConfig/assertNewScarcityId/validateLiveOps — build-time rejection of rate-edit/clone/re-release; PEAK aggregate ceiling; one spawn-gating event at a time)
-           · Fish (+Step-13 the two Frozen-Lake catches: alaska_burbot [genuinely-new Legendary, RD1b] + alaska_lake_whitefish; the requiresItem item-ownership field) · Spawning (+Step-13 frozen_lake area, capped low)
+           · LiveOps (Step 13 — the event calendar: Winter Freeze + Salmon Run records + the daily-quest pool; Winter Freeze's `mintsFish` INTRODUCES the genuinely-new Frozen-Lake catches [alaska_burbot Legendary RD1b + alaska_lake_whitefish], merged into config.fish by Catalog with a clone-evasion collision check; config-not-code, self-validates)
+           · FishBuilder (Step 13 — the shared XOR-enforcing fish() + rareFields() builder, used by both Fish and LiveOps mintsFish)
+           · Validation (+Step-13 the RD1 scarcity-discipline guard: assertEventConfig/assertNewScarcityId/assertFishItemRefs/validateLiveOps — build-time rejection of rate-edit/clone/re-release [mintNew must be ∈ mintsFish, ∉ base catalog]; PEAK aggregate ceiling; one spawn-gating event at a time)
+           · Fish (+Step-13 the requiresItem item-ownership field; builder extracted to FishBuilder) · Spawning (+Step-13 frozen_lake area, capped low)
   logic/   (pure)  EffectiveTier (EHT/EFT) · Gate (evaluateGate) · Balance (checkpoint+tail fold) · Profile
            · Shell (Step 3 — distances/walk-time/crossing-time + shell validators)
            · Combat (Step 4 — weapon/armor curves, shot/kill math, co-op, non-lethal clamp, min-tier derivation, validators)
@@ -850,13 +851,17 @@ commodity-ownership gate pattern (`Fishing.ownsBoatForWater`), the `Daily` cross
   downgrade the cadence (flagged).
 - **The scarcity-discipline guard (RD1 — the one moat-structural piece; a BUILD-TIME error).**
   `Validation.assertEventConfig` / `assertNewScarcityId` / `validateLiveOps`, run at `Catalog` require time
-  (a malformed event config **fails the require**). It rejects, with teeth: a new-scarcity id colliding with
-  any existing catalog id (the **clone evasion** — "editing scarcity" and "cloning under a colliding id" are
-  the same mechanism); a `mintNew` naming an existing standing rare (a **re-release**); a `referenceWindow`
-  to a non-existent or non-rare target; a `cashBudget` over the ceiling. It **accepts** a `referenceWindow`
-  to an existing rare (window at **unchanged 1-in-N**, RD1a) and/or a genuinely-new event-exclusive
-  `mintNew` (RD1b). All directions are asserted in `LiveOps.spec`. *Dilution is unrepresentable, not
-  remembered.*
+  (a malformed event config **fails the require**). An event INTRODUCES genuinely-new scarcity via
+  `mintsFish` (fish authored in the event, **not** the base catalog); `Catalog` merges them only after
+  `assertNewScarcityId` proves each id is **∉ any base catalog** (the **clone evasion** — "editing scarcity"
+  and "cloning under a colliding id" are the same mechanism). A `mintNew` declaration must name a member of
+  `mintsFish`, so **re-releasing an existing rare is structurally impossible** (a standing rare isn't in
+  `mintsFish`, and putting it there collides at merge — the fix for the forgeable-spawn-clause re-release the
+  adversarial review surfaced). It also rejects: a `referenceWindow` to a non-existent/non-rare target; a
+  `cashBudget` over the ceiling; a minted fish not gated by its own event. It **accepts** a `referenceWindow`
+  to an existing rare (window at **unchanged 1-in-N**, RD1a) and a genuinely-new event-exclusive `mintNew`
+  (RD1b). All directions — including the same-clause re-release attack — are asserted in `LiveOps.spec`.
+  *Dilution is unrepresentable, not remembered.*
 - **The scheduler / activation (server-authoritative, server-time).** `logic/LiveOps` is **pure**:
   `isEventActive`/`activeWorldEvent`/`worldStateAt` recompute liveness from `serverTime ∈ [start,end]` **every
   tick**, so `world.event` goes active at `start` and **reverts after `end`** — never latched, never
@@ -1114,7 +1119,7 @@ claim by day esp. session 2, reactivation, cadence-adherence). The `T_current = 
 flagged (economy's open call), not re-resolved. Step 13 **calls** the inherited spawn predicate / ledger /
 entitlement / Daily substrate — it rebuilds none.
 
-**1124 assertions pass headless (Steps 1–13); both negative fixtures fail analysis as required; `rojo build`
+**1135 assertions pass headless (Steps 1–13); both negative fixtures fail analysis as required; `rojo build`
 produces a place.** The Studio playtest checklists above are the honest bar for UI/feel/live-data — not
 headless-green.
 ```
