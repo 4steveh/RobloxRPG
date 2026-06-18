@@ -5,6 +5,7 @@
 -- the target stamina), so it animates on the server's fightProgress; the authoritative resolve is "landed".
 local Net = require(script.Parent:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Hud"))
+local Feel = require(script.Parent:WaitForChild("FishingFeel")) -- S2 game-feel: rod, cast line, bobber, reel, landed FX
 
 local STATE = { idle = "idle", waiting = "waiting", fighting = "fighting" }
 local state = STATE.idle
@@ -32,11 +33,13 @@ castBtn.Activated:Connect(function()
 	castToken += 1
 	local mine = castToken
 	Net.cast:FireServer("cast")
+	Feel.onCast()
 	Hud.toast("Casting…", Color3.fromRGB(150, 200, 230))
 	task.delay(4, function()
 		if state == STATE.waiting and castToken == mine then
 			state = STATE.idle
 			Hud.toast("No bite — cast again", Color3.fromRGB(220, 200, 140))
+			Feel.onIdle()
 		end
 	end)
 end)
@@ -71,6 +74,7 @@ local function fightLoop()
 		if state == STATE.fighting and (os.clock() - lastFightReply) > 1.5 then
 			resetToIdle()
 			Hud.toast("Fish got away — cast again", Color3.fromRGB(220, 200, 140))
+			Feel.onIdle()
 			return
 		end
 	end
@@ -84,15 +88,18 @@ Net.cast.OnClientEvent:Connect(function(kind, fishId, extra)
 		reelBtn.Visible = true
 		Hud.setGauge(true, 0)
 		Hud.toast("Bite! Hold REEL", Color3.fromRGB(150, 200, 230))
+		Feel.onBite()
 		task.spawn(fightLoop)
 	elseif kind == "fightProgress" then
 		lastFightReply = os.clock()
 		progressTicks += 1
 		Hud.setGauge(true, math.clamp(progressTicks / 8, 0, 0.95)) -- cosmetic; true max is server-side
+		Feel.onReel(math.clamp(progressTicks / 8, 0, 1))
 	elseif kind == "landed" then
 		lastFightReply = os.clock()
 		resetToIdle()
 		Hud.applyProjection(extra) -- extra = projection (payout delta)
 		Hud.toast("Landed!", Color3.fromRGB(150, 230, 140))
+		Feel.onLanded(fishId, extra)
 	end
 end)
