@@ -197,7 +197,9 @@ Tuning.liveops = table.freeze({
 	dailyQuestSetSize = 3, -- §5 ~3 quests/day; always includes the cross-loop pair (≥1 hunt + 1 fish)
 	decorReplenishCadence = 2, -- §4 min Cash-priced evergreen decor SKUs per cycle (game-pass cosmetics do NOT count)
 	evergreenSinkShareAlarmThreshold = 0.25, -- §4 below this share of endgame Cash → out-of-band decor drop fires
-	eventEntitlementSeconds = 0, -- §7 window-bounded boost duration (0 = entitlement expires at the event's endTime)
+	eventEntitlementSeconds = 0, -- §7 RESERVED forward knob for a future window-bounded boost duration (not yet
+	-- consumed). The Step-13 event-CLAIM marker is a per-window idempotency entitlement whose expiry is the
+	-- handler's `event.endTime + 1` (the inclusive-boundary fix), NOT this knob.
 })
 
 -- Big one-time access/convenience sink multipliers (EQUIPMENT_MASTER §4.5–§4.7; coarse defaults, OQ-D).

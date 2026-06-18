@@ -204,7 +204,12 @@ end
 --     an existing rare is structurally impossible: a standing rare's id is NOT in mintsFish, and putting it
 --     there collides at merge. This is the fix for the forgeable-spawn-clause re-release the review found.
 -- Plus: every fish the event MINTS must be gated by THIS event (event-exclusive), and every minted RARE must
--- be declared as a mintNew (no undeclared scarcity rides the event — the RD1 audit).
+-- be declared as a mintNew (no undeclared MINTED scarcity — the RD1 audit on introduced content). NOTE: this
+-- guard is the STRUCTURAL floor (no rate edit, no clone, no re-release, no undeclared mint). It does NOT also
+-- require an event to file a referenceWindow for every EXISTING rare its imposed clause happens to window —
+-- opening a window at an UNCHANGED 1-in-N is the explicitly-permitted RD1(a) behavior, and the completeness
+-- of windowing declarations is the OPERATIONAL scarcity-mint approval gate the spec leaves to live-ops
+-- (SYS_liveops_calendar Open Questions), not the schema guard.
 function V.assertEventConfig(event: Schema.EventConfig, config: Config)
 	assert(event.startTime < event.endTime, event.id .. ": event window start must be < end")
 	assert(event.cashBudget >= 0, event.id .. ": cashBudget must be ≥ 0")
