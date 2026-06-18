@@ -121,6 +121,13 @@ function M.crossLoopBonus(config: Config, tier: number): number
 	return round(config.tuning.economy.crossLoopBonusHours * M.income(config, tier))
 end
 
+-- §5 (Step 12) the trade tax on a Cash leg — round(rate · gross). The rate is LOW (anti-wash-trading
+-- friction, not inflation ballast); this code APPLIES it (economy owns the rate). Zero gross → zero tax
+-- (an item-for-item trade has no Cash leg to skim). Taken once, inside the atomic swap commit.
+function M.tradeTax(config: Config, grossCash: number): number
+	return round(grossCash * config.tuning.economy.tradeTaxRate)
+end
+
 -- §6 reconciliation: the normalized routine hour for a (destination, loop) — equals Income(dest tier) BY
 -- CONSTRUCTION (mean of mult/avgMult = 1). The test asserts this per MVL tier on each loop → parity is
 -- automatic despite different absolute rates and different per-loop Common/Uncommon mixes.

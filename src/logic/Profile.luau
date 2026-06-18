@@ -72,6 +72,7 @@ function M.freshProfile(config: Config): PlayerData
 			reel = "ci3",
 		},
 		artifacts = {},
+		tradeLog = {},
 		cash = { checkpoint = { balance = 0, compactedCount = 0, lastEntryId = 0 }, tail = {} }, -- balance 0
 		nextCommodityInstanceSeq = 4, -- ci1..ci3 used; next mint is ci4 (Step 6 buys mint from here)
 		redeemedPurchaseIds = {},

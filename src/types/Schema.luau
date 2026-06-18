@@ -221,6 +221,20 @@ export type Artifact = {
 	tombstoned: boolean, -- SALVAGED or traded-away artifacts are MARKED, never erased (audit/rollback)
 	provenance: Provenance,
 }
+-- Step 12: the two-sided trade record (audit/rollback substrate, data-integrity §5/§7). Written to BOTH
+-- parties' tradeLog inside the atomic swap so a reconcile-on-reload can reconstruct/reverse a trade across
+-- the residual two-key persist crash window.
+export type TradeRecord = {
+	tradeId: string,
+	partyA: string, -- the two owner keys
+	partyB: string,
+	aArtifactIds: { ArtifactId }, -- A's artifacts that moved to B
+	bArtifactIds: { ArtifactId }, -- B's artifacts that moved to A
+	payer: string, -- the owner key that paid the net Cash leg ("" if no Cash leg)
+	cashGross: number, -- the gross Cash moved (net of the two sides' offers); tax skimmed from it
+	tax: number,
+	timestamp: number,
+}
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Lodge state (Step 8) — the player's count-based typed-owned slots/decor + decor layout. DISTINCT from
 -- the instance-based `inventory.commodities` (gear): no instanceId, no equipped, no artifactId. Persisted
@@ -258,6 +272,7 @@ export type PlayerData = {
 	inventory: Inventory,
 	equipped: EquippedRefs,
 	artifacts: { [ArtifactId]: Artifact },
+	tradeLog: { TradeRecord }, -- Step 12: append-only two-sided trade records (audit/rollback)
 	cash: Ledger, -- §3 checkpoint+tail (replaces Step 1's flat cashLedger)
 	-- ── integrity-mechanism fields (extend §1's table; each implied/required by §3/§6) ──
 	nextCommodityInstanceSeq: number, -- monotonic source for commodity instanceIds (Step 6 mints on buy)

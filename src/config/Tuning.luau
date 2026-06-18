@@ -164,6 +164,7 @@ Tuning.economy = table.freeze({
 	-- ≈ half an hour of current-tier income for doing one hunt AND one catch in a day (breadth-as-reward).
 	dailyQuestFraction = 0.25,
 	crossLoopBonusHours = 0.5,
+	tradeTaxRate = 0.05, -- §5 LOW anti-wash-trading friction on the Cash leg (NOT inflation ballast); Step 12
 })
 
 -- §lodge (Step 8 — SYS_lodge_trophy §2/§3 + economy §9). The Trophy-Hall slot economy + the instancing
@@ -210,6 +211,7 @@ Tuning.persistence = table.freeze({
 	ledgerTailLength = 50, -- entries kept in the live profile before compaction folds the oldest away (§3)
 	ledgerTailDays = 7, -- the audit-log-vs-in-profile rollback boundary (§7); Step 2 uses length for MVL
 	escrowTimeoutSeconds = 120, -- pending-trade auto-cancel window (Step 12 consumes)
+	commitSettleSeconds = 3, -- the settle freeze between the 2nd confirm and the swap (Step 12; the fat-finger guard)
 	-- artifactIdScheme = GUID (globally unique; injected IdGenerator). auditLogDestination = separate DataStore.
 })
 

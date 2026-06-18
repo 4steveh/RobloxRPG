@@ -53,6 +53,10 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/CrossTier.spec"),
 	-- Step 11 (Boats, Mounts & Tracking Dogs — the vendor sinks)
 	require("@tests/VendorHandler.spec"),
+	-- Step 12 (Trading — the moat's runtime enforcement)
+	require("@tests/PairTransaction.spec"),
+	require("@tests/TradeSwap.spec"),
+	require("@tests/TradeService.spec"),
 }
 
 for _, spec in specs do

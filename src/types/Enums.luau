@@ -137,6 +137,18 @@ Enums.Disposition = table.freeze({
 	SALVAGED = "SALVAGED" :: Disposition,
 })
 
+-- Step 12: the PendingTrade negotiation states (server-owned; the read-only projection carries this).
+export type TradeState = "REQUESTED" | "BUILDING" | "A_CONFIRMED" | "B_CONFIRMED" | "COMMITTING" | "COMPLETE" | "CANCELLED"
+Enums.TradeState = table.freeze({
+	REQUESTED = "REQUESTED" :: TradeState,
+	BUILDING = "BUILDING" :: TradeState,
+	A_CONFIRMED = "A_CONFIRMED" :: TradeState,
+	B_CONFIRMED = "B_CONFIRMED" :: TradeState,
+	COMMITTING = "COMMITTING" :: TradeState, -- both confirmed; in the settle window, then the swap
+	COMPLETE = "COMPLETE" :: TradeState,
+	CANCELLED = "CANCELLED" :: TradeState,
+})
+
 -- Artifact kind gates which dispositions are legal (data-integrity §4):
 --   trophy        → full enum {HELD, DISPLAYED, ESCROWED, SALVAGED}
 --   non-trophy    → reduced set {HELD, ESCROWED} (+ ownership transfer); DISPLAYED/SALVAGED are Trophy-only.

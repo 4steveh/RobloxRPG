@@ -92,4 +92,43 @@ function M.transition(profile: PlayerData, artifactId: string, expected: Disposi
 	return { ok = true }
 end
 
+-- ── Step 12: the cross-profile OWNERSHIP TRANSFER (the swap's per-artifact move; SYS_data_integrity §5).
+-- Rides the ESCROWED → (new owner, HELD) edge: the new owner gets a LIVE copy (owner flipped, HELD, owned);
+-- the old owner's record is TOMBSTONED (marked traded-away, never erased — audit/rollback, exactly as SALVAGE
+-- tombstones) and leaves the owned set. CAS on the expected ESCROWED state defeats the double-spend race.
+-- THE anti-dupe invariant: no artifact is ever LIVE in two profiles (the old side is a tombstone, not live).
+-- The two-profile atomicity (all-or-nothing, no-yield, restore-both-on-failure) is the CALLER's job (TradeSwap
+-- over PairTransaction); this is the single-artifact primitive it composes.
+function M.transferOwnership(fromProfile: PlayerData, toProfile: PlayerData, artifactId: string, expected: Disposition, newOwner: string): TransitionResult
+	local a = fromProfile.artifacts[artifactId]
+	if a == nil then
+		return { ok = false, reason = "no_such_artifact" }
+	end
+	if a.tombstoned then
+		return { ok = false, reason = "tombstoned" }
+	end
+	if a.disposition ~= expected then
+		return { ok = false, reason = "precondition_mismatch" } -- CAS failure (the artifact isn't ESCROWED as expected)
+	end
+	if not a.tradeable then
+		return { ok = false, reason = "not_tradeable" }
+	end
+	-- the new owner's LIVE record: owner flipped, HELD; provenance preserved (immutable mint history).
+	local live: Artifact = {
+		artifactId = a.artifactId,
+		owner = newOwner,
+		kind = a.kind,
+		disposition = D.HELD,
+		tradeable = a.tradeable,
+		tombstoned = false,
+		provenance = { sourceId = a.provenance.sourceId, mintedAt = a.provenance.mintedAt, validatingEventId = a.provenance.validatingEventId },
+	}
+	toProfile.artifacts[artifactId] = live -- overwrites any prior tombstone of this id (a re-acquisition)
+	toProfile.inventory.artifactIds[artifactId] = true
+	-- the old owner's side: a TOMBSTONE (audit, never erased), out of the owned set (not live, not tradeable).
+	a.tombstoned = true
+	fromProfile.inventory.artifactIds[artifactId] = nil
+	return { ok = true }
+end
+
 return M

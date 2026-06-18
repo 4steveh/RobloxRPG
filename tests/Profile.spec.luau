@@ -65,4 +65,10 @@ return function(t: Harness.T)
 		t.ok("a second mint is monotonic (ci5)", c2.instanceId == "ci5")
 		t.ok("buying does NOT equip → EHT unchanged until the player equips it", EHT.effectiveHuntingTier(mp, Catalog) == 1)
 	end
+
+	t.section("Profile — a fresh profile starts with an empty tradeLog (Step 12 audit substrate)")
+	do
+		local p = Profile.freshProfile(Catalog)
+		t.eq("freshProfile tradeLog is empty", #p.tradeLog, 0)
+	end
 end

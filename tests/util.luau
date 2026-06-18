@@ -73,6 +73,7 @@ function U.mkProfile(config: Config, equip: Equip): PlayerData
 		inventory = { fungible = {}, commodities = commodities, artifactIds = {} },
 		equipped = equipped,
 		artifacts = {},
+		tradeLog = {},
 		cash = { checkpoint = { balance = 0, compactedCount = 0, lastEntryId = #tail }, tail = tail },
 		nextCommodityInstanceSeq = seq + 1,
 		redeemedPurchaseIds = {},

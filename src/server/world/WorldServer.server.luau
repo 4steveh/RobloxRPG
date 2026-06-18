@@ -39,6 +39,7 @@ local SalvageHandler = require("@src/server/lodge/SalvageHandler")
 local DisplayHandler = require("@src/server/lodge/DisplayHandler")
 local LodgeShopHandler = require("@src/server/lodge/LodgeShopHandler")
 local WorldMapHandler = require("@src/server/progression/WorldMapHandler")
+local TradeService = require("@src/server/trading/TradeService")
 local Progression = require("@src/logic/Progression")
 local DestinationService = require("@src/server/DestinationService")
 local SessionService = require("@src/server/SessionService")
@@ -109,6 +110,25 @@ Gauntlet.register(registry, LodgeShopHandler.buySlotHandler({ idGen = idGen, tel
 Gauntlet.register(registry, LodgeShopHandler.buyDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, LodgeShopHandler.placeDecorHandler({ idGen = idGen, telemetry = telemetry }))
 Gauntlet.register(registry, WorldMapHandler.new({ telemetry = telemetry }))
+
+-- Step 12: the Trading Post — a SPECIAL two-session path (NOT a gauntlet handler; the gauntlet is single-
+-- profile). It reaches both traders' profiles via the one SessionService and runs the atomic swap (TradeSwap)
+-- over PairTransaction. Client trade intents (request/accept/setOffer/confirm/cancel) route to tradeService;
+-- a tick drives timeoutTick + the post-settle tryCommit; PlayerRemoving fires onDisconnect. Owner keys are
+-- the player's UserId as a string; tonumber recovers the SessionService playerId.
+local tradeService = TradeService.new({
+	config = Catalog,
+	idGen = idGen,
+	telemetry = telemetry,
+	getProfile = function(key: string)
+		local s = sessionService.sessions[tonumber(key) :: number]
+		return if s ~= nil then s.profile else nil
+	end,
+	saveProfile = function(key: string)
+		return SessionService.saveNow(sessionService, tonumber(key) :: number)
+	end,
+})
+local _ = tradeService -- the RemoteEvent routing + the settle/timeout tick are the Studio surface (playtest-pending)
 
 -- shared gauntlet deps for a given player (the write-through + dirty-flag wiring used by every handler)
 local function gauntletDeps(plr)
@@ -301,7 +321,7 @@ buildWorldGeometry("alaska",     worldOffsets.alaska)
 -- is the Phase-3 pass. PLACED service points (this doc owns the Trophy Hall; it only PLACES the others):
 --   • Outfitter + Tackle Shop  → BUILT (Step 6 handlers) — look-navigable gun rack / tackle bench
 --   • Trophy Hall              → BUILT (this step) — the display room (a VIEW over DISPLAYED artifacts)
---   • World Map (Travel Desk)  → Step 9 BUILT · Boat Dealer/Kennel → Step 11 BUILT · Trading Post → Step 12 STUB
+--   • World Map (Travel Desk)  → Step 9 BUILT · Boat Dealer/Kennel → Step 11 BUILT · Trading Post → Step 12 BUILT (UI playtest-pending)
 -- The Trophy Hall renders the player's DISPLAYED artifacts (Replication.projection.trophyHall) — rendering
 -- the rarity-distinct mounts + provenance plaques is the Studio checklist. Visit/social topology is FLAGGED
 -- (own-Lodge only at MVL; Tuning.lodge.visitInstancingMode).
@@ -331,7 +351,7 @@ fixture("Outfitter", Vector3.new(-30, 4, -20), Color3.fromRGB(150, 120, 90), "bu
 fixture("TackleShop", Vector3.new(-30, 4, 0), Color3.fromRGB(90, 120, 150), "built")
 fixture("TrophyHall", Vector3.new(0, 4, -30), Color3.fromRGB(180, 150, 70), "built")
 fixture("TravelDesk_WorldMap", Vector3.new(30, 4, -20), Color3.fromRGB(120, 110, 80), "built") -- Step 9
-fixture("TradingPost", Vector3.new(30, 4, 0), Color3.fromRGB(110, 130, 110), "stub") -- Step 12
+fixture("TradingPost", Vector3.new(30, 4, 0), Color3.fromRGB(110, 130, 110), "built") -- Step 12: same-server P2P escrow swap
 fixture("BoatDealer", Vector3.new(30, 4, 20), Color3.fromRGB(90, 110, 140), "built") -- Step 11: Coastal Skiff + boats (Cash sink)
 fixture("KennelAndStable", Vector3.new(-30, 4, 20), Color3.fromRGB(130, 110, 90), "built") -- Step 11: mounts + dogs (Cash sinks)
 

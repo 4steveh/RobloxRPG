@@ -83,4 +83,13 @@ return function(t: Harness.T)
 		t.eq("crossLoopBonus(1) ≈ 0.5 hr of Income(1) = 500", Economy.crossLoopBonus(Catalog, 1), 500)
 		t.ok("both scale with the player's current tier", Economy.dailyQuestReward(Catalog, 2) > Economy.dailyQuestReward(Catalog, 1) and Economy.crossLoopBonus(Catalog, 2) > Economy.crossLoopBonus(Catalog, 1))
 	end
+
+	t.section("Economy — trade tax: round(rate * gross); LOW anti-wash friction (Step 12)")
+	do
+		t.eq("5% of 1000 = 50", Economy.tradeTax(Catalog, 1000), 50)
+		t.eq("zero gross = zero tax (item-for-item)", Economy.tradeTax(Catalog, 0), 0)
+		t.eq("rounds to integer Cash", Economy.tradeTax(Catalog, 999), 50) -- 999*0.05=49.95 → 50
+		t.ok("the rate is LOW (≤ 10%)", Catalog.tuning.economy.tradeTaxRate <= 0.10)
+		t.ok("commitSettleSeconds is a small positive freeze", Catalog.tuning.persistence.commitSettleSeconds > 0 and Catalog.tuning.persistence.commitSettleSeconds <= 10)
+	end
 end

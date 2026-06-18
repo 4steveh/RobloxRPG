@@ -78,6 +78,15 @@ note per step.
   Cash vendors (`VendorHandler`) reuse the Step-6 atomic buy (the rare Redbone is trade-routed → Step 12);
   a build-time guardrail proves no mount/dog gates or carries power. **The traversal/tracking *effects* and
   the coastal-water feel are Studio** — split honestly below.
+- **Step 12 — Trading (the moat's runtime enforcement).** The rigor-critical step: design-time scarcity
+  becomes runtime scarcity. The **atomic two-sided swap** (`TradeSwap` over the new two-profile
+  `PairTransaction` + `ArtifactStore.transferOwnership`) is dupe-proof — the new owner gets the **live**
+  artifact, the old owner's is **tombstoned, never erased**, and **no artifact is ever LIVE in two profiles**;
+  a CAS mismatch or save failure reverts **both** profiles and transfers nothing. The **`TradeService`** state
+  machine owns the negotiation, the **version-bound double-confirm** (any change re-arms both confirms), the
+  escrow lifecycle (reverts on every exit), the **no-raw-Cash** rule, and the **trade tax** triple. All **8
+  MVL pre-launch checks** are headless-proven. **The Trading Post UI, the final-terms panel, and the
+  reconcile-on-reload for the two-key persist crash window are Studio/ops** — split honestly below.
 
 > Source-of-truth specs, in priority order: `02_DATA_SCHEMA_AND_TEMPLATES.md` (units/templates),
 > `04_GLOSSARY.md` (names), `SYS_progression.md`, `SYS_economy.md`, `EQUIPMENT_MASTER.md`,
@@ -799,6 +808,23 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
 
 **Deferrals (named with their owning step):** rare-breed *trading* → **Step 12** (Trading Post); the Winter Freeze event + the Ice-Fishing Kit's Frozen-Lake gate → **Step 13** (LiveOps); premium bait (entirely) + real-money Boat tiers → **Step 14** (monetization); the coastal geometry / mount-traversal feel / dog-tracking UI → Studio; the Ocean Trawler (T7) → post-launch.
 
+## Step 12 — Trading (the moat's runtime enforcement; the bar is split, honestly)
+
+Design-time scarcity becomes runtime scarcity: rares trade, and **cannot be duped**.
+
+- **The atomic two-sided swap (rigor-critical core).** `ArtifactStore.transferOwnership` rides the `ESCROWED → (new owner, HELD)` edge: the new owner gets the **live** record (owner flipped, HELD, owned); the old owner's is **tombstoned — marked traded-away, never erased** (audit/rollback, exactly as salvage tombstones). `TradeSwap.commit` pre-validates **every** CAS precondition before any mutation, then in **one no-yield section** (`PairTransaction`, the new two-profile transaction) moves both sides' artifacts, applies the `tradepay-out`/`tradepay-in`/`tradetax` Cash triple, and writes the two-sided trade record to both `tradeLog`s. **THE invariant: no artifact is ever LIVE in two profiles.** A forced CAS mismatch transfers nothing (both unchanged); a forced save failure reverts **both** profiles in memory. (Headless-proven in `TradeSwap.spec`.)
+- **The new primitives (built here; the CAS edge table was inherited).** `PairTransaction.run` (two-profile snapshot/mutate/save/restore-both — parallel to the single-profile `Transaction.run`); `ArtifactStore.transferOwnership` (the cross-profile ownership transfer); the swap is a **special two-session path** (both profiles via the one `SessionService`), never a single-profile gauntlet handler.
+- **The trade flow (`TradeService`).** A server-owned `PendingTrade` state machine: `REQUESTED → BUILDING → A/B_CONFIRMED → COMMITTING → COMPLETE | CANCELLED`. One active trade per player. The **double-confirm is bound to a terms-snapshot version**: any offer change increments the version, clears **both** confirms, and reverts that side's escrow; a stale-version confirm is **rejected** (structural). Escrow at confirm (HELD→ESCROWED via the existing CAS); a `commitSettleSeconds` freeze (fat-finger window) before the swap. Escrow reverts on **every** exit — re-arm, cancel, timeout, disconnect.
+- **No raw Cash.** Cash moves only as the net payment leg, inside the atomic commit, net of the **trade tax** (`Economy.tradeTax`, a LOW anti-wash rate); `|A.items| + |B.items| ≥ 1` at commit; tax taken **exactly once**, never on cancel/re-arm; zero-Cash trades pay zero tax.
+- **Anti-scam.** The final-terms projection is **server-sourced** — each offered item's name/rarity comes from the artifact's authoritative record (provenance → Catalog), never client text. gross/tax/net are server-computed.
+- **The 8 MVL pre-launch checks** are headless-proven (`TradeService.spec`): (1) re-arm clears both confirms + reverts escrow, stale-version confirm rejected; (2) disconnect auto-cancels with full escrow revert; (3) a forced CAS mismatch transfers nothing + reverts to CANCELLED; (4) a DISPLAYED trophy can't be offered until un-displayed; (5) a `tradeable=false` commodity can't be added; (6) a pure-Cash trade can't commit; (7) tax taken exactly once on commit; (8) one-active-trade blocks a second.
+- **The two-key persist window (named recovery path, not silently unhandled).** `saveNow` is one ProfileStore key per profile, so two profiles are two saves (not ProfileStore-atomic). The two-profile snapshot/restore covers a save **failure** (revert both in memory — tested). The residual **crash window** (key A persisted, server dies before key B) is closed by the **two-sided trade record** (written here to both `tradeLog`s) consumed by a **reconcile-on-reload** — flagged as the named recovery path leveraging the audit / point-in-time substrate already deferred to ops.
+- **Rare-dog note (honest gap):** rare *trophies* and *record catches* mint as artifacts (Steps 4/5) and trade through this path today. The rare-breed dog (`dog_redbone_rare`, `tradeable=true`) is Cash-rejected by the Step-11 vendor (`rare_trade_routed`) and is **not yet minted as an artifact** anywhere — its acquisition→artifact-mint hook is a noted gap (the trade machinery is ready for it; the mint that puts one in a player's hands is not built).
+
+**Studio / telemetry (NOT headless — playtest-pending):** the Trading Post in-instance player list + "open to trade" toggle + browse-before-request; the negotiation panels (live offers, visible re-arm); the final-terms panel (server-sourced names/rarity, gross/tax/net, settle countdown + live Cancel, escrow-timeout countdown, disconnect message); the RemoteEvent routing + the settle/timeout tick; telemetry dashboards (initiated/completed/cancelled+reason, traded-by-rarity, Cash volume + tradetax, swap-precondition-failure rate ≈ 0); the actual reconcile-on-reload consumer of the trade record.
+
+**Deferrals (named):** cross-server trading / MemoryStore broker → post-launch; auction house / order book / matching → post-launch; raw Cash transfer → never (the `≥ 1 artifact` rule is the structural block); the rare-dog artifact-mint hook → a future wire.
+
 ## Deferred — who owns what
 
 | Deferred | Owning step |
@@ -813,7 +839,7 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
 | ~~MVL **T2→T4 difficulty check**~~ — **DONE (Step 10)**: cross-tier floor/ceiling semantics (sufficiency + role band + co-op-wall + co-op-soluble) replace strict `derived==authored` (proven unachievable cross-tier; user-confirmed). Two derivation defects fixed; two stat defects caught and corrected. | ✅ Step 10 |
 | ~~**dual-loop reconciliation/drift** check (needs Appalachia/Alaska rosters)~~ — **DONE (Step 6/10)**: `routineHourSum` = `Income(T)` both loops, all destinations (Bayou/Appalachia/Alaska) | ✅ Step 6 + Step 10 |
 | Rare-spawn **LiveOps event scheduling** (condition frequency on the calendar; the spawn *mechanism* is built in Step 4) | Step 13 |
-| ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; remaining: trading's escrow/swap | Step 12 |
+| ~~Disposition **flows** (held-then-choose, display, salvage — call the CAS primitive)~~ — **DONE (Step 8)**; ~~trading's escrow/swap~~ — **DONE (Step 12)** | ✅ Steps 8 + 12 |
 | ~~cosmetics & Lodge decor (the evergreen inflation ballast)~~ — **decor catalog + slot/decor Cash sink DONE (Step 8)**; **real-money** decor + the **auto-sell** pass | Step 14 |
 | ~~World Map UI, **gated teleport execution + enforcement**~~ — **enforcement + travel flow + surface data + unlock-commit DONE (Step 9)**; ~~the `TeleportService` execution beyond Lodge/Bayou~~ — the headless arrival-resolver seam (`ArrivalService.resolveDestinationArrival`) is **DONE + headless-tested**; the Studio fast-travel **EXECUTION** (within-place `PivotTo`) is written but **playtest-pending / not headless-verified** (see Step 10 Studio checklist); remaining: the map UI | Studio / later |
 | ~~**Boat item + coastal sub-area enforcement** (Boat-gating King Salmon / Giant Halibut zones)~~ — **DONE (Step 11)**: enforced (zone-access + catch backstop), vended, guardrailed; the fishing resolution takes no vehicle (access-not-power, structural) | ✅ Step 11 |
@@ -821,7 +847,7 @@ beyond Lodge/Bayou → **Step 10**; the MVL T2→T4 combat-difficulty check → 
 | **Rockies (T3 destination)** — gate DAG already includes it; LOC/roster future content | post-launch |
 | Full multi-world spawner gameplay generalization (cross-place TeleportService, concurrent-world spawner lifecycle, server-list-aware pop management) | iterative Studio work |
 | Conquest/co-op telemetry events (per-destination time-to-conquer, apex attempt/success, T2→T4 drop-off, income-vs-band) — hooks `TODO`'d; need conquest/co-op events fired in Studio | Studio iteration |
-| Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback (call CAS `HELD↔ESCROWED` + Transaction + paired ledger entries) | Step 12 |
+| ~~Trading: negotiation, `PendingTrade` escrow, atomic two-sided swap, ownership transfer, two-sided rollback~~ — **DONE (Step 12)**: `TradeService` state machine + version-bound double-confirm + escrow lifecycle; `TradeSwap` over the new `PairTransaction` + `ArtifactStore.transferOwnership` (live-to-new + tombstone-not-erase); `tradepay-out/in/tradetax` triple; the 8 checks headless-proven. Remaining: the Trading Post UI + the **reconcile-on-reload** consumer of the trade record (the two-key crash window) | ✅ Step 12 / ops |
 | Real-money product wiring (`ProcessReceipt`, currency packs, game passes — call `attemptRealMoneyCredit`) | Step 14 |
 | `TODO(open)`: MemoryStore cross-server lock brokering · `TODO(ops)`: `auditLogDestination` choice, point-in-time rollback operation | ops/later |
 

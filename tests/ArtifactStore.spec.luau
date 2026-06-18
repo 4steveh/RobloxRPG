@@ -55,4 +55,29 @@ return function(t: Harness.T)
 		assert(ArtifactStore.transition(p, trophy.artifactId, "HELD", "DISPLAYED").ok)
 		return ArtifactStore.transition(p, trophy.artifactId, "DISPLAYED", "ESCROWED").ok == false
 	end)())
+
+	t.section("ArtifactStore — transferOwnership: live to new owner, TOMBSTONE (not erased) on the old (Step 12)")
+	do
+		local from = Util.mkProfile(Catalog, {})
+		local to = Util.mkProfile(Catalog, {})
+		local a = ArtifactStore.mint(from, { kind = "trophy", tradeable = true, owner = "u1", sourceId = "bayou_white_alligator", validatingEventId = "ev" }, Fakes.newIdGenerator(), 1)
+		assert(ArtifactStore.transition(from, a.artifactId, "HELD", "ESCROWED").ok) -- escrow before the swap
+		local r = ArtifactStore.transferOwnership(from, to, a.artifactId, "ESCROWED", "u2")
+		t.ok("the transfer succeeds", r.ok)
+		t.ok("LIVE in the new owner: owner flipped, HELD, owned, not tombstoned", to.artifacts[a.artifactId] ~= nil and to.artifacts[a.artifactId].owner == "u2" and to.artifacts[a.artifactId].disposition == "HELD" and to.inventory.artifactIds[a.artifactId] == true and to.artifacts[a.artifactId].tombstoned == false)
+		t.ok("TOMBSTONE in the old owner: marked, NOT erased, NOT in the owned set", from.artifacts[a.artifactId] ~= nil and from.artifacts[a.artifactId].tombstoned == true and from.inventory.artifactIds[a.artifactId] == nil)
+		t.ok("provenance preserved on the live record (immutable history)", to.artifacts[a.artifactId].provenance.sourceId == "bayou_white_alligator")
+		t.ok("the anti-dupe invariant: NOT live in two profiles", (from.inventory.artifactIds[a.artifactId] == nil) and (to.inventory.artifactIds[a.artifactId] == true))
+	end
+
+	t.section("ArtifactStore — transferOwnership CAS: a non-ESCROWED source is rejected (no transfer)")
+	do
+		local from = Util.mkProfile(Catalog, {})
+		local to = Util.mkProfile(Catalog, {})
+		local a = ArtifactStore.mint(from, { kind = "trophy", tradeable = true, owner = "u1", sourceId = "bayou_white_alligator", validatingEventId = "ev" }, Fakes.newIdGenerator(), 1)
+		-- still HELD (not escrowed) → expected=ESCROWED CAS fails
+		local r = ArtifactStore.transferOwnership(from, to, a.artifactId, "ESCROWED", "u2")
+		t.ok("rejected: precondition_mismatch (CAS)", r.ok == false and r.reason == "precondition_mismatch")
+		t.ok("nothing transferred: old keeps it live, new has nothing", from.inventory.artifactIds[a.artifactId] == true and to.artifacts[a.artifactId] == nil)
+	end
 end
