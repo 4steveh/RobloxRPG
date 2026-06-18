@@ -236,6 +236,33 @@ return function(t: Harness.T)
 		-- stays at the spawn-predicate level — the requiresItem-scoped backstop does not reach it).
 		local _, reasonKing = frozenAuth(coastalAngler(true), "alaska_king_salmon", outWindow)
 		t.ok("a non-Kit fish is NOT denied by the Frozen-Lake gate", reasonKing ~= "event_inactive" and reasonKing ~= "missing_ice_fishing_kit")
+
+		-- the event-exclusive rare mints an artifact and writes NO Cash (RD2 — value is trade/Trophy-Hall, not
+		-- the faucet). A full in-window catch with the Kit lands the Legendary burbot through the whole pipeline.
+		local catcher = frozenAngler(true)
+		local reelDrain = Fishing.reelDrainMax(Catalog, 4, "maxed")
+		local stamina = Fishing.staminaToLand(Catalog, Catalog.fish.alaska_burbot)
+		local burbotShot = {
+			targetId = "alaska_burbot",
+			biteActive = true,
+			E = 0.7,
+			claimedDrain = reelDrain * 0.7,
+			accumulatedStaminaBefore = stamina - reelDrain * 0.7,
+			owner = "u1",
+		}
+		local burbotDeps: Gauntlet.Deps = {
+			config = Catalog,
+			now = inWindow,
+			saveFn = function()
+				return true
+			end,
+			markDirty = function() end,
+			telemetry = Fakes.newTelemetry(),
+		}
+		local rBurbot = Gauntlet.handle(newReg(), { intent = "catch", playerId = 1, payload = burbotShot }, { playerId = 1, profile = catcher, live = true }, burbotDeps)
+		t.ok("the in-window burbot catch (with the Kit) lands", rBurbot.ok)
+		t.eq("the event rare writes NO Cash at mint (RD2)", #catcher.cash.tail, 0)
+		t.ok("an artifact was minted (its value flows to trade/Trophy Hall)", next(catcher.artifacts) ~= nil)
 	end
 
 	t.section("Spawner — the Frozen Lake window is the PRIMARY gate (closed out-of-window)")
