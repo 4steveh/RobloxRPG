@@ -13,6 +13,7 @@ local Enums = require("@src/types/Enums")
 local Schema = require("@src/types/Schema")
 local Combat = require("@src/logic/Combat")
 local Fishing = require("@src/logic/Fishing")
+local LiveOps = require("@src/logic/LiveOps")
 
 type EquipmentItem = Schema.EquipmentItem
 type Creature = Schema.Creature
@@ -168,6 +169,113 @@ function V.assertCreatureReskin(c: Creature, config: Config)
 	assert(reusesTemplate, c.id .. ": a re-skin must reuse its origin's behavior template (progression §6)")
 end
 
+-- ── Step 13: the LiveOps scarcity-discipline guard (SYS_liveops_calendar RD1 — THE moat-structural piece).
+-- A build-time schema error, the same class as assertDecorItem/assertFish. Events are precisely where the
+-- pressure to dilute a rare's scarcity arrives; a single dilutive re-release collapses the trade moat, so the
+-- discipline is a PROPERTY OF THE SCHEMA, not a thing someone remembers under pressure. ──────────────────
+
+-- A new-scarcity id MUST be genuinely new — not present in ANY existing catalog (the clone evasion: a config
+-- "introducing a new entry" whose id collides with an existing rare overwrites/clones it). RD1.
+function V.assertNewScarcityId(proposedId: string, config: Config)
+	local collides = config.equipment[proposedId] ~= nil
+		or config.creatures[proposedId] ~= nil
+		or config.fish[proposedId] ~= nil
+		or config.decor[proposedId] ~= nil
+		or config.destinations[proposedId] ~= nil
+	assert(not collides, "new-scarcity id '" .. proposedId .. "' collides with an existing catalog id — a new entry must be genuinely new (RD1 clone-evasion guard)")
+end
+
+-- Resolve a newScarcity target to its index entry (existence + rarity) and its spawn conditions (the event
+-- clause it is gated by). Fish and creatures both carry spawn.conditions; equipment/decor are not targets.
+local function targetConditions(config: Config, targetId: string): Schema.SpawnConditions?
+	local f = config.fish[targetId]
+	if f ~= nil then
+		return f.spawn.conditions
+	end
+	local c = config.creatures[targetId]
+	if c ~= nil then
+		return c.spawn.conditions
+	end
+	return nil
+end
+
+-- An event config obeys RD1/RD2: budget within the (economy-owned) ceiling; a well-formed window; and each
+-- new-scarcity declaration is legal — referenceWindow names an EXISTING rare (its 1-in-N untouched; the
+-- event carries no rate, so dilution is structurally absent), mintNew names a GENUINELY-NEW event-exclusive
+-- rare (gated by THIS event — re-releasing an existing standing rare under a new event is rejected).
+function V.assertEventConfig(event: Schema.EventConfig, config: Config)
+	assert(event.startTime < event.endTime, event.id .. ": event window start must be < end")
+	assert(event.cashBudget >= 0, event.id .. ": cashBudget must be ≥ 0")
+	assert(event.cashBudget <= config.tuning.economy.eventPayoutBudgetCeiling,
+		event.id .. ": cashBudget exceeds eventPayoutBudgetCeiling (economy owns the per-event Cash bound — SYS_liveops §6)")
+	for _, decl in event.newScarcity do
+		local idx = config.targetIndex[decl.targetId]
+		assert(idx ~= nil, event.id .. ": newScarcity target '" .. decl.targetId .. "' must resolve to a catalog target")
+		assert(V.isRareOrAbove(idx.rarity),
+			event.id .. ": newScarcity target '" .. decl.targetId .. "' must be a rare — RD1 governs SCARCITY (rare-and-above) only")
+		if decl.kind == Enums.NewScarcityKind.mintNew then
+			-- A genuinely-new event-exclusive mint is gated by THIS event's imposed spawn clause. Naming an
+			-- existing standing rare (gated by another event/season, or ungated) is a re-release — forbidden (RD1).
+			local cond = targetConditions(config, decl.targetId)
+			local gating = cond ~= nil and cond.event or nil
+			assert(event.imposes.event ~= nil and gating == event.imposes.event,
+				event.id .. ": mintNew '" .. decl.targetId .. "' must be a genuinely-new event-exclusive rare gated by THIS event (re-releasing an existing rare dilutes its holders — RD1)")
+		end
+	end
+end
+
+-- A daily-quest pool entry is mechanical (not narrative), carries a legal loop, and any theming resolves.
+function V.assertQuest(q: Schema.Quest, config: Config)
+	assert(q.objective ~= "", q.id .. ": quest objective must be set (mechanical content)")
+	assert(q.loop == Enums.QuestLoop.Hunting or q.loop == Enums.QuestLoop.Fishing or q.loop == Enums.QuestLoop.either,
+		q.id .. ": illegal quest loop '" .. tostring(q.loop) .. "'")
+	if q.themedFor ~= nil then
+		assert(config.liveOps.events[q.themedFor] ~= nil, q.id .. ": themedFor '" .. q.themedFor .. "' must resolve to an event")
+	end
+end
+
+-- Whole-LiveOps validation: per-event guard; the daily pool can form the cross-loop pair; the aggregate
+-- concurrent Cash faucet stays within the (economy-owned) PEAK ceiling; and at most ONE spawn-gating event
+-- is ever live at a time (world.event is a single string, equality-matched).
+function V.validateLiveOps(config: Config)
+	local lo = config.liveOps
+	for id, e in lo.events do
+		assert(e.id == id, "liveOps event key '" .. id .. "' must match its id '" .. e.id .. "'")
+		V.assertEventConfig(e, config)
+	end
+
+	local hasHunt, hasFish = false, false
+	for _, q in lo.dailyQuestPool do
+		V.assertQuest(q, config)
+		if q.loop == Enums.QuestLoop.Hunting then
+			hasHunt = true
+		elseif q.loop == Enums.QuestLoop.Fishing then
+			hasFish = true
+		end
+	end
+	if #lo.dailyQuestPool > 0 then
+		assert(hasHunt, "daily-quest pool must contain ≥1 Hunting quest (the cross-loop pair must be formable)")
+		assert(hasFish, "daily-quest pool must contain ≥1 Fishing quest (the cross-loop pair must be formable)")
+	end
+
+	assert(LiveOps.peakConcurrentCashBudget(config) <= config.tuning.economy.aggregateEventFaucetCeiling,
+		"concurrent event Cash faucets exceed aggregateEventFaucetCeiling (the PEAK instantaneous sum — SYS_liveops §6)")
+
+	local gating: { Schema.EventConfig } = {}
+	for _, e in lo.events do
+		if e.imposes.event ~= nil then
+			table.insert(gating, e)
+		end
+	end
+	for i = 1, #gating do
+		for j = i + 1, #gating do
+			local a, b = gating[i], gating[j]
+			assert(not (a.startTime <= b.endTime and b.startTime <= a.endTime),
+				"spawn-gating events '" .. a.id .. "' and '" .. b.id .. "' overlap — only one spawn-gating event at a time (world.event is a single string)")
+		end
+	end
+end
+
 -- Whole-catalog validation: per-row checks + cross-reference integrity (the seams that only show up
 -- across catalogs — reskins, milestone targets, gate prerequisites).
 function V.validateConfig(config: Config)
@@ -299,6 +407,9 @@ function V.validateConfig(config: Config)
 		assert(hasMilestone(Enums.Loop.Hunting, dId), dId .. ": missing a designated hunting milestone target")
 		assert(hasMilestone(Enums.Loop.Fishing, dId), dId .. ": missing a designated fishing milestone target")
 	end
+
+	-- Step 13: the LiveOps event calendar + daily-quest pool self-validate on load (the scarcity guard).
+	V.validateLiveOps(config)
 end
 
 return V
