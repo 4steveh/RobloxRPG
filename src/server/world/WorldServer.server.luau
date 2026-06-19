@@ -30,6 +30,7 @@ local Combat = require("../../logic/Combat")
 local Fishing = require("../../logic/Fishing")
 local LiveOps = require("../../logic/LiveOps")
 local Onboarding = require("../../logic/Onboarding")
+local Loadout = require("../../logic/Loadout")
 local Gauntlet = require("../authority/Gauntlet")
 local FireHandler = require("../combat/FireHandler")
 local CatchHandler = require("../fishing/CatchHandler")
@@ -1135,6 +1136,45 @@ shopRequest.OnServerEvent:Connect(function(plr, action, arg1, arg2)
 		end
 	else
 		shopRequest:FireClient(plr, "result", action, false, r.reason)
+	end
+end)
+
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- FIELD INVENTORY (additive, vendor-FREE): view owned gear by slot + equip anywhere. "equip" routes the
+-- SAME gauntlet intent as the shop (EquipHandler unchanged); the ONLY new behavior is that the projection
+-- is ALWAYS returned on a field equip (the shop path gates its refresh on a known vendor). Read-only "open"
+-- needs no gauntlet (no mutation). The shop path + buildShopListing are untouched.
+-- ════════════════════════════════════════════════════════════════════════════════════════════════════
+local inventoryRequest = Instance.new("RemoteEvent")
+inventoryRequest.Name = "InventoryRequest"
+inventoryRequest.Parent = ReplicatedStorage
+
+inventoryRequest.OnServerEvent:Connect(function(plr, action, arg1)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil then
+		return
+	end
+	if action == "open" then
+		inventoryRequest:FireClient(
+			plr, "loadout",
+			Loadout.ownedEquippableBySlot(session.profile, Catalog),
+			Replication.buildProjection(session.profile, Catalog)
+		)
+		return
+	end
+	if action == "equip" then
+		local r = Gauntlet.handle(
+			registry,
+			{ intent = "equip", playerId = plr.UserId, payload = { commodityInstanceId = arg1 } },
+			session,
+			gauntletDeps(plr)
+		)
+		inventoryRequest:FireClient(
+			plr, "equipped", r.ok, r.reason,
+			Loadout.ownedEquippableBySlot(session.profile, Catalog),
+			r.projection
+		)
+		return
 	end
 end)
 
