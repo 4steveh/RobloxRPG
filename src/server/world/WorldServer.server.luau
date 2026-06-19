@@ -1137,6 +1137,22 @@ local function guaranteeFirstSpawns(plr)
 	end
 end
 
+-- STUDIO FEEL: login-time state push + pull. The HUD had no projection until the first kill/cast/shop
+-- event (showing dashes). StateSync pushes the read-only projection on spawn AND answers a client request
+-- (the HUD asks on load), so the header + the next-goal gate reasons populate immediately.
+local stateSync = Instance.new("RemoteEvent")
+stateSync.Name = "StateSync"
+stateSync.Parent = ReplicatedStorage
+local function pushState(plr)
+	local session = sessionService.sessions[plr.UserId]
+	if session ~= nil then
+		stateSync:FireClient(plr, Replication.buildProjection(session.profile, Catalog))
+	end
+end
+stateSync.OnServerEvent:Connect(function(plr)
+	pushState(plr)
+end)
+
 Players.PlayerAdded:Connect(function(plr)
 	pcall(function()
 		SessionService.login(sessionService, plr.UserId) -- THE single login lock (lock + load via Step 2)
@@ -1157,6 +1173,7 @@ Players.PlayerAdded:Connect(function(plr)
 		guardHumanoid(hum)
 		placeCharacter(plr, char)
 		guaranteeFirstSpawns(plr)
+		pushState(plr) -- STUDIO FEEL: populate the HUD header + next-goal immediately on spawn
 	end)
 end)
 Players.PlayerRemoving:Connect(function(plr)
