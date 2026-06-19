@@ -70,10 +70,52 @@ local ArtAssets = {
 	},
 
 	-- ── ASSET TABLES (filled by the generation tasks; the manifest IS the deliverable being populated) ──
-	props = {}, -- [propId] = { meshId = "rbxassetid://N", scale = n, color = {r,g,b}, count = n, zones = {..} }
-	creatures = {}, -- [creatureId] = { scale = n, parts = { { name=, meshId=, size={x,y,z}, hitZone=, offset={x,y,z} } } }
-	fish = {}, -- [fishId] = { meshId = "rbxassetid://N", scale = n, color = {r,g,b} }
+	props = {
+		-- Creator Store "Realistic Swamp Bald Cypress Trees Pack Scenic" — multi-part Model (~31 parts), parked as
+		-- a clone template at ReplicatedStorage.WildWorldArt.Props.Cypress (upright pivot at base center).
+		cypress = { modelAssetId = "136271797295845", source = "Creator Store cypress pack", scaleRange = { 0.8, 1.4 } },
+		-- Appalachia/Alaska conifer pool: 1 wrapper Model w/ 34 "Tree" variants, parked at RS.WildWorldArt.Props.Forest.
+		forest = { modelAssetId = "104935044529680", source = "Creator Store conifer pack (34 variants); Alaska clones frosted" },
+	},
+	-- [creatureId] = visual mesh + hitZone proxy layout. Single-mesh creatures carry invisible hitZone proxy
+	-- parts (vital=head, body=torso, limb=legs) so the headshot raycast keeps working after the in-place upgrade.
+	creatures = {
+		bayou_american_alligator = {
+			meshId = "rbxassetid://75097229317873", textureId = "rbxassetid://81799021849112",
+			scale = 1.0, source = "generate_mesh (validated exemplar)",
+		},
+		bayou_swamp_rabbit = { modelAssetId = "9564989831", scale = 1.0, source = "Creator Store rabbit" },
+		bayou_wood_duck = { modelAssetId = "130991578358791", scale = 0.045, source = "Creator Store mallard (recolor for wood duck)" },
+		bayou_great_egret = { modelAssetId = "13929862465", scale = 0.7, source = "Creator Store crane (heron/egret stand-in)" },
+		bayou_painted_turtle = { modelAssetId = "165224066", scale = 1.0, source = "Creator Store turtle" },
+		-- bayou_nutria / songbird + the rare reskins (Leucistic Duck, Ghost Gator) — pending (recolor clones / AI-gen gaps)
+		-- ── Appalachia + Alaska (Creator Store; stashed in RS.WildWorldArt.Creatures as Deer/Bear/Moose/Grizzly) ──
+		appalachia_whitetail_deer = { modelAssetId = "5114925772", source = "Creator Store whitetail buck (GREAT)" },
+		alaska_caribou = { modelAssetId = "5114925772", source = "deer reskin (grey-brown recolor)" },
+		alaska_bull_moose = { modelAssetId = "238635661", scale = "height-normalized ~7", source = "Creator Store moose" },
+		alaska_grizzly_bear = { modelAssetId = "17533317792", source = "Creator Store bear, recolored brown + texture stripped → Grizzly" },
+		-- appalachia_wild_boar / mountain_lion, alaska_sitka_deer / glacier_grizzly — reskins/searches pending
+	},
+	fish = {
+		-- the Mythic Bayou Leviathan = a Creator-Store arapaima (large PBR fish w/ animations); recolor/scale per use.
+		bayou_leviathan = { modelAssetId = "6889945071", scale = 1.0, source = "Creator Store arapaima" },
+		-- bayou_bluegill / bullhead_catfish / channel_catfish / blue_catfish / albino — catfish AI-gen in progress
+	},
 	lodge = {}, -- { materials = {..}, lights = {..}, fixtures = {..} } — Phase D
+	-- VEHICLES/MOUNTS/DOGS (Creator Store; stashed in RS.WildWorldArt.Vehicles; set-dressing at thematic spots)
+	vehicles = {
+		pirogue = { modelAssetId = "3372133622", source = "Creator Store log boat → Bayou pirogue (the_landing/channel)" },
+		motorboat = { modelAssetId = "4521678016", source = "Creator Store motorboat → Alaska coastal skiff" },
+		dog_coonhound = { modelAssetId = "130861786583714", source = "Creator Store labrador → hunting dog (Lodge Kennel)" },
+		mount_horse = { modelAssetId = "8544555368", source = "Creator Store horse → mount (Lodge Stable)" },
+	},
+	-- AMBIENT SOUNDSCAPE — free Pro Sound Effects loops; positional Sounds per world (rolloff keeps each local).
+	sound = {
+		bayouFrogs = "9112810059",      -- Jungle Frogs (night chorus, 57s)
+		appalachiaWoods = "9112806424", -- Jungle Dawn (woods birds/insects, 36s)
+		alaskaWind = "9114057128",      -- Desert Wind whistley gusts (92s)
+		lodgeFire = "9112780193",       -- Fireplace crackle (36s)
+	},
 }
 
 return ArtAssets
