@@ -66,6 +66,8 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/RewardedAdHandler.spec"),
 	-- Step 15 (Analytics — taxonomy, retention, funnel, the measured per-loop balance, canaries, T_current)
 	require("@tests/Analytics.spec"),
+	-- Field inventory (Loadout — owned equippable gear grouped by slot)
+	require("@tests/Loadout.spec"),
 }
 
 for _, spec in specs do
