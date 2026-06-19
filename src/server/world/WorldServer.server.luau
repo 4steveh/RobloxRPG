@@ -27,6 +27,7 @@ local Shells = require("../../config/Shells")
 local Spawning = require("../../config/Spawning")
 local Spawner = require("../../logic/Spawner")
 local Combat = require("../../logic/Combat")
+local Harvest = require("../../logic/Harvest")
 local Fishing = require("../../logic/Fishing")
 local LiveOps = require("../../logic/LiveOps")
 local Onboarding = require("../../logic/Onboarding")
@@ -789,6 +790,30 @@ task.spawn(function()
 	end
 end)
 
+local RECORD_THRESHOLD = 0.95
+-- Assemble the result-card payload from the committed RewardPipeline.Result + the catalog row. Cosmetic
+-- weight is rolled here (Studio owns randomness); every value of record is read from the authoritative result.
+local function buildHarvest(loop, targetId, row, result, profile, shotZone)
+	local res = result or {}
+	local weightKg, isRecord = nil, false
+	if row.typicalWeightKg ~= nil then
+		weightKg = Harvest.rollWeightKg(row.typicalWeightKg.min, row.typicalWeightKg.max, math.random())
+		if row.recordWeightKg ~= nil then
+			isRecord = Harvest.isRecord(weightKg, row.recordWeightKg, RECORD_THRESHOLD)
+		end
+	end
+	local minted = res.mintedArtifactId
+	local isNew = minted ~= nil and Harvest.timesSourced(profile, targetId) == 1
+	return {
+		loop = loop, targetId = targetId, name = row.name, rarity = row.rarity, tier = row.tier,
+		weightLb = if weightKg ~= nil then Harvest.kgToLb(weightKg) else nil,
+		isRecord = isRecord, shotZone = shotZone,
+		cash = res.cash or 0, boostCash = res.boostCash or 0, rankXP = res.rankXP or 0,
+		isNew = isNew, mintedArtifactId = minted, cleanKillMoment = res.cleanKillMoment,
+		conquest = res.conquestNewlySet == true,
+	}
+end
+
 local fireRequest = Instance.new("RemoteEvent")
 fireRequest.Name = "FireRequest"
 fireRequest.Parent = ReplicatedStorage
@@ -860,7 +885,8 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 		local r = Gauntlet.handle(registry, { intent = "fire", playerId = plr.UserId, payload = payload }, session, deps)
 		if r.ok then
 			despawnTarget(model, huntingSpawn.areas[state.zoneId] and huntingSpawn.areas[state.zoneId].respawnIntervalSeconds or nil)
-			fireRequest:FireClient(plr, "kill", rayHitTargetId, r.projection)
+			local harvest = buildHarvest("Hunting", rayHitTargetId, Catalog.creatures[rayHitTargetId], r.result, session.profile, zone)
+			fireRequest:FireClient(plr, "kill", rayHitTargetId, { projection = r.projection, harvest = harvest })
 			-- TODO(Studio feel): hit-stop/impact/audio/haptics; the rare clean-kill flourish fires here when
 			-- the kill minted an artifact → then the "Mount it in the Trophy Hall" auto-prompt (autoPromptOnMint
 			-- on; a UI beat — the artifact stays HELD until the player taps; dismissing is a no-op).
@@ -983,7 +1009,8 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 			local r = Gauntlet.handle(registry, { intent = "catch", playerId = plr.UserId, payload = payload }, session, deps)
 			if r.ok then
 				depleteBite(fight.marker)
-				castRequest:FireClient(plr, "landed", fishId, r.projection)
+				local harvest = buildHarvest("Fishing", fishId, Catalog.fish[fishId], r.result, session.profile, nil)
+				castRequest:FireClient(plr, "landed", fishId, { projection = r.projection, harvest = harvest })
 				-- TODO(Studio feel): land animation, weighty haptic resolve; on a rare mint, the clean-catch
 				-- flourish → the "Mount it" auto-prompt (the artifact stays HELD until tapped).
 			end
@@ -1102,6 +1129,20 @@ local function buildShopListing(profile, vendor)
 	end
 	return { vendor = vendor, forSale = forSale, owned = owned }
 end
+
+-- Lodge: the harvest card's "MOUNT IT" routes the mountTrophy intent (HELD->DISPLAYED CAS, slot-gated)
+-- through the gauntlet. Server-authoritative: the client sends only the artifactId; the gauntlet validates.
+local lodgeRequest = Instance.new("RemoteEvent")
+lodgeRequest.Name = "LodgeRequest"
+lodgeRequest.Parent = ReplicatedStorage
+lodgeRequest.OnServerEvent:Connect(function(plr, artifactId)
+	local session = sessionService.sessions[plr.UserId]
+	if session == nil or type(artifactId) ~= "string" then
+		return
+	end
+	local r = Gauntlet.handle(registry, { intent = "mountTrophy", playerId = plr.UserId, payload = { artifactId = artifactId } }, session, gauntletDeps(plr))
+	lodgeRequest:FireClient(plr, r.ok, artifactId, r.reason)
+end)
 
 local shopRequest = Instance.new("RemoteEvent")
 shopRequest.Name = "ShopRequest"

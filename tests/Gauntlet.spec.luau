@@ -114,4 +114,33 @@ return function(t: Harness.T)
 		t.eq("authoritative balance unchanged by editing the shadow", Balance.balanceOf(p), 500)
 		t.ok("authoritative unlocked set unchanged", p.unlockedDestinations["alaska"] == nil)
 	end
+
+	t.section("Gauntlet — a handler's commit return is threaded onto HandleResult.result")
+	do
+		local rreg = Gauntlet.new()
+		Gauntlet.register(rreg, {
+			intent = "resultTest",
+			critical = true,
+			simulate = nil,
+			authority = function(): (boolean, string?)
+				return true, nil
+			end,
+			commit = function(ctx: Gauntlet.Ctx)
+				if ctx.resultSink then
+					ctx.resultSink.value = { cash = 42, tag = "from-commit" }
+				end
+			end,
+		})
+		local p = Util.mkProfile(Catalog, {})
+		local session: Gauntlet.Session = { playerId = 1, profile = p, live = true }
+		local r = Gauntlet.handle(rreg, { intent = "resultTest", playerId = 1, payload = {} }, session, deps)
+		t.ok("the commit return is surfaced on r.result", r.ok and (r.result :: any).cash == 42 and (r.result :: any).tag == "from-commit")
+
+		-- a handler that returns nothing → r.result is nil (the equip path, non-critical)
+		local p2 = Util.mkProfile(Catalog, { weapon = 2, armor = 4 })
+		table.insert(p2.inventory.commodities, { instanceId = "ci-heavy2", catalogId = "weapon_heavy_expedition_rifle", intraLevel = 0, equipped = false })
+		local s2: Gauntlet.Session = { playerId = 1, profile = p2, live = true }
+		local r2 = Gauntlet.handle(reg, { intent = "equip", playerId = 1, payload = { commodityInstanceId = "ci-heavy2" } }, s2, deps)
+		t.ok("a void-commit handler leaves r.result nil", r2.ok and r2.result == nil)
+	end
 end

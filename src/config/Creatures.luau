@@ -45,6 +45,7 @@ type CreatureInput = {
 	reskinOf: string?,
 	isMilestoneTarget: boolean?,
 	cash: { min: number, max: number }?, -- required for non-ambiance Common/Uncommon
+	typicalWeightKg: { min: number, max: number }?, -- cosmetic per-catch weight range (harvest card)
 	rare: RareFields?, -- required for Rare-and-above (its tradeable/displayable drive the mint)
 }
 
@@ -83,6 +84,7 @@ local function creature(i: CreatureInput): Creature
 		spawn = { location = i.spawnLocation, conditions = i.conditions },
 		rare = i.rare,
 		isMilestoneTarget = i.isMilestoneTarget,
+		typicalWeightKg = i.typicalWeightKg,
 	}
 end
 
@@ -151,6 +153,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_wood_duck",
+		typicalWeightKg = { min = 0.5, max = 1.0 },
 		destinationId = D.Bayou,
 		name = "Wood Duck (flock)",
 		tier = 1,
@@ -170,6 +173,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_swamp_rabbit",
+		typicalWeightKg = { min = 1.5, max = 2.5 },
 		destinationId = D.Bayou,
 		name = "Swamp Rabbit",
 		tier = 1,
@@ -188,6 +192,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_nutria",
+		typicalWeightKg = { min = 4, max = 9 },
 		destinationId = D.Bayou,
 		name = "Nutria",
 		tier = 1,
@@ -206,6 +211,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_american_alligator",
+		typicalWeightKg = { min = 140, max = 360 },
 		destinationId = D.Bayou,
 		name = "American Alligator",
 		tier = 1,
@@ -227,6 +233,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_leucistic_wood_duck",
+		typicalWeightKg = { min = 0.5, max = 1.0 },
 		destinationId = D.Bayou,
 		name = "Leucistic Wood Duck (the Pale Drake)",
 		tier = 1,
@@ -247,6 +254,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "bayou_white_alligator",
+		typicalWeightKg = { min = 140, max = 360 },
 		destinationId = D.Bayou,
 		name = "White Alligator (the Ghost Gator)",
 		tier = 1,
@@ -285,6 +293,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_eastern_cottontail",
+		typicalWeightKg = { min = 0.9, max = 1.8 },
 		destinationId = D.Appalachia,
 		name = "Eastern Cottontail",
 		tier = 2,
@@ -304,6 +313,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_whitetail_deer",
+		typicalWeightKg = { min = 45, max = 100 },
 		destinationId = D.Appalachia,
 		name = "Whitetail Deer",
 		tier = 2,
@@ -323,6 +333,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_coyote",
+		typicalWeightKg = { min = 9, max = 20 },
 		destinationId = D.Appalachia,
 		name = "Coyote (pack)",
 		tier = 2,
@@ -343,6 +354,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_wild_boar",
+		typicalWeightKg = { min = 50, max = 140 },
 		destinationId = D.Appalachia,
 		name = "Wild Boar",
 		tier = 2,
@@ -362,6 +374,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_mountain_lion",
+		typicalWeightKg = { min = 40, max = 80 },
 		destinationId = D.Appalachia,
 		name = "Mountain Lion (Catamount)",
 		tier = 2,
@@ -380,6 +393,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_piebald_whitetail",
+		typicalWeightKg = { min = 45, max = 100 },
 		destinationId = D.Appalachia,
 		name = "Piebald Whitetail",
 		tier = 2,
@@ -400,6 +414,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_ghost_buck",
+		typicalWeightKg = { min = 45, max = 100 },
 		destinationId = D.Appalachia,
 		name = "Ghost Buck (Albino Whitetail)",
 		tier = 2,
@@ -420,6 +435,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "appalachia_black_catamount",
+		typicalWeightKg = { min = 40, max = 80 },
 		destinationId = D.Appalachia,
 		name = "Black Catamount (Melanistic Mountain Lion)",
 		tier = 2,
@@ -442,6 +458,7 @@ local rows: { Creature } = {
 	-- ───────────────────────── ALASKA (Tier 4) ─────────────────────────
 	creature({
 		id = "alaska_arctic_hare",
+		typicalWeightKg = { min = 3, max = 5 },
 		destinationId = D.Alaska,
 		name = "Arctic Hare",
 		tier = 4,
@@ -461,6 +478,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_sitka_deer",
+		typicalWeightKg = { min = 30, max = 55 },
 		destinationId = D.Alaska,
 		name = "Sitka Black-tailed Deer",
 		tier = 4,
@@ -479,6 +497,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_caribou",
+		typicalWeightKg = { min = 80, max = 180 },
 		destinationId = D.Alaska,
 		name = "Caribou",
 		tier = 4,
@@ -499,6 +518,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_bull_moose",
+		typicalWeightKg = { min = 350, max = 600 },
 		destinationId = D.Alaska,
 		name = "Bull Moose",
 		tier = 4,
@@ -518,6 +538,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_grizzly_bear",
+		typicalWeightKg = { min = 180, max = 450 },
 		destinationId = D.Alaska,
 		name = "Grizzly Bear",
 		tier = 4,
@@ -536,6 +557,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_cross_fox",
+		typicalWeightKg = { min = 4, max = 7 },
 		destinationId = D.Alaska,
 		name = "Cross Fox",
 		tier = 4,
@@ -555,6 +577,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_spirit_moose",
+		typicalWeightKg = { min = 350, max = 600 },
 		destinationId = D.Alaska,
 		name = "Spirit Moose (Piebald/Albino Bull Moose)",
 		tier = 4,
@@ -575,6 +598,7 @@ local rows: { Creature } = {
 	}),
 	creature({
 		id = "alaska_glacier_grizzly",
+		typicalWeightKg = { min = 180, max = 450 },
 		destinationId = D.Alaska,
 		name = "Glacier Grizzly (blonde color-phase)",
 		tier = 4,

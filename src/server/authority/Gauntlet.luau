@@ -16,12 +16,16 @@ type Config = Schema.Config
 
 local M = {}
 
-export type Ctx = { profile: PlayerData, config: Config, payload: any, now: number }
+-- resultSink: a per-request OUTPUT channel. A handler MAY publish an opaque result (e.g. a
+-- RewardPipeline.Result) by writing `ctx.resultSink.value` in its commit; the caller reads it off
+-- HandleResult.result. The common case writes nothing → result stays nil. This keeps the `commit` contract
+-- void (no return), so the substrate stays reward-agnostic and the broad handler registry is untouched.
+export type Ctx = { profile: PlayerData, config: Config, payload: any, now: number, resultSink: { value: any? }? }
 export type IntentHandler = {
 	intent: string,
 	authority: (ctx: Ctx) -> (boolean, string?), -- step 2: does authoritative state permit it?
 	simulate: ((ctx: Ctx) -> (boolean, string?))?, -- step 3: pluggable domain check (nil → skip)
-	commit: (ctx: Ctx) -> (), -- step 4: apply the mutation(s) in one no-yield section
+	commit: (ctx: Ctx) -> (), -- step 4: apply the mutation(s) in one no-yield section (may publish via ctx.resultSink)
 	critical: boolean, -- step 5: write-through (true) vs dirty-flag (false)
 }
 export type Session = { playerId: number, profile: PlayerData, live: boolean }
@@ -33,7 +37,7 @@ export type Deps = {
 	markDirty: () -> (), -- mark the profile dirty for the periodic autosave
 	telemetry: Types.Telemetry?,
 }
-export type HandleResult = { ok: boolean, reason: string?, projection: Replication.Projection? }
+export type HandleResult = { ok: boolean, reason: string?, projection: Replication.Projection?, result: any? }
 export type Registry = { handlers: { [string]: IntentHandler } }
 
 local function incr(deps: Deps, metric: string)
@@ -65,7 +69,8 @@ function M.handle(reg: Registry, request: Request, session: Session, deps: Deps)
 		incr(deps, "gauntlet.rejected_unknown_intent")
 		return { ok = false, reason = "unknown_intent" }
 	end
-	local ctx: Ctx = { profile = session.profile, config = deps.config, payload = request.payload, now = deps.now }
+	local sink: { value: any? } = { value = nil }
+	local ctx: Ctx = { profile = session.profile, config = deps.config, payload = request.payload, now = deps.now, resultSink = sink }
 	-- 2. Authority — does authoritative state permit it?
 	local authOk, authReason = handler.authority(ctx)
 	if not authOk then
@@ -94,9 +99,9 @@ function M.handle(reg: Registry, request: Request, session: Session, deps: Deps)
 		handler.commit(ctx)
 		deps.markDirty()
 	end
-	-- 6. Replicate — a fresh read-only projection.
+	-- 6. Replicate — a fresh read-only projection. Any result the handler published rides alongside it.
 	incr(deps, "gauntlet.handled:" .. request.intent)
-	return { ok = true, projection = Replication.buildProjection(session.profile, deps.config) }
+	return { ok = true, projection = Replication.buildProjection(session.profile, deps.config), result = sink.value }
 end
 
 return M

@@ -13,4 +13,5 @@ return {
 	cast = ev("FishingCast"),
 	shop = ev("ShopRequest"),
 	travel = ev("TravelRequest"),
+	lodge = ev("LodgeRequest"),
 }

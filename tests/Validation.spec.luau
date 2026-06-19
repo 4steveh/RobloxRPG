@@ -65,6 +65,22 @@ return function(t: Harness.T)
 		Validation.assertCreature(bad)
 	end)
 
+	t.test("a valid typicalWeightKg range validates", function()
+		local good: Schema.Creature = table.clone(goodCommon)
+		good.typicalWeightKg = { min = 0.7, max = 1.1 }
+		Validation.assertCreature(good)
+	end)
+	t.errs("typicalWeightKg with min <= 0 is rejected", function()
+		local bad: Schema.Creature = table.clone(goodCommon)
+		bad.typicalWeightKg = { min = 0, max = 1 }
+		Validation.assertCreature(bad)
+	end)
+	t.errs("typicalWeightKg with max < min is rejected", function()
+		local bad: Schema.Creature = table.clone(goodCommon)
+		bad.typicalWeightKg = { min = 5, max = 2 }
+		Validation.assertCreature(bad)
+	end)
+
 	t.section("Validation — tierInput cannot drift from category; cosmetics are balance-free")
 	local goodWeapon = Catalog.equipment["weapon_lever_action_rifle"]
 	t.test("a real gating weapon validates", function()

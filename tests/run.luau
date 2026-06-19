@@ -26,6 +26,7 @@ local specs: { (Harness.T) -> () } = {
 	-- Step 4 (hunting — combat math, spawner, reward pipeline, fire handler)
 	require("@tests/Combat.spec"),
 	require("@tests/Spawner.spec"),
+	require("@tests/Harvest.spec"),
 	require("@tests/RewardPipeline.spec"),
 	require("@tests/FireHandler.spec"),
 	-- Step 5 (fishing — catchability math, the shared pipeline extended, the spawner cap generalized)
