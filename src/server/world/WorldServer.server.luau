@@ -568,7 +568,9 @@ local function buildCreatureModel(creatureId, originCFrame)
 	model.Name = creature.name
 	local torso = buildBody(model, arch)
 	model.PrimaryPart = torso
-	model:PivotTo(originCFrame + Vector3.new(0, 1.2 * arch.scale, 0))
+	-- S3 GROUND CONTRACT: originCFrame already carries the resolved torso-center Y (groundY + footOffset from
+	-- spawnTarget). The old fixed +1.2*scale lift is GONE — placement Y now lives in one place: the ground raycast.
+	model:PivotTo(originCFrame)
 	model:SetAttribute("creatureId", creatureId)
 	model:SetAttribute("targetId", creatureId)
 	model:SetAttribute("maxHealth", creature.health)
@@ -583,14 +585,57 @@ local function creatureSpeed(creatureId)
 	return MOVE_SPEED[arch.kind] or 5
 end
 
+-- STUDIO FEEL (S3 GROUND CONTRACT): per-archetype FOOT OFFSET = distance from the PrimaryPart (torso center)
+-- DOWN to the body's resting contact. It equals the torso half-height from buildBody, so the torso BOTTOM
+-- sits on the ground: a reptile rests LOW (belly near the ground; its short legs splay/clip — a gator
+-- belly-crawls), a small mammal / bird (no separate legs in the silhouette) stands on its body. One formula
+-- keyed on the archetype's kind+scale — never hand-tuned per creature. Mirrors buildBody's torso Size.Y.
+local TORSO_HEIGHT = { reptile = 1.1, bird = 1.4, small_mammal = 1.5 }
+local function footOffset(arch)
+	return (TORSO_HEIGHT[arch.kind] or 1.5) * 0.5 * arch.scale
+end
+
+-- STUDIO FEEL (S3 GROUND CONTRACT): resolve the Y of the surface the PLAYER SEES & WALKS ON at (x, z), so a
+-- creature is placed/kept on the rendered ground regardless of what the baked art looks like (we can't see
+-- the art from the repo — the ray adapts to whatever is there). RespectCanCollide skips non-collidable décor
+-- (reeds/props/overlay meshes); excluding HuntingTargets + the live characters means we hit the SAME top
+-- collidable surface the character's feet rest on — baked Terrain grass when the art layer is enabled, the
+-- placeholder pads/floor when it isn't. That reconciles the art-ground ↔ collision-floor seam by construction.
+-- IgnoreWater → we want the land surface, not the water plane.
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Exclude
+groundParams.RespectCanCollide = true
+groundParams.IgnoreWater = true
+local function refreshGroundFilter()
+	local filter = { targetsFolder }
+	for _, plr in Players:GetPlayers() do
+		if plr.Character ~= nil then
+			table.insert(filter, plr.Character)
+		end
+	end
+	groundParams.FilterDescendantsInstances = filter
+end
+-- One downward ray per call from well above (x, z). Cheap; callers refreshGroundFilter() once per batch.
+local function groundYAt(x, z, fromY)
+	local origin = Vector3.new(x, (fromY or 0) + 64, z)
+	local hit = workspace:Raycast(origin, Vector3.new(0, -512, 0), groundParams)
+	return if hit ~= nil then hit.Position.Y else nil
+end
+
 local function spawnTarget(creatureId, zoneId)
 	local zone = shell.zones[zoneId]
-	local pos = vec(zone.center) + Vector3.new((math.random() - 0.5) * zone.size.x, 1.5, (math.random() - 0.5) * zone.size.z)
-	local model = buildCreatureModel(creatureId, CFrame.new(pos))
+	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
+	local foot = footOffset(arch)
+	local x = zone.center.x + (math.random() - 0.5) * zone.size.x
+	local z = zone.center.z + (math.random() - 0.5) * zone.size.z
+	-- Rest the creature ON the surface the player sees, not at a fixed height above an old flat placeholder.
+	refreshGroundFilter()
+	local groundY = groundYAt(x, z, zone.center.y) or zone.center.y
+	local model = buildCreatureModel(creatureId, CFrame.new(x, groundY + foot, z))
 	model.Parent = targetsFolder
 	liveTargets[model] = {
 		creatureId = creatureId, health = Catalog.creatures[creatureId].health, accumulated = 0, zoneId = zoneId,
-		mode = "wander", target = nil, fleeUntil = 0, fleeFrom = nil, speed = creatureSpeed(creatureId),
+		mode = "wander", target = nil, fleeUntil = 0, fleeFrom = nil, speed = creatureSpeed(creatureId), footOffset = foot,
 	}
 	return model
 end
@@ -658,6 +703,7 @@ end
 
 local function moveCreatures(dt)
 	local now = os.clock()
+	refreshGroundFilter() -- S3: refresh the live-character exclude list once per move-tick, not per creature
 	for model, state in liveTargets do
 		if model.PrimaryPart ~= nil then
 			local pos = model:GetPivot().Position
@@ -681,12 +727,13 @@ local function moveCreatures(dt)
 			end
 			if dir.Magnitude > 0.15 then
 				dir = dir.Unit
-				local newPos = pos + dir * speed * dt
-				newPos = Vector3.new(
-					math.clamp(newPos.X, center.X - z.size.x / 2, center.X + z.size.x / 2),
-					pos.Y,
-					math.clamp(newPos.Z, center.Z - z.size.z / 2, center.Z + z.size.z / 2)
-				)
+				local step = pos + dir * speed * dt
+				local nx = math.clamp(step.X, center.X - z.size.x / 2, center.X + z.size.x / 2)
+				local nz = math.clamp(step.Z, center.Z - z.size.z / 2, center.Z + z.size.z / 2)
+				-- S3 GROUND CONTRACT: follow terrain elevation at the new (x, z) instead of sliding at a fixed Y.
+				local groundY = groundYAt(nx, nz, center.Y)
+				local ny = if groundY ~= nil then groundY + (state.footOffset or 0) else pos.Y
+				local newPos = Vector3.new(nx, ny, nz)
 				model:PivotTo(CFrame.lookAt(newPos, newPos + dir))
 			end
 		end
