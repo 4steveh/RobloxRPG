@@ -468,6 +468,34 @@ function M.buildSoundscape()
 	emit("LodgeFire", Vector3.new(0,4,639), snd.lodgeFire, 0.6, 8, 55)
 end
 
+-- ── Suppress WorldServer's RUNTIME placeholder boxes (rebuilt every session) so the baked art shows cleanly.
+-- Waits out the spawn-order race, keeps SpawnLocations + a walkable invisible ground floor, leaves fixtures
+-- present (transparent) for gameplay clicks, re-hides late-added children. Runs EVERY session (not Built-gated).
+function M.suppressPlaceholders()
+	local function hide(f)
+		for _, d in ipairs(f:GetDescendants()) do
+			if d:IsA("BasePart") and not d:IsA("SpawnLocation") then
+				d.Transparency = 1
+				if d.Name ~= "Ground" then d.CanCollide = false end
+			end
+		end
+	end
+	task.spawn(function()
+		for _, name in ipairs({ "BayouShell_Placeholder", "AppalachiaShell_Placeholder", "AlaskaShell_Placeholder", "Lodge_Placeholder" }) do
+			local f = workspace:WaitForChild(name, 30)
+			if f then
+				hide(f)
+				f.DescendantAdded:Connect(function(d)
+					if d:IsA("BasePart") and not d:IsA("SpawnLocation") then
+						d.Transparency = 1
+						if d.Name ~= "Ground" then d.CanCollide = false end
+					end
+				end)
+			end
+		end
+	end)
+end
+
 -- orchestrates the full reproducible build (idempotent; called once from the gate when not already built)
 function M.buildAllWorlds()
 	M.ensureTemplates()
@@ -588,6 +616,7 @@ end
 -- live creature upgrade. To test: set workspace:SetAttribute("WildWorldArt", true) and Play.
 if workspace:GetAttribute("WildWorldArt") == true then
 	pcall(M.applyGlobalLook) -- cheap; always (re)apply the look
+	pcall(M.suppressPlaceholders) -- every session: hide WorldServer's placeholder boxes so the baked art shows
 	-- the heavy world build runs ONCE per place: a fresh place builds + sets the marker; a saved/baked place
 	-- (marker present, or content already saved) skips it. Set workspace attr "WildWorldArt_Rebuild"=true to
 	-- force a from-scratch rebuild (clears + re-sculpts everything from the manifest).
