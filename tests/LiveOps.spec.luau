@@ -399,4 +399,21 @@ return function(t: Harness.T)
 		t.eq("weather cleared after its own window", ws2.weather, nil)
 	end
 
+
+	t.section("LiveOps weather rotation — the SHIPPED config validates + drives traits")
+	do
+		local anyWeather: EventConfig? = nil
+		for _, e in Catalog.liveOps.events do
+			if e.kind == "weatherWindow" then
+				anyWeather = e
+				break
+			end
+		end
+		t.ok("the config ships weatherWindow records", anyWeather ~= nil)
+		local w = anyWeather :: EventConfig
+		t.eq("activeWeather sees the real window at its start", LiveOps.activeWeather(Catalog, w.startTime), w.imposes.weather)
+		t.ok("activeTraits is non-empty inside the real window", next(LiveOps.activeTraits(Catalog, w.startTime)) ~= nil)
+		t.ok("nextWindowChangeAt is defined inside the real window", LiveOps.nextWindowChangeAt(Catalog, w.startTime) ~= nil)
+	end
+
 end
