@@ -44,11 +44,13 @@ export type KillEvent = {
 	validatingEventId: string,
 	loop: Enums.Loop, -- "Hunting" | "Fishing"
 	partySize: number?,
+	traits: { Enums.Trait }?, -- NEW: server-rolled weather traits (nil/empty = base catch). Routine only.
 }
 export type Result = {
 	ambiance: boolean,
 	cash: number, -- total Cash granted = base routine payout + the §14 boost bonus (0 for a rare mint)
 	boostCash: number, -- Step 14: the 2x/VIP active-income bonus portion of `cash` (0 = no active multiplier)
+	traitCash: number, -- Step weather/traits: the weather-trait bonus portion of `cash` (0 = no trait rolled)
 	mintedArtifactId: string?,
 	rankXP: number,
 	conquestNewlySet: boolean,
@@ -114,7 +116,7 @@ end
 function M.resolve(profile: PlayerData, config: Config, event: KillEvent, deps: PipelineDeps): Result
 	local d = describe(config, event)
 	local result: Result =
-		{ ambiance = false, cash = 0, boostCash = 0, mintedArtifactId = nil, rankXP = 0, conquestNewlySet = false, cleanKillMoment = nil }
+		{ ambiance = false, cash = 0, boostCash = 0, traitCash = 0, mintedArtifactId = nil, rankXP = 0, conquestNewlySet = false, cleanKillMoment = nil }
 
 	-- 1. Ambiance FIRST — an ambiance creature can never be a faucet, milestone, or Rank-XP exploit.
 	if d.ambiance then
@@ -173,6 +175,26 @@ function M.resolve(profile: PlayerData, config: Config, event: KillEvent, deps: 
 			result.boostCash = bonus
 			incr(deps, "monetization.boostFaucet")
 		end
+			-- WEATHER TRAIT bonus (the GH stackable-mutation analogue). Cash branch ONLY, OUTSIDE the normalized band
+			-- (avgRoutineMultiplier never self-cancels it), as its own loop="none" tagged entry — the SAME separable
+			-- pattern as the 2x/VIP boost, so the routine-hour reconciliation is left intact. Rares mint in the IF
+			-- branch (no Cash) so a trait can never touch an artifact.
+			local traits = event.traits
+			if traits ~= nil and #traits > 0 then
+				local traitBonus = Monetization.boostBonus(amount, Economy.traitStackMultiplier(config, traits :: { string }))
+				if traitBonus > 0 then
+					Ledger.applyEntry(profile.cash, {
+						type = "traitBonus", -- the weather-trait faucet subtype (separable; loop=none -> reconciliation clean)
+						amount = traitBonus,
+						tier = d.tier,
+						loop = "none",
+						validatingEventId = event.validatingEventId .. ":trait",
+					}, deps.now)
+					result.cash += traitBonus
+					result.traitCash = traitBonus
+					incr(deps, "liveops.traitFaucet")
+				end
+			end
 	end
 
 	-- 3. Hunter/Angler Rank XP — active-play only (idle never calls this). Difficulty/rarity weighted.

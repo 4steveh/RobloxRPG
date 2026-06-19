@@ -74,6 +74,21 @@ function M.rarityMultiplier(config: Config, rarity: string): number
 	return (config.tuning.economy.rarityMultiplier :: { [string]: number })[rarity]
 end
 
+-- The Cash multiplier a single weather trait confers (Tuning.economy.traitMultiplier). Unknown trait -> 1.
+function M.traitMultiplier(config: Config, trait: string): number
+	return (config.tuning.economy.traitMultiplier :: { [string]: number })[trait] or 1
+end
+
+-- The COMBINED stacked multiplier for a set of traits (multiplicative, capped at traitStackCeiling). Mirrors
+-- the 2x/VIP stack-with-ceiling pattern so worst-case minting is bounded.
+function M.traitStackMultiplier(config: Config, traits: { string }): number
+	local m = 1.0
+	for _, tr in traits do
+		m *= M.traitMultiplier(config, tr)
+	end
+	return math.min(m, config.tuning.economy.traitStackCeiling)
+end
+
 -- The reward-bearing ROUTINE population of a (destination, loop): Common/Uncommon non-ambiance targets
 -- (RD5 — rares are bonus on top, excluded). The set the band is normalized over (uniform spawn over species).
 type RoutineTarget = { tier: number, rarity: Rarity }

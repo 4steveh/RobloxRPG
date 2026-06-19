@@ -153,6 +153,17 @@ Tuning.economy = table.freeze({
 		Legendary = 9,
 		Mythic = 16,
 	}),
+	-- Weather-trait Cash overlay (the GH stackable-mutation analogue). ILLUSTRATIVE — calibrate against the
+	-- liveops.traitFaucet telemetry share (must stay a thin fraction of Income(T)). Every trait is PRICED.
+	traitMultiplier = table.freeze({
+		stormTouched = 1.5,
+		frostbitten = 1.4,
+		goldenHour = 1.6,
+		fogShrouded = 1.3,
+		moonlit = 1.8,
+	}),
+	traitStackCeiling = 3.0, -- max stacked per-catch trait multiplier (bounds worst-case mint)
+	traitRollChance = 0.15, -- per-eligible-trait independent roll probability while its weather is live (Studio reads this)
 	idleFraction = 0.15, -- fraction of current-tier active income accrued idle (Step 2 consumes)
 	idleCapHours = 8, -- daily-return-hook clamp (Step 2 consumes)
 	-- §5 salvage floor (Step 6 — the one economy value not authored in Step 1): a rare's NPC-vendor Cash,

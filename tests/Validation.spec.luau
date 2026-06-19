@@ -174,4 +174,47 @@ return function(t: Harness.T)
 			Validation.assertProduct(bad, Catalog)
 		end)
 	end
+
+	t.section("Validation — weatherWindow trait discipline (Step: weather/traits)")
+	do
+		t.errs("traitsGranted on a non-weatherWindow event is rejected", function()
+			local bad: Schema.EventConfig = {
+				id = "bad_traits", name = "Bad", kind = "seasonal", startTime = 1, endTime = 2,
+				imposes = {}, cashBudget = 0, mintsFish = nil, newScarcity = {}, notes = "",
+				traitsGranted = { "stormTouched" },
+			}
+			Validation.assertEventConfig(bad, Catalog)
+		end)
+		t.errs("a granted trait with no traitMultiplier (unpriced) is rejected", function()
+			local bad = ({
+				id = "bad_price", name = "Bad", kind = "weatherWindow", startTime = 1, endTime = 2,
+				imposes = { weather = "storm" }, cashBudget = 0, mintsFish = nil, newScarcity = {}, notes = "",
+				traitsGranted = { "unpricedTrait" },
+			} :: any) :: Schema.EventConfig
+			Validation.assertEventConfig(bad, Catalog)
+		end)
+		t.errs("two overlapping weatherWindow events are rejected", function()
+			local w1: Schema.EventConfig = {
+				id = "w1", name = "W1", kind = "weatherWindow", startTime = 1000, endTime = 2000,
+				imposes = { weather = "storm" }, cashBudget = 0, mintsFish = nil, newScarcity = {}, notes = "",
+				traitsGranted = { "stormTouched" },
+			}
+			local w2: Schema.EventConfig = {
+				id = "w2", name = "W2", kind = "weatherWindow", startTime = 1500, endTime = 2500,
+				imposes = { weather = "snow" }, cashBudget = 0, mintsFish = nil, newScarcity = {}, notes = "",
+				traitsGranted = { "frostbitten" },
+			}
+			local cfg = ({ liveOps = { events = { w1 = w1, w2 = w2 }, dailyQuestPool = {} }, tuning = Catalog.tuning, decor = {}, targetIndex = Catalog.targetIndex } :: any) :: Schema.Config
+			Validation.validateLiveOps(cfg)
+		end)
+		t.test("a well-formed weatherWindow with priced traits validates", function()
+			local ok: Schema.EventConfig = {
+				id = "w_ok", name = "OK", kind = "weatherWindow", startTime = 1000, endTime = 2000,
+				imposes = { weather = "storm" }, cashBudget = 0, mintsFish = nil, newScarcity = {}, notes = "",
+				traitsGranted = { "stormTouched", "moonlit" },
+			}
+			Validation.assertEventConfig(ok, Catalog)
+		end)
+	end
+
 end
