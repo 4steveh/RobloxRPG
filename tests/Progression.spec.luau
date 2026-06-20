@@ -164,7 +164,7 @@ return function(t: Harness.T)
 	do
 		local p = Util.mkProfile(Catalog, {})
 		p.unlockedDestinations[D.Bayou] = true
-		local proj = Replication.buildProjection(p, Catalog)
+		local proj = Replication.buildProjection(p, Catalog, 0)
 		t.ok("the projection carries the worldMap pins", proj.worldMap ~= nil and proj.worldMap[D.Bayou].unlocked == true)
 		t.ok("the projection carries the passport counts", proj.passport ~= nil and proj.passport.unlocked >= 1)
 	end

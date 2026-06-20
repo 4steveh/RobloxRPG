@@ -96,7 +96,7 @@ function M.handle(reg: Registry, request: Request, session: Session, deps: Deps)
 	end
 	-- 6. Replicate — a fresh read-only projection.
 	incr(deps, "gauntlet.handled:" .. request.intent)
-	return { ok = true, projection = Replication.buildProjection(session.profile, deps.config) }
+	return { ok = true, projection = Replication.buildProjection(session.profile, deps.config, deps.now) }
 end
 
 return M
