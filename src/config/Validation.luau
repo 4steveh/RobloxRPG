@@ -254,6 +254,14 @@ function V.assertEventConfig(event: Schema.EventConfig, config: Config)
 				event.id .. ": minted RARE '" .. mf.id .. "' must be declared as a mintNew newScarcity entry (the RD1 audit)")
 		end
 	end
+	if event.traitsGranted ~= nil then
+		assert(event.kind == "weatherWindow",
+			event.id .. ": traitsGranted is only legal on a weatherWindow event")
+		for _, tr in event.traitsGranted do
+			assert((config.tuning.economy.traitMultiplier :: any)[tr] ~= nil,
+				event.id .. ": trait '" .. tostring(tr) .. "' has no traitMultiplier (every granted trait must be priced)")
+		end
+	end
 end
 
 -- A daily-quest pool entry is mechanical (not narrative), carries a legal loop, and any theming resolves.
@@ -308,6 +316,22 @@ function V.validateLiveOps(config: Config)
 			local a, b = gating[i], gating[j]
 			assert(not (a.startTime <= b.endTime and b.startTime <= a.endTime),
 				"spawn-gating events '" .. a.id .. "' and '" .. b.id .. "' overlap — only one spawn-gating event at a time (world.event is a single string)")
+		end
+	end
+
+	-- NEW: at most ONE weatherWindow live at any instant (activeWeather is a single string; activeTraits
+	-- first-match relies on it). Mirrors the spawn-gating non-overlap check.
+	local weather: { Schema.EventConfig } = {}
+	for _, e in lo.events do
+		if e.kind == "weatherWindow" then
+			table.insert(weather, e)
+		end
+	end
+	for i = 1, #weather do
+		for j = i + 1, #weather do
+			local a, b = weather[i], weather[j]
+			assert(not (a.startTime <= b.endTime and b.startTime <= a.endTime),
+				"weatherWindow events '" .. a.id .. "' and '" .. b.id .. "' overlap — one weather at a time")
 		end
 	end
 end

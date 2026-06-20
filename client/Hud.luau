@@ -126,6 +126,32 @@ end
 -- kill/catch controllers fire their own "Down!"/"Landed!" toast, so the first payout is still visible.
 -- (A login-time projection push would let the first payout show its +$ delta too — deferred, see spec §9.)
 local lastBalance = nil
+-- Weather countdown chip (top-center): "Storm · next 02:14" — a server-time target, client display only.
+local RunService = game:GetService("RunService")
+local weatherChip = label(gui, "WeatherChip", UDim2.new(0.5, -110, 0, 10), UDim2.fromOffset(220, 22), 15)
+weatherChip.TextXAlignment = Enum.TextXAlignment.Center
+weatherChip.TextStrokeTransparency = 0.4
+weatherChip.Visible = false
+local countdownTarget = nil
+local countdownWeather = nil
+local function fmtMMSS(secs)
+	secs = math.max(0, math.floor(secs))
+	return string.format("%d:%02d", math.floor(secs / 60), secs % 60)
+end
+function M.setCountdown(nextWindowChangeAt, activeWeather, _activeTraits)
+	countdownTarget = nextWindowChangeAt
+	countdownWeather = activeWeather
+	weatherChip.Visible = nextWindowChangeAt ~= nil
+end
+RunService.Heartbeat:Connect(function()
+	if countdownTarget == nil then
+		return
+	end
+	local remaining = countdownTarget - workspace:GetServerTimeNow()
+	local w = countdownWeather and (tostring(countdownWeather):gsub("^%l", string.upper)) or "Clear"
+	weatherChip.Text = w .. " · next " .. fmtMMSS(remaining)
+end)
+
 function M.applyProjection(proj)
 	if proj == nil then
 		return
@@ -156,6 +182,7 @@ function M.applyProjection(proj)
 			goalFrame.Visible = false
 		end
 	end
+	M.setCountdown(proj.nextWindowChangeAt, proj.activeWeather, proj.activeTraits)
 end
 function M.balance()
 	return lastBalance

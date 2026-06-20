@@ -347,4 +347,73 @@ return function(t: Harness.T)
 			Validation.assertFishItemRefs(Catalog.fish["alaska_arctic_grayling"], Catalog)
 		end)
 	end
+
+	t.section("LiveOps weather windows — activeWeather / activeTraits / nextWindowChangeAt")
+	do
+		local storm: EventConfig = {
+			id = "w_storm", name = "Storm Window", kind = "weatherWindow",
+			startTime = 1000, endTime = 1299, imposes = { weather = "storm" },
+			cashBudget = 0, newScarcity = {}, notes = "", traitsGranted = { "stormTouched", "moonlit" },
+		}
+		local snow: EventConfig = {
+			id = "w_snow", name = "Snow Window", kind = "weatherWindow",
+			startTime = 1300, endTime = 1599, imposes = { weather = "snow" },
+			cashBudget = 0, newScarcity = {}, notes = "", traitsGranted = { "frostbitten" },
+		}
+		local cfg = fakeConfig({ w_storm = storm, w_snow = snow })
+
+		t.eq("activeWeather inside the storm window", LiveOps.activeWeather(cfg, 1100), "storm")
+		t.eq("activeWeather at the inclusive end", LiveOps.activeWeather(cfg, 1299), "storm")
+		t.eq("activeWeather reverts at end+1 (now the snow window)", LiveOps.activeWeather(cfg, 1300), "snow")
+		t.eq("activeWeather nil in a gap after all windows", LiveOps.activeWeather(cfg, 2000), nil)
+
+		local traits = LiveOps.activeTraits(cfg, 1100)
+		t.ok("activeTraits has the storm window's traits", traits.stormTouched == true and traits.moonlit == true)
+		t.ok("activeTraits excludes other windows' traits", traits.frostbitten == nil)
+		t.ok("activeTraits empty in a gap", next(LiveOps.activeTraits(cfg, 2000)) == nil)
+
+		t.eq("nextWindowChangeAt inside storm -> storm end+1", LiveOps.nextWindowChangeAt(cfg, 1100), 1300)
+		t.eq("nextWindowChangeAt before all -> first start", LiveOps.nextWindowChangeAt(cfg, 500), 1000)
+		t.eq("nextWindowChangeAt after all -> nil", LiveOps.nextWindowChangeAt(cfg, 9999), nil)
+	end
+
+	t.section("LiveOps weather overlay — weather rotates UNDER a spawn-gating seasonal event")
+	do
+		local salmon: EventConfig = {
+			id = "salmon_run", name = "Salmon Run", kind = "seasonal",
+			startTime = 1000, endTime = 2000, imposes = { event = "Salmon Run", season = "Salmon Run" },
+			cashBudget = 0, newScarcity = {}, notes = "",
+		}
+		local stormSub: EventConfig = {
+			id = "w_storm2", name = "Storm Window", kind = "weatherWindow",
+			startTime = 1100, endTime = 1399, imposes = { weather = "storm" },
+			cashBudget = 0, newScarcity = {}, notes = "", traitsGranted = { "stormTouched" },
+		}
+		local cfg = fakeConfig({ salmon_run = salmon, w_storm2 = stormSub })
+		local ws = LiveOps.worldStateAt(cfg, 1200)
+		t.eq("the seasonal event clause is preserved", ws.event, "Salmon Run")
+		t.eq("the weather-only window overlays weather simultaneously", ws.weather, "storm")
+		t.eq("season still imposed by the seasonal event", ws.season, "Salmon Run")
+		local ws2 = LiveOps.worldStateAt(cfg, 1500)
+		t.eq("event persists after weather ends", ws2.event, "Salmon Run")
+		t.eq("weather cleared after its own window", ws2.weather, nil)
+	end
+
+
+	t.section("LiveOps weather rotation — the SHIPPED config validates + drives traits")
+	do
+		local anyWeather: EventConfig? = nil
+		for _, e in Catalog.liveOps.events do
+			if e.kind == "weatherWindow" then
+				anyWeather = e
+				break
+			end
+		end
+		t.ok("the config ships weatherWindow records", anyWeather ~= nil)
+		local w = anyWeather :: EventConfig
+		t.eq("activeWeather sees the real window at its start", LiveOps.activeWeather(Catalog, w.startTime), w.imposes.weather)
+		t.ok("activeTraits is non-empty inside the real window", next(LiveOps.activeTraits(Catalog, w.startTime)) ~= nil)
+		t.ok("nextWindowChangeAt is defined inside the real window", LiveOps.nextWindowChangeAt(Catalog, w.startTime) ~= nil)
+	end
+
 end

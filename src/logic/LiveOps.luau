@@ -64,12 +64,59 @@ end
 -- time/weather/season (the day-night + weather + real-season systems) are merged on top by the Studio tick;
 -- this is the event-driven half (what makes the event-gated rares eligible).
 function M.worldStateAt(config: Config, now: number): WorldState
+	local ws: WorldState = {}
 	for _, e in config.liveOps.events do
 		if e.imposes.event ~= nil and now >= e.startTime and now <= e.endTime then
-			return { time = e.imposes.time, weather = e.imposes.weather, season = e.imposes.season, event = e.imposes.event }
+			ws.event = e.imposes.event
+			ws.season = e.imposes.season or ws.season
+			ws.time = e.imposes.time or ws.time
+			ws.weather = e.imposes.weather or ws.weather
 		end
 	end
-	return {}
+	ws.weather = ws.weather or M.activeWeather(config, now) -- weather-only windows still drive `weather`
+	return ws
+end
+
+-- The single weather tag imposed now (the active weatherWindow's imposes.weather). Independent of the
+-- spawn-gating `event` clause: a weatherWindow may impose ONLY weather. Build-time non-overlap of
+-- weatherWindow events (Validation) guarantees <=1 at any instant, so first-match is unambiguous.
+function M.activeWeather(config: Config, now: number): string?
+	for _, e in config.liveOps.events do
+		if e.kind == "weatherWindow" and e.imposes.weather ~= nil and now >= e.startTime and now <= e.endTime then
+			return e.imposes.weather
+		end
+	end
+	return nil
+end
+
+-- The traits ELIGIBLE to roll at `now` — the union of traitsGranted across live events (in practice the single
+-- active weatherWindow, by the non-overlap guard). Empty set = no trait can roll (a base catch).
+function M.activeTraits(config: Config, now: number): { [string]: boolean }
+	local set: { [string]: boolean } = {}
+	for _, e in config.liveOps.events do
+		if e.traitsGranted ~= nil and now >= e.startTime and now <= e.endTime then
+			for _, tr in e.traitsGranted do
+				set[tr] = true
+			end
+		end
+	end
+	return set
+end
+
+-- The next server-time instant at which the live weatherWindow set CHANGES (the next start OR end+1 of any
+-- weatherWindow strictly after `now`). The countdown's source of truth. nil = no upcoming boundary.
+function M.nextWindowChangeAt(config: Config, now: number): number?
+	local best: number? = nil
+	for _, e in config.liveOps.events do
+		if e.kind == "weatherWindow" then
+			for _, boundary in { e.startTime, e.endTime + 1 } do
+				if boundary > now and (best == nil or boundary < best) then
+					best = boundary
+				end
+			end
+		end
+	end
+	return best
 end
 
 -- A timed entitlement (window-bounded boost / event access) is valid iff `now` is before its absolute

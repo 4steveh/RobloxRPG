@@ -29,6 +29,23 @@ local Spawner = require("../../logic/Spawner")
 local Combat = require("../../logic/Combat")
 local Fishing = require("../../logic/Fishing")
 local LiveOps = require("../../logic/LiveOps")
+
+-- Weather TRAIT roll (SYS_liveops_weather_traits §5.1): on a ROUTINE (cash) target, independently roll
+-- each live trait at traitRollChance. Rares (reward.kind == "artifact") never get a Cash trait. Studio
+-- owns the randomness; the rolled set rides KillEvent.traits into the shared RewardPipeline.
+local function rollTraits(row)
+	if row == nil or row.reward == nil or row.reward.kind ~= "cash" then
+		return nil -- ambiance/rare: no Cash trait
+	end
+	local rolled = nil
+	for tr in LiveOps.activeTraits(Catalog, os.time()) do
+		if math.random() < Catalog.tuning.economy.traitRollChance then
+			rolled = rolled or {}
+			table.insert(rolled, tr)
+		end
+	end
+	return rolled
+end
 local Onboarding = require("../../logic/Onboarding")
 local Loadout = require("../../logic/Loadout")
 local Gauntlet = require("../authority/Gauntlet")
@@ -830,6 +847,7 @@ fireRequest.OnServerEvent:Connect(function(plr, aimOrigin, aimDirection)
 		targetId = rayHitTargetId, zone = zone, distance = distance, claimedDamage = nil,
 		lastShotAt = lastShotAt[plr.UserId] or 0, rayHitTargetId = rayHitTargetId, targetAlive = true,
 		accumulatedDamageBefore = state.accumulated, owner = tostring(plr.UserId), partySize = 1,
+		traits = rollTraits(Catalog.creatures[rayHitTargetId]),
 	}
 	local function equippedTierLevel()
 		local refs = session.profile.equipped
@@ -979,6 +997,7 @@ castRequest.OnServerEvent:Connect(function(plr, action, arg)
 			local payload = {
 				targetId = fishId, biteActive = true, E = E, claimedDrain = drain,
 				accumulatedStaminaBefore = fight.accumulated - drain, owner = tostring(plr.UserId), partySize = 1,
+				traits = rollTraits(Catalog.fish[fishId]),
 			}
 			local deps = gauntletDeps(plr)
 			local r = Gauntlet.handle(registry, { intent = "catch", playerId = plr.UserId, payload = payload }, session, deps)
@@ -1119,7 +1138,7 @@ shopRequest.OnServerEvent:Connect(function(plr, action, arg1, arg2)
 		if VENDOR_CATEGORIES[arg1] == nil then
 			return
 		end
-		shopRequest:FireClient(plr, "listing", arg1, buildShopListing(session.profile, arg1), Replication.buildProjection(session.profile, Catalog))
+		shopRequest:FireClient(plr, "listing", arg1, buildShopListing(session.profile, arg1), Replication.buildProjection(session.profile, Catalog, os.time()))
 		return
 	end
 	local intent = SHOP_INTENT[action]
@@ -1233,7 +1252,7 @@ stateSync.Parent = ReplicatedStorage
 local function pushState(plr)
 	local session = sessionService.sessions[plr.UserId]
 	if session ~= nil then
-		stateSync:FireClient(plr, Replication.buildProjection(session.profile, Catalog))
+		stateSync:FireClient(plr, Replication.buildProjection(session.profile, Catalog, os.time()))
 	end
 end
 stateSync.OnServerEvent:Connect(function(plr)

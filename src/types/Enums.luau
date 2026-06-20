@@ -224,12 +224,13 @@ Enums.DecorKind = table.freeze({
 
 -- Step 13: LiveOps event taxonomy (SYS_liveops_calendar §2 — the four KINDS of scheduled event content).
 -- LiveOps owns the SCHEDULE of each; it owns the MECHANISM of none. A closed set.
-export type EventKind = "conditionWindow" | "seasonal" | "limitedTime" | "destinationDrop"
+export type EventKind = "conditionWindow" | "seasonal" | "limitedTime" | "destinationDrop" | "weatherWindow"
 Enums.EventKind = table.freeze({
 	conditionWindow = "conditionWindow" :: EventKind, -- §3.1 a scheduled period a rare's spawn condition is active
 	seasonal = "seasonal" :: EventKind, -- §3.2 real-season tie-ins (salmon run) at calendar scale
 	limitedTime = "limitedTime" :: EventKind, -- §3.3 a manufactured moment (the spectacle / Winter Freeze)
 	destinationDrop = "destinationDrop" :: EventKind, -- §3.4 a new region as a scheduled launch event (post-launch)
+	weatherWindow = "weatherWindow" :: EventKind, -- recurring short-cycle weather beat (exclusive spawns + trait grants)
 })
 
 -- Step 13: the RD1 scarcity-discipline declaration kinds. An event may (a) schedule a window for an EXISTING
@@ -247,6 +248,18 @@ Enums.QuestLoop = table.freeze({
 	Hunting = "Hunting" :: QuestLoop,
 	Fishing = "Fishing" :: QuestLoop,
 	either = "either" :: QuestLoop,
+})
+
+-- Weather-window catch traits (the GH "stackable mutation" analogue). A per-catch Cash-branch overlay ROLLED
+-- at kill/catch time when its enabling weather window is live. Closed set — a trait is identity, never power;
+-- it scales Cash only (RewardPipeline boost-branch), never tier/rarity/gate/artifact.
+export type Trait = "stormTouched" | "frostbitten" | "goldenHour" | "fogShrouded" | "moonlit"
+Enums.Trait = table.freeze({
+	stormTouched = "stormTouched" :: Trait,
+	frostbitten = "frostbitten" :: Trait,
+	goldenHour = "goldenHour" :: Trait,
+	fogShrouded = "fogShrouded" :: Trait,
+	moonlit = "moonlit" :: Trait,
 })
 
 return table.freeze(Enums)

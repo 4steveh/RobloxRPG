@@ -110,6 +110,43 @@ local events: Schema.EventCatalog = {
 	},
 }
 
+-- ── Weather rotation (SYS_liveops_weather_traits §8.3) ──────────────────────────────────────────────
+-- A deterministic, server-time ring of back-to-back ~5-min weather windows. Each imposes ONLY weather (no
+-- spawn-gating `event` clause) so weather rotates as an INDEPENDENT axis UNDER a seasonal beat, and each
+-- grants a stackable Cash trait (RewardPipeline rolls it per routine catch). DISJOINT by construction (the
+-- weatherWindow non-overlap guard validates it). Live-ops RE-BASES WEATHER_BASE per the real clock, or the
+-- Studio ambient driver supersedes (spec D3); this is the illustrative seed rotation.
+local WEATHER_WINDOW_SECONDS = 300
+local WEATHER_BASE = SALMON_RUN_START -- seeded under the run so weather rotates beneath it; live-ops re-bases
+local WEATHER_RING: { { weather: string, traits: { Enums.Trait } } } = {
+	{ weather = "storm", traits = { Enums.Trait.stormTouched } },
+	{ weather = "snow", traits = { Enums.Trait.frostbitten } },
+	{ weather = "clear", traits = { Enums.Trait.goldenHour } },
+	{ weather = "fog", traits = { Enums.Trait.fogShrouded } },
+	{ weather = "overcast", traits = { Enums.Trait.moonlit } },
+}
+local WEATHER_CYCLES = 12 -- ring repeats this many times from WEATHER_BASE (the seed span; live-ops extends)
+for cycle = 0, WEATHER_CYCLES - 1 do
+	for ringIndex, entry in WEATHER_RING do
+		local k = cycle * #WEATHER_RING + (ringIndex - 1)
+		local startT = WEATHER_BASE + k * WEATHER_WINDOW_SECONDS
+		local wid = "weather_" .. entry.weather .. "_" .. tostring(k)
+		events[wid] = {
+			id = wid,
+			name = "Weather: " .. entry.weather,
+			kind = "weatherWindow",
+			startTime = startT,
+			endTime = startT + WEATHER_WINDOW_SECONDS - 1, -- inclusive, disjoint from the next start
+			imposes = { weather = entry.weather }, -- weather-only (event = nil): not spawn-gating
+			cashBudget = 0, -- traits pay via RewardPipeline, not the event faucet
+			mintsFish = nil,
+			newScarcity = {},
+			traitsGranted = entry.traits,
+			notes = "Recurring weather window (trait grants); re-based by live-ops (spec D3).",
+		}
+	end
+end
+
 -- §5 daily-quest pool — MECHANICAL objectives (not narrative). The pool must be able to form the cross-loop
 -- pair (≥1 Hunting + ≥1 Fishing — the guard enforces it); the scheduler's dailyQuestSet picks ~3/day with
 -- the pair preserved and themes to an active beat. Reward SCALE is economy's (ClaimDailyHandler), not here.

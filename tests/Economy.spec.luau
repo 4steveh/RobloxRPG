@@ -106,4 +106,13 @@ return function(t: Harness.T)
 		local q = Util.mkProfile(Catalog, { weapon = 2, armor = 2, rod = 2, reel = 2 })
 		t.ok("at parity, per-loop == per-loop == max", Economy.currentTier(q, Catalog, H) == 2 and Economy.currentTier(q, Catalog, F) == 2 and Economy.currentTier(q, Catalog) == 2)
 	end
+
+	t.section("Economy — weather trait multipliers")
+	do
+		t.ok("traitMultiplier reads Tuning", approx(Economy.traitMultiplier(Catalog, "stormTouched"), 1.5))
+		t.eq("unknown trait -> 1", Economy.traitMultiplier(Catalog, "nope"), 1)
+		t.ok("traitStackMultiplier is multiplicative", approx(Economy.traitStackMultiplier(Catalog, { "stormTouched", "moonlit" }), 1.5 * 1.8))
+		t.ok("traitStackMultiplier caps at traitStackCeiling (3.0)", approx(Economy.traitStackMultiplier(Catalog, { "stormTouched", "moonlit", "goldenHour" }), 3.0))
+	end
+
 end

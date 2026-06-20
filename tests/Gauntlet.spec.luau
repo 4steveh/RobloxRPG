@@ -106,12 +106,21 @@ return function(t: Harness.T)
 	t.section("Replication — the projection is a read-only server-computed shadow")
 	do
 		local p = Util.mkProfile(Catalog, { weapon = 2, ledger = { 500 } })
-		local proj = Replication.buildProjection(p, Catalog)
+		local wStart, wWeather = 0, nil
+		for _, e in Catalog.liveOps.events do
+			if e.kind == "weatherWindow" then
+				wStart = e.startTime
+				wWeather = e.imposes.weather
+				break
+			end
+		end
+		local proj = Replication.buildProjection(p, Catalog, wStart) -- a real weatherWindow instant (base-independent)
 		t.eq("projection balance reflects the ledger", proj.balance, 500)
 		-- editing the shadow must change nothing server-side
 		proj.balance = 999999
 		proj.unlockedDestinations["alaska"] = true
 		t.eq("authoritative balance unchanged by editing the shadow", Balance.balanceOf(p), 500)
 		t.ok("authoritative unlocked set unchanged", p.unlockedDestinations["alaska"] == nil)
+		t.ok("projection carries the active weather + traits at a weather-window instant", proj.activeWeather == wWeather and #proj.activeTraits > 0 and proj.nextWindowChangeAt ~= nil)
 	end
 end

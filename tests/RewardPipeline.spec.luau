@@ -13,6 +13,7 @@ local Transaction = require("@src/server/authority/Transaction")
 local Balance = require("@src/logic/Balance")
 local Economy = require("@src/logic/Economy")
 local Enums = require("@src/types/Enums")
+local Monetization = require("@src/logic/Monetization")
 
 return function(t: Harness.T)
 	local function newDeps(): RewardPipeline.PipelineDeps
@@ -143,4 +144,32 @@ return function(t: Harness.T)
 		t.ok("transaction reports failure", txn.ok == false)
 		t.ok("no orphan mint / Angler XP", next(p.artifacts) == nil and p.anglerRankXP == 0)
 	end
+
+	t.section("RewardPipeline — weather TRAIT bonus (Cash branch, separable, reconciliation-safe)")
+	do
+		local p = Util.mkProfile(Catalog, {})
+		local base = Economy.payout(Catalog, 1, "Common", "bayou", Enums.Loop.Hunting)
+		local expectedBonus = Monetization.boostBonus(base, Economy.traitStackMultiplier(Catalog, { Enums.Trait.stormTouched }))
+		local ev = huntEvent("bayou_wood_duck")
+		ev.traits = { Enums.Trait.stormTouched }
+		local r = RewardPipeline.resolve(p, Catalog, ev, newDeps())
+		t.eq("two ledger entries: base + trait", #p.cash.tail, 2)
+		t.ok("base entry is the UNMULTIPLIED kill faucet", p.cash.tail[1].type == "kill" and p.cash.tail[1].amount == base and p.cash.tail[1].loop == "Hunting")
+		t.ok("trait entry is loop=none, type=traitBonus", p.cash.tail[2].type == "traitBonus" and p.cash.tail[2].loop == "none" and p.cash.tail[2].amount == expectedBonus)
+		t.eq("result.cash = base + traitBonus", r.cash, base + expectedBonus)
+		t.eq("result.traitCash = the bonus", r.traitCash, expectedBonus)
+	end
+
+	t.section("RewardPipeline — trait stacking; rare immunity; no-trait parity")
+	do
+		local pr = Util.mkProfile(Catalog, {})
+		local re = huntEvent("bayou_white_alligator")
+		re.traits = { Enums.Trait.stormTouched, Enums.Trait.moonlit }
+		local rr = RewardPipeline.resolve(pr, Catalog, re, newDeps())
+		t.ok("rare+traits: mints, cash=0, traitCash=0, NO ledger entry (XOR holds)", rr.mintedArtifactId ~= nil and rr.cash == 0 and rr.traitCash == 0 and #pr.cash.tail == 0)
+		local pn = Util.mkProfile(Catalog, {})
+		local rn = RewardPipeline.resolve(pn, Catalog, huntEvent("bayou_wood_duck"), newDeps())
+		t.ok("no traits -> single entry, traitCash 0 (regression)", #pn.cash.tail == 1 and rn.traitCash == 0)
+	end
+
 end

@@ -12,6 +12,7 @@ local Gate = require("../../logic/Gate")
 local Copy = require("../persistence/Copy")
 local TrophyHall = require("../../logic/TrophyHall")
 local Progression = require("../../logic/Progression")
+local LiveOps = require("../../logic/LiveOps")
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -32,9 +33,19 @@ export type Projection = {
 	-- Passport counts — the server-authoritative progression surface the client renders (never re-derives).
 	worldMap: { [string]: Progression.Pin },
 	passport: Progression.PassportCounts,
+	-- Weather/traits: the read-only weather surface the client renders (the HUD countdown + "what can I
+	-- farm now" chip). Server-time-derived; the client never gates on its own clock (display only).
+	activeWeather: string?,
+	activeTraits: { string },
+	nextWindowChangeAt: number?,
 }
 
-function M.buildProjection(profile: PlayerData, config: Config): Projection
+function M.buildProjection(profile: PlayerData, config: Config, now: number): Projection
+	local activeTraitsList: { string } = {}
+	for tr in LiveOps.activeTraits(config, now) do
+		table.insert(activeTraitsList, tr)
+	end
+	table.sort(activeTraitsList)
 	local gates: { [string]: Gate.GateResult } = {}
 	for id, destination in config.destinations do
 		gates[id] = Gate.evaluateGate(profile, destination, config)
@@ -54,6 +65,9 @@ function M.buildProjection(profile: PlayerData, config: Config): Projection
 		trophyHall = { displayed = Copy.deep(TrophyHall.displayed(profile)), slotsUsed = usage.used, slotsTotal = usage.total },
 		worldMap = Progression.worldMapPins(profile, config),
 		passport = Progression.passportCounts(profile, config),
+		activeWeather = LiveOps.activeWeather(config, now),
+		activeTraits = activeTraitsList,
+		nextWindowChangeAt = LiveOps.nextWindowChangeAt(config, now),
 	}
 end
 

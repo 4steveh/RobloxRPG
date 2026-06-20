@@ -21,6 +21,7 @@ type FunnelBeat = Enums.FunnelBeat
 type RealMoneyKind = Enums.RealMoneyKind
 type DecorKind = Enums.DecorKind
 type EventKind = Enums.EventKind
+type Trait = Enums.Trait
 type NewScarcityKind = Enums.NewScarcityKind
 type QuestLoop = Enums.QuestLoop
 type DestinationId = Ids.DestinationId
@@ -352,6 +353,7 @@ export type EventConfig = {
 	-- rare. OPTIONAL — most events (conditionWindow / seasonal) introduce no new fish (nil = none).
 	mintsFish: { Fish }?,
 	newScarcity: { NewScarcityDecl }, -- the RD1 declaration (audited + guarded at load)
+	traitsGranted: { Trait }?, -- weatherWindow only: traits eligible to roll on routine catches while live (nil = none)
 	notes: string,
 }
 export type EventCatalog = { [EventId]: EventConfig }
