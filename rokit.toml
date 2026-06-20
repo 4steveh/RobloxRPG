@@ -1,0 +1,12 @@
+# Rokit toolchain manifest — pins the build/sync tool so a fresh clone reproduces the same Rojo.
+# (Audit 2026-06-20: the toolchain was previously unpinned — rojo/luau installed ad-hoc at ~/.local/bin.)
+# Install with: rokit install
+#
+# NOTE: the headless Luau CLI (`luau`, `luau-analyze`, `luau-compile` — used by ./run-tests.sh) is provided
+# by the luau-lang/luau release installed at ~/.local/bin (see CLAUDE.md). It is intentionally NOT pinned
+# here because the test gate depends on a specific analyzer build that is managed outside Rokit; pinning a
+# divergent version via Rokit could silently change analysis results. Add it here only if/when the team
+# standardizes the analyzer version: `rokit add luau-lang/luau`.
+
+[tools]
+rojo = "rojo-rbx/rojo@7.6.1"

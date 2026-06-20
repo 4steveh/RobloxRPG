@@ -10,6 +10,13 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 local M = {}
 
+-- thousands-separated cash (modern read: "$ 12,480" not "$ 12480")
+local function commafmt(n)
+	local s = tostring(math.floor(tonumber(n) or 0))
+	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return (out:gsub("^,", ""))
+end
+
 -- the MVL unlock path (after the free Bayou) — used to surface the "next goal" from proj.gates.
 local DEST_ORDER = { "appalachia", "rockies", "alaska", "deep_sea" }
 local DEST_NAMES = { appalachia = "Appalachia", rockies = "The Rockies", alaska = "Alaska", deep_sea = "The Deep Sea" }
@@ -46,6 +53,8 @@ header.BackgroundColor3 = Color3.fromRGB(20, 24, 20)
 header.BackgroundTransparency = 0.35
 header.BorderSizePixel = 0
 header.Parent = gui
+local headerCorner = Instance.new("UICorner"); headerCorner.CornerRadius = UDim.new(0, 8); headerCorner.Parent = header
+local headerStroke = Instance.new("UIStroke"); headerStroke.Color = Color3.fromRGB(120, 140, 110); headerStroke.Thickness = 1; headerStroke.Transparency = 0.55; headerStroke.Parent = header
 local cashLabel = label(header, "Cash", UDim2.fromOffset(10, 6), UDim2.fromOffset(210, 26), 22)
 local tierLabel = label(header, "Tiers", UDim2.fromOffset(10, 36), UDim2.fromOffset(210, 20), 14)
 cashLabel.Text = "$ —"
@@ -68,16 +77,68 @@ local goalBody = label(goalFrame, "GoalBody", UDim2.fromOffset(10, 20), UDim2.fr
 goalBody.TextWrapped = true
 goalBody.TextYAlignment = Enum.TextYAlignment.Top
 
--- crosshair
-local crosshair = Instance.new("Frame")
-crosshair.Name = "Crosshair"
-crosshair.AnchorPoint = Vector2.new(0.5, 0.5)
-crosshair.Position = UDim2.fromScale(0.5, 0.5)
-crosshair.Size = UDim2.fromOffset(6, 6)
-crosshair.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-crosshair.BackgroundTransparency = 0.2
-crosshair.BorderSizePixel = 0
-crosshair.Parent = gui
+-- crosshair — a 4-tick reticle + centre dot that TIGHTENS on ADS (review 2.2). The ticks live in a
+-- container at screen centre; setAimState() tweens their spread + colour (wide/dim at hip → tight/crisp on aim).
+local TweenSvc = game:GetService("TweenService")
+local reticle = Instance.new("Frame")
+reticle.Name = "Crosshair"
+reticle.AnchorPoint = Vector2.new(0.5, 0.5)
+reticle.Position = UDim2.fromScale(0.5, 0.5)
+reticle.Size = UDim2.fromOffset(2, 2)
+reticle.BackgroundTransparency = 1
+reticle.Parent = gui
+local function tick(name)
+	local t = Instance.new("Frame")
+	t.Name = name
+	t.AnchorPoint = Vector2.new(0.5, 0.5)
+	t.BackgroundColor3 = Color3.fromRGB(240, 240, 230)
+	t.BackgroundTransparency = 0.15
+	t.BorderSizePixel = 0
+	t.Parent = reticle
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 2)
+	c.Parent = t
+	return t
+end
+local dot = tick("Dot")
+dot.Size = UDim2.fromOffset(3, 3)
+dot.Position = UDim2.fromScale(0.5, 0.5)
+local tickN, tickS, tickE, tickW = tick("N"), tick("S"), tick("E"), tick("W")
+local HIP_SPREAD, ADS_SPREAD = 14, 7
+local function layoutReticle(spread, thin, alpha, color)
+	local len = 7
+	for _, t in ipairs({ tickN, tickS }) do t.Size = UDim2.fromOffset(thin, len) end
+	for _, t in ipairs({ tickE, tickW }) do t.Size = UDim2.fromOffset(len, thin) end
+	tickN.Position = UDim2.new(0.5, 0, 0.5, -spread)
+	tickS.Position = UDim2.new(0.5, 0, 0.5, spread)
+	tickE.Position = UDim2.new(0.5, spread, 0.5, 0)
+	tickW.Position = UDim2.new(0.5, -spread, 0.5, 0)
+	for _, t in ipairs({ tickN, tickS, tickE, tickW, dot }) do
+		t.BackgroundTransparency = alpha
+		t.BackgroundColor3 = color
+	end
+end
+layoutReticle(HIP_SPREAD, 2, 0.3, Color3.fromRGB(240, 240, 230))
+-- public: tighten/brighten the reticle on ADS (called by AimController)
+local aimTweens = {}
+function M.setAimState(on)
+	for _, tw in ipairs(aimTweens) do tw:Cancel() end
+	aimTweens = {}
+	local spread = on and ADS_SPREAD or HIP_SPREAD
+	local alpha = on and 0.05 or 0.3
+	local color = on and Color3.fromRGB(150, 230, 150) or Color3.fromRGB(240, 240, 230)
+	local info = TweenInfo.new(0.16, Enum.EasingStyle.Quad)
+	tickN.Position = tickN.Position -- (no-op; keep refs)
+	for _, spec in ipairs({
+		{ tickN, UDim2.new(0.5, 0, 0.5, -spread) }, { tickS, UDim2.new(0.5, 0, 0.5, spread) },
+		{ tickE, UDim2.new(0.5, spread, 0.5, 0) }, { tickW, UDim2.new(0.5, -spread, 0.5, 0) },
+	}) do
+		local tw = TweenSvc:Create(spec[1], info, { Position = spec[2], BackgroundTransparency = alpha, BackgroundColor3 = color })
+		tw:Play(); table.insert(aimTweens, tw)
+	end
+	local td = TweenSvc:Create(dot, info, { BackgroundTransparency = alpha, BackgroundColor3 = color })
+	td:Play(); table.insert(aimTweens, td)
+end
 
 -- toast
 local toast = label(gui, "Toast", UDim2.new(0.5, -200, 0.16, 0), UDim2.fromOffset(400, 28), 20)
@@ -152,6 +213,64 @@ RunService.Heartbeat:Connect(function()
 	weatherChip.Text = w .. " · next " .. fmtMMSS(remaining)
 end)
 
+-- ── OBJECTIVE CARD — the first-session DIRECTION the game was missing (review §6). The server now ships the
+-- onboarding beat in proj.onboarding (beat + targetKind + progress); the CLIENT owns the wording. Top-center,
+-- can't-miss; hides once the funnel is COMPLETE (then the next-goal panel carries destination unlocks).
+local OBJECTIVE_COPY: { [string]: string } = {
+	FIRST_HUNT = "Take aim and bag your first animal",
+	FIRST_CATCH = "Head to the water and catch your first fish",
+	FIRST_PURCHASE = "Visit a shop and upgrade your gear",
+	WORLD_MAP = "Open the World Map at the Travel Desk",
+	LOOP_CONFIRM = "Keep hunting or fishing to build your stake",
+	DAILY_INTRO = "Claim your daily reward",
+}
+local objCard = Instance.new("Frame")
+objCard.Name = "ObjectiveCard"
+objCard.AnchorPoint = Vector2.new(0.5, 0)
+objCard.Position = UDim2.new(0.5, 0, 0, 40)
+objCard.Size = UDim2.fromOffset(348, 48)
+objCard.BackgroundColor3 = Color3.fromRGB(22, 27, 22)
+objCard.BackgroundTransparency = 0.15
+objCard.BorderSizePixel = 0
+objCard.Visible = false
+objCard.Parent = gui
+local objCorner = Instance.new("UICorner"); objCorner.CornerRadius = UDim.new(0, 8); objCorner.Parent = objCard
+local objStroke = Instance.new("UIStroke"); objStroke.Color = Color3.fromRGB(150, 200, 140); objStroke.Thickness = 1.5; objStroke.Transparency = 0.35; objStroke.Parent = objCard
+local objAccent = Instance.new("Frame"); objAccent.Size = UDim2.new(0, 4, 1, -10); objAccent.Position = UDim2.fromOffset(6, 5); objAccent.BackgroundColor3 = Color3.fromRGB(150, 220, 130); objAccent.BorderSizePixel = 0; objAccent.Parent = objCard
+local objAccentC = Instance.new("UICorner"); objAccentC.CornerRadius = UDim.new(0, 2); objAccentC.Parent = objAccent
+local objTitle = Instance.new("TextLabel")
+objTitle.BackgroundTransparency = 1; objTitle.Position = UDim2.fromOffset(18, 5); objTitle.Size = UDim2.new(1, -90, 0, 13)
+objTitle.Font = Enum.Font.GothamBold; objTitle.TextSize = 10; objTitle.TextXAlignment = Enum.TextXAlignment.Left
+objTitle.TextColor3 = Color3.fromRGB(150, 210, 140); objTitle.Text = "NEXT OBJECTIVE"; objTitle.Parent = objCard
+local objLabel = Instance.new("TextLabel")
+objLabel.BackgroundTransparency = 1; objLabel.Position = UDim2.fromOffset(18, 19); objLabel.Size = UDim2.new(1, -96, 0, 24)
+objLabel.Font = Enum.Font.GothamSemibold; objLabel.TextSize = 16; objLabel.TextXAlignment = Enum.TextXAlignment.Left
+objLabel.TextColor3 = Color3.fromRGB(240, 240, 230); objLabel.TextStrokeTransparency = 0.6; objLabel.Text = ""; objLabel.Parent = objCard
+local objProgress = Instance.new("TextLabel")
+objProgress.BackgroundTransparency = 1; objProgress.AnchorPoint = Vector2.new(1, 0.5); objProgress.Position = UDim2.new(1, -12, 0.5, 0); objProgress.Size = UDim2.fromOffset(58, 30)
+objProgress.Font = Enum.Font.GothamBold; objProgress.TextSize = 17; objProgress.TextXAlignment = Enum.TextXAlignment.Right
+objProgress.TextColor3 = Color3.fromRGB(150, 230, 140); objProgress.Text = ""; objProgress.Parent = objCard
+local lastObjective = nil
+-- the waypoint controller reads this (the HUD always holds the latest projection, from StateSync + kill/catch replies)
+function M.currentObjective()
+	return lastObjective
+end
+function M.setObjective(ob)
+	lastObjective = ob
+	if ob == nil or ob.complete or ob.beat == "COMPLETE" then
+		objCard.Visible = false
+		return
+	end
+	local text = OBJECTIVE_COPY[ob.beat]
+	if text == nil then
+		objCard.Visible = false
+		return
+	end
+	objLabel.Text = text
+	objProgress.Text = ((ob.requiredCount or 1) > 1) and string.format("%d/%d", ob.progress or 0, ob.requiredCount) or ""
+	objCard.Visible = true
+end
+
 function M.applyProjection(proj)
 	if proj == nil then
 		return
@@ -160,7 +279,7 @@ function M.applyProjection(proj)
 		if lastBalance ~= nil and proj.balance > lastBalance then
 			M.toast("+$" .. tostring(proj.balance - lastBalance), Color3.fromRGB(150, 230, 140))
 		end
-		cashLabel.Text = "$ " .. tostring(proj.balance)
+		cashLabel.Text = "$ " .. commafmt(proj.balance)
 		lastBalance = proj.balance
 	end
 	tierLabel.Text = string.format("EHT %s · EFT %s", tostring(proj.eht), tostring(proj.eft))
@@ -183,6 +302,7 @@ function M.applyProjection(proj)
 		end
 	end
 	M.setCountdown(proj.nextWindowChangeAt, proj.activeWeather, proj.activeTraits)
+	M.setObjective(proj.onboarding)
 end
 function M.balance()
 	return lastBalance
@@ -220,3 +340,5 @@ task.spawn(function()
 end)
 
 return M
+
+-- rojo-live-test-marker-42

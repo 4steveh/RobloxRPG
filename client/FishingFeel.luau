@@ -10,6 +10,7 @@ local Debris = game:GetService("Debris")
 local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
+local ArmRig = require(script.Parent:WaitForChild("ArmRig")) -- shared weapon/tool handling rig (arm poses)
 
 local M = {}
 
@@ -59,7 +60,8 @@ local function buildRod(char)
 		p.CanQuery = false
 		p.Massless = true
 		p.Material = Enum.Material.SmoothPlastic
-		p.LocalTransparencyModifier = 1 -- hidden until fishing
+		p.Transparency = 1 -- hidden until fishing (Transparency is reliable; LocalTransparencyModifier on a
+		-- character-welded part can be reset by the engine, which leaked the rod into view during hunting)
 		p.Parent = model
 		return p
 	end
@@ -90,7 +92,7 @@ local function setModelHidden(model, hidden)
 	if model then
 		for _, p in ipairs(model:GetDescendants()) do
 			if p:IsA("BasePart") then
-				p.LocalTransparencyModifier = hidden and 1 or 0
+				p.Transparency = hidden and 1 or 0
 			end
 		end
 	end
@@ -100,12 +102,14 @@ function M.enterFishing()
 	setModelHidden(rodModel, false)
 	local char = player.Character
 	setModelHidden(char and char:FindFirstChild("HeldRifle"), true)
+	ArmRig.setMode("rod") -- arms switch to the rod hold
 end
 
 function M.exitFishing()
 	setModelHidden(rodModel, true)
 	local char = player.Character
 	setModelHidden(char and char:FindFirstChild("HeldRifle"), false)
+	ArmRig.setMode("rifle") -- back to the rifle low-ready hold
 end
 
 -- ── tackle state + helpers ───────────────────────────────────────────────────────────────────────────

@@ -21,7 +21,8 @@ player.CameraMinZoomDistance = CAMERA_MIN_ZOOM
 player.CameraMaxZoomDistance = CAMERA_MAX_ZOOM
 player.CameraMode = Enum.CameraMode.Classic -- free third-person look (good on touch)
 
--- Ensure mobile touch controls are active (Roblox provides the thumbstick + jump button by default on
--- touch devices; this is a no-op guard so a future control override doesn't silently disable them).
-player.DevTouchMovementMode = Enum.DevTouchMovementMode.UserChoice
-player.DevComputerMovementMode = Enum.DevComputerMovementMode.UserChoice
+-- NOTE: DevTouchMovementMode / DevComputerMovementMode are intentionally NOT set here. Setting them from a
+-- plain LocalScript throws "lacking capability RobloxScript" on modern Roblox (a security-capability change)
+-- — it errored every spawn (Studio console). The engine defaults are already UserChoice (thumbstick + jump on
+-- touch), so these are true no-ops; the right home for an override is StarterPlayer properties in Studio, not
+-- a runtime script. (Removed the throwing assignments.)

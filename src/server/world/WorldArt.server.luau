@@ -53,6 +53,20 @@ function M.applyGlobalLook()
 	Lighting.OutdoorAmbient = c3(L.outdoorAmbient)
 	Lighting.ColorShift_Top = c3(L.colorShiftTop)
 
+	-- IMAGE-BASED LIGHTING (review §1.7 — the single highest-leverage graphics change). These two scales were
+	-- 0 on the saved place, so every PBR / SurfaceAppearance mesh (the 659 fauna/flora) got NO sky-bounce
+	-- ambient or specular response and rendered FLAT. At 1 they pick up the warm dawn sky + reflections, which
+	-- deepens bark, fur, scales, and water. Future tech + global shadows are required for the spec channel.
+	pcall(function() Lighting.Technology = Enum.Technology.Future end)
+	Lighting.EnvironmentDiffuseScale = L.environmentDiffuseScale or 1
+	Lighting.EnvironmentSpecularScale = L.environmentSpecularScale or 1
+	Lighting.GlobalShadows = true
+	-- A real fog cull/backstop authored HERE (was effectively off — FogEnd 100000 on the saved place) so depth
+	-- reads and distant world-edges fall into warm haze that matches the Atmosphere colour. Warm dawn tint.
+	Lighting.FogStart = L.fogStart or 90
+	Lighting.FogEnd = L.fogEnd or 520
+	Lighting.FogColor = c3(A.atmosphere.color)
+
 	local at = A.atmosphere
 	local atm = findOrNew(Lighting, "Atmosphere", "Atmosphere")
 	atm.Density, atm.Offset, atm.Color, atm.Decay, atm.Glare, atm.Haze =
@@ -514,18 +528,48 @@ end
 -- per-instance phase), reading PrimaryPart, never setting world position (locomotion stays gameplay's job).
 -- ⚠ NEEDS A PLAY TEST (HuntingTargets only exist at runtime). Gated dormant by the attribute below.
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════
+-- Maps every huntable creatureId → the best available mesh template in RS.WildWorldArt.Creatures
+-- (Alligator/SwampRabbit/WoodDuck/Heron/Turtle/Deer/Moose/Bear/Grizzly). Review 1.3: the Appalachia/Alaska
+-- huntables were unmapped → rendered as generic grey boxes even though Deer/Moose/Bear/Grizzly meshes exist.
+-- Herbivores map exactly; the carnivores (boar/cougar/catamount/coyote/fox) have no dedicated mesh yet, so
+-- they use "Bear" as a documented quadruped STOPGAP (TODO: author slim canid/cat meshes). Zero new assets.
 local CREATURE_MAP = {
+	-- ── Bayou ──
 	bayou_american_alligator = "Alligator",
-	bayou_white_alligator = "Alligator",      -- Ghost Gator (pale reskin)
+	bayou_white_alligator = "Alligator",        -- Ghost Gator (pale reskin)
 	bayou_swamp_rabbit = "SwampRabbit",
-	bayou_nutria = "SwampRabbit",             -- fallback reuse until a nutria mesh lands
+	bayou_nutria = "SwampRabbit",               -- fallback reuse until a nutria mesh lands
 	bayou_wood_duck = "WoodDuck",
-	bayou_leucistic_wood_duck = "WoodDuck",   -- Pale Drake (pale reskin)
+	bayou_leucistic_wood_duck = "WoodDuck",     -- Pale Drake (pale reskin)
 	bayou_great_egret = "Heron",
 	bayou_painted_turtle = "Turtle",
-	bayou_songbird = "WoodDuck",              -- fallback small bird
+	bayou_songbird = "WoodDuck",                -- fallback small bird
+	-- ── Appalachia ──
+	appalachia_whitetail_deer = "Deer",
+	appalachia_piebald_whitetail = "Deer",      -- piebald (pale-patched reskin)
+	appalachia_ghost_buck = "Deer",             -- rare pale buck (pale reskin)
+	appalachia_eastern_cottontail = "SwampRabbit",
+	appalachia_gray_squirrel = "SwampRabbit",   -- small-mammal stand-in
+	appalachia_wild_boar = "Bear",              -- STOPGAP quadruped (no boar mesh yet)
+	appalachia_mountain_lion = "Bear",          -- STOPGAP quadruped (no cougar mesh yet)
+	appalachia_black_catamount = "Bear",        -- STOPGAP quadruped (no cat mesh yet)
+	appalachia_coyote = "Bear",                 -- STOPGAP quadruped (no canid mesh yet)
+	-- ── Alaska ──
+	alaska_bull_moose = "Moose",
+	alaska_spirit_moose = "Moose",              -- rare pale moose (pale reskin)
+	alaska_caribou = "Deer",
+	alaska_sitka_deer = "Deer",
+	alaska_grizzly_bear = "Grizzly",
+	alaska_glacier_grizzly = "Grizzly",         -- rare pale grizzly (pale reskin)
+	alaska_arctic_hare = "SwampRabbit",
+	alaska_cross_fox = "Bear",                  -- STOPGAP quadruped (no fox mesh yet)
 }
-local PALE_RESKIN = { bayou_white_alligator = true, bayou_leucistic_wood_duck = true }
+-- the rare pale variants: strip the texture + tint toward bone-white so they read as the marquee trophy targets
+local PALE_RESKIN = {
+	bayou_white_alligator = true, bayou_leucistic_wood_duck = true,
+	appalachia_piebald_whitetail = true, appalachia_ghost_buck = true,
+	alaska_spirit_moose = true, alaska_glacier_grizzly = true,
+}
 
 local function creaturesFolder()
 	local root = ReplicatedStorage:FindFirstChild("WildWorldArt")
@@ -540,7 +584,12 @@ function M.upgradeCreature(model)
 	local folder = creaturesFolder()
 	if cid == nil or pp == nil or folder == nil then return end
 	local tpl = folder:FindFirstChild(CREATURE_MAP[cid] or "")
-	if tpl == nil then return end -- graceful: unknown creature keeps its box visuals
+	if tpl == nil then
+		-- graceful: unknown creature keeps its box visuals, but SURFACE it (silent box-fallbacks hid the
+		-- ~18 unmapped Appalachia/Alaska huntables for a whole step — a warn makes the gap visible in ops).
+		warn(("[WildWorldArt] no mesh template for creatureId '%s' (CREATURE_MAP miss or template not loaded) — keeping box visuals"):format(tostring(cid)))
+		return
+	end
 	model:SetAttribute("artUpgraded", true)
 
 	-- 1) hide the box visuals but KEEP them as invisible hitboxes (zones/raycast unchanged)

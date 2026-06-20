@@ -13,6 +13,7 @@ local Copy = require("../persistence/Copy")
 local TrophyHall = require("../../logic/TrophyHall")
 local Progression = require("../../logic/Progression")
 local LiveOps = require("../../logic/LiveOps")
+local Onboarding = require("../../logic/Onboarding") -- review §6: surface the onboarding beat to the client
 
 type PlayerData = Schema.PlayerData
 type Config = Schema.Config
@@ -38,6 +39,9 @@ export type Projection = {
 	activeWeather: string?,
 	activeTraits: { string },
 	nextWindowChangeAt: number?,
+	-- the onboarding objective surface (beat + target kind + progress) — the HUD renders an objective card +
+	-- a world-space waypoint from this; DATA only (the client owns the wording). Review §6.
+	onboarding: Onboarding.ObjectiveProjection,
 }
 
 function M.buildProjection(profile: PlayerData, config: Config, now: number): Projection
@@ -68,6 +72,7 @@ function M.buildProjection(profile: PlayerData, config: Config, now: number): Pr
 		activeWeather = LiveOps.activeWeather(config, now),
 		activeTraits = activeTraitsList,
 		nextWindowChangeAt = LiveOps.nextWindowChangeAt(config, now),
+		onboarding = Onboarding.projection(profile),
 	}
 end
 
