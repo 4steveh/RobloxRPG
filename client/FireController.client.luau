@@ -10,6 +10,7 @@ local player = Players.LocalPlayer
 local Net = require(script.Parent:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Hud"))
 local Feel = require(script.Parent:WaitForChild("HuntingFeel")) -- S2 game-feel: muzzle/tracer/recoil + hit/kill FX
+local ArmRig = require(script.Parent:WaitForChild("ArmRig")) -- weapon-handling rig: arm recoil + ADS camera
 local HarvestCard = require(script.Parent:WaitForChild("HarvestCard"))
 
 local FIRE_COOLDOWN = 0.15 -- client-side anti-spam only; the server enforces the authoritative fire rate
@@ -29,7 +30,8 @@ local function aimAndFire()
 	local vp = cam.ViewportSize
 	local ray = cam:ViewportPointToRay(vp.X / 2, vp.Y / 2)
 	Net.fire:FireServer(ray.Origin, ray.Direction.Unit)
-	Feel.onFire(ray) -- predicted muzzle flash + tracer + recoil
+	Feel.onFire(ray) -- predicted muzzle flash + tracer + sound
+	ArmRig.recoil(0.95) -- arm kick + camera FOV punch (ArmRig owns the FOV now)
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)

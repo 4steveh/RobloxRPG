@@ -22,6 +22,11 @@ local ArtAssets = {
 			ambient = { 54, 60, 48 },
 			outdoorAmbient = { 96, 104, 86 },
 			colorShiftTop = { 255, 214, 150 },
+			-- image-based lighting (review §1.7): both were 0 on the saved place → flat PBR. On = sky-bounce.
+			environmentDiffuseScale = 1,
+			environmentSpecularScale = 1,
+			fogStart = 90,
+			fogEnd = 520, -- warm-haze depth cull/backstop (FogColor inherits atmosphere.color)
 		},
 		bayouDusk = { clockTime = 17.8 }, -- overrides only; inherits bayouDawn otherwise
 	},

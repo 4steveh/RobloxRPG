@@ -33,6 +33,42 @@ local BEATS: { [string]: BeatDef } = {
 	[B.COMPLETE] = { completesOn = nil, requiredCount = 1, next = nil, passThrough = false },
 }
 
+-- map a beat → a player-facing TARGET KIND (a semantic key, NOT display copy — the client owns the wording,
+-- keeping this module content-free / pure). Drives the HUD objective card + the world-space waypoint.
+local BEAT_TARGET: { [string]: string } = {
+	[B.FIRST_HUNT] = "hunt",
+	[B.FIRST_CATCH] = "fish",
+	[B.FIRST_PURCHASE] = "shop",
+	[B.WORLD_MAP] = "travelDesk",
+	[B.LOOP_CONFIRM] = "loop",
+	[B.DAILY_INTRO] = "daily",
+	[B.COMPLETE] = "none",
+}
+
+export type ObjectiveProjection = {
+	beat: FunnelBeat,
+	targetKind: string,
+	progress: number,
+	requiredCount: number,
+	complete: boolean,
+}
+
+-- projection(profile): the read-only onboarding surface for the client HUD + waypoint. DATA only — the
+-- client maps the beat to display copy. The funnel logic is unchanged; this just SURFACES the already-
+-- advancing state (review §6: the working funnel never reached the client, so the player got no direction).
+function M.projection(profile: PlayerData): ObjectiveProjection
+	local ob = profile.onboarding
+	local beat = ob.funnelBeat
+	local def = BEATS[beat]
+	return {
+		beat = beat,
+		targetKind = BEAT_TARGET[beat] or "none",
+		progress = ob.progress or 0,
+		requiredCount = (def and def.requiredCount) or 1,
+		complete = beat == B.COMPLETE,
+	}
+end
+
 -- The arrival-proximate first-spawn area per (destination, loop) — the ONLY place the first-of-each guarantee
 -- is allowed (the no-farming-leak scope). MVL: the Bayou only. (LOC_01 owns the placement; this is the scope.)
 local ONBOARDING_AREAS: { [string]: { [string]: string } } = {

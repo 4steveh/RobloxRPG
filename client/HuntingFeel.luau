@@ -124,10 +124,8 @@ function M.onFire(aimRay)
 	TweenService:Create(beam, TweenInfo.new(0.15), { Transparency = 1 }):Play()
 	Debris:AddItem(beam, 0.2)
 
-	-- recoil: a quick FOV punch that settles (does not fight the follow camera)
-	cam.FieldOfView = BASE_FOV + 4
-	TweenService:Create(cam, TweenInfo.new(0.18), { FieldOfView = BASE_FOV }):Play()
-
+	-- recoil camera FOV punch is now owned by ArmRig (M.recoil) so it composes with the ADS zoom instead of
+	-- fighting it (a fixed BASE_FOV tween here would yank the camera out of aim). Muzzle/tracer/sound stay here.
 	playSound("fire", 0.45)
 end
 
