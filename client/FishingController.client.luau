@@ -6,6 +6,7 @@
 local Net = require(script.Parent:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Hud"))
 local Feel = require(script.Parent:WaitForChild("FishingFeel")) -- S2 game-feel: rod, cast line, bobber, reel, landed FX
+local HarvestCard = require(script.Parent:WaitForChild("HarvestCard"))
 
 local STATE = { idle = "idle", waiting = "waiting", fighting = "fighting" }
 local state = STATE.idle
@@ -98,8 +99,13 @@ Net.cast.OnClientEvent:Connect(function(kind, fishId, extra)
 	elseif kind == "landed" then
 		lastFightReply = os.clock()
 		resetToIdle()
-		Hud.applyProjection(extra) -- extra = projection (payout delta)
-		Hud.toast("Landed!", Color3.fromRGB(150, 230, 140))
-		Feel.onLanded(fishId, extra)
+		local h = extra.harvest
+		Hud.applyProjection(extra.projection)
+		if h.mintedArtifactId or h.isRecord or h.isNew then
+			HarvestCard.show(h)
+		else
+			Hud.toast("+$" .. tostring(h.cash) .. "  " .. tostring(h.name), Color3.fromRGB(150, 230, 140))
+		end
+		Feel.onLanded(fishId, h.name)
 	end
 end)

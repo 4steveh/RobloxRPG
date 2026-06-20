@@ -133,6 +133,7 @@ export type Creature = {
 	spawn: CreatureSpawn,
 	rare: RareFields?, -- present iff rarity ≥ Rare
 	isMilestoneTarget: boolean?, -- the destination's designated HUNTING conquest target
+	typicalWeightKg: { min: number, max: number }?, -- cosmetic per-catch weight range (lb on the harvest card); never a payout input
 }
 
 -- ─────────────────────────────────────────────────────────────────────────────

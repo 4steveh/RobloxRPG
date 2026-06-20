@@ -10,6 +10,7 @@ local player = Players.LocalPlayer
 local Net = require(script.Parent:WaitForChild("Net"))
 local Hud = require(script.Parent:WaitForChild("Hud"))
 local Feel = require(script.Parent:WaitForChild("HuntingFeel")) -- S2 game-feel: muzzle/tracer/recoil + hit/kill FX
+local HarvestCard = require(script.Parent:WaitForChild("HarvestCard"))
 
 local FIRE_COOLDOWN = 0.15 -- client-side anti-spam only; the server enforces the authoritative fire rate
 local lastFire = 0
@@ -50,9 +51,14 @@ fireBtn.Activated:Connect(aimAndFire)
 
 Net.fire.OnClientEvent:Connect(function(kind, targetId, extra)
 	if kind == "kill" then
-		Hud.applyProjection(extra) -- extra = projection (carries the new balance → payout-delta toast)
-		Hud.toast("Down!", Color3.fromRGB(150, 230, 140))
-		Feel.onKill(extra)
+		local h = extra.harvest
+		Hud.applyProjection(extra.projection)
+		if h.mintedArtifactId or h.isRecord or h.isNew then
+			HarvestCard.show(h)
+		else
+			Hud.toast("+$" .. tostring(h.cash) .. "  " .. tostring(h.name), Color3.fromRGB(150, 230, 140))
+		end
+		Feel.onKill(extra.projection)
 	elseif kind == "hit" then
 		Hud.toast("hit " .. tostring(extra), Color3.fromRGB(230, 220, 140)) -- extra = per-shot damage
 		Feel.onHit()

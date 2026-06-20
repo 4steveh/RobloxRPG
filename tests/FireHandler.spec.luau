@@ -57,6 +57,7 @@ return function(t: Harness.T)
 		t.eq("one Cash faucet entry written (routine kill, stub Payout)", #p.cash.tail, 1)
 		t.ok("Hunter Rank XP awarded", p.hunterRankXP > 0)
 		t.ok("projection reflects the new balance", r.projection ~= nil and (r.projection :: any).balance == p.cash.tail[1].amount)
+		t.ok("the RewardPipeline.Result is surfaced on r.result (routine kill)", r.result ~= nil and (r.result :: any).cash > 0 and (r.result :: any).rankXP > 0 and (r.result :: any).mintedArtifactId == nil and (r.result :: any).boostCash == 0)
 	end
 
 	t.section("FireHandler — the alligator milestone kill sets conquest (validated, not client-asserted)")

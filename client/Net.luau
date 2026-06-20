@@ -14,4 +14,5 @@ return {
 	shop = ev("ShopRequest"),
 	travel = ev("TravelRequest"),
 	inventory = ev("InventoryRequest"),
+	lodge = ev("LodgeRequest"),
 }

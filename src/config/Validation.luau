@@ -137,6 +137,10 @@ function V.assertCreature(c: Creature)
 			assert(reward.kind == "cash", c.id .. ": Common/Uncommon must pay Cash")
 		end
 	end
+	if c.typicalWeightKg ~= nil then
+		assert(c.typicalWeightKg.min > 0 and c.typicalWeightKg.max >= c.typicalWeightKg.min,
+			c.id .. ": typicalWeightKg must have 0 < min <= max")
+	end
 end
 
 function V.assertFish(f: Fish)

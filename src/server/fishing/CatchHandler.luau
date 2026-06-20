@@ -157,6 +157,10 @@ function M.new(deps: CatchDeps): Gauntlet.IntentHandler
 				deps.telemetry.incr("fishing.coastalCatch", 1)
 			end
 			-- Step 9: a new conquest may newly satisfy a downstream gate's milestone half (atomic with the catch).
+			-- Surface the committed result so the caller can render the harvest card (HandleResult.result).
+			if ctx.resultSink then
+				ctx.resultSink.value = result
+			end
 			if result.conquestNewlySet then
 				Progression.commitUnlocks(ctx.profile, ctx.config)
 			end

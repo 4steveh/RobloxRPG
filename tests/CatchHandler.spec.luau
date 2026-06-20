@@ -96,6 +96,7 @@ return function(t: Harness.T)
 		t.eq("one Cash faucet entry written (routine catch)", #p.cash.tail, 1)
 		t.ok("Angler Rank XP awarded (not Hunter)", p.anglerRankXP > 0 and p.hunterRankXP == 0)
 		t.ok("projection reflects the new balance", r.projection ~= nil and (r.projection :: any).balance == p.cash.tail[1].amount)
+		t.ok("the RewardPipeline.Result is surfaced on r.result (routine catch)", r.result ~= nil and (r.result :: any).cash > 0 and (r.result :: any).rankXP > 0 and (r.result :: any).mintedArtifactId == nil)
 	end
 
 	t.section("CatchHandler — the Blue Catfish milestone catch sets the (shared) Bayou conquest")
@@ -263,6 +264,7 @@ return function(t: Harness.T)
 		t.ok("the in-window burbot catch (with the Kit) lands", rBurbot.ok)
 		t.eq("the event rare writes NO Cash at mint (RD2)", #catcher.cash.tail, 0)
 		t.ok("an artifact was minted (its value flows to trade/Trophy Hall)", next(catcher.artifacts) ~= nil)
+		t.ok("the rare burbot result carries the mint + zero cash (XOR) on r.result", (rBurbot.result :: any).mintedArtifactId ~= nil and (rBurbot.result :: any).cash == 0 and (rBurbot.result :: any).cleanKillMoment ~= nil)
 	end
 
 	t.section("Spawner — the Frozen Lake window is the PRIMARY gate (closed out-of-window)")

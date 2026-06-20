@@ -128,6 +128,10 @@ function M.new(deps: FireDeps): Gauntlet.IntentHandler
 			end
 			-- Step 9: a NEW conquest may newly satisfy a downstream gate's milestone half → re-evaluate
 			-- unlocks atomically with the kill (the gauntlet's Transaction reverts both on a failed save).
+			-- Surface the committed result so the caller can render the harvest card (HandleResult.result).
+			if ctx.resultSink then
+				ctx.resultSink.value = result
+			end
 			if result.conquestNewlySet then
 				Progression.commitUnlocks(ctx.profile, ctx.config)
 			end
