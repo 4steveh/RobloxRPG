@@ -816,13 +816,19 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 				material = r.logMaterial,
 			})
 		end
+		-- Shed roof over the porch: full height where it meets the cabin wall (+Z), tapering down to the
+		-- outer edge. Local +Z is the full-height end, so yaw = 0 points it at the wall.
+		--
+		-- Its high edge must tuck UNDER the main roof's eave. At postH + rise*0.175 it topped out above the
+		-- eave and read as a second roof fighting the first, which is what the live Lodge shot showed. The
+		-- pitch is also shallower than the main roof's, the way a real porch lean-to is.
+		local porchRise = rise * 0.2
+		local porchTop = r.wallHeight - logT * 1.2
 		table.insert(out, {
 			name = "PorchRoof",
 			shape = Art.Shape.wedge,
-			-- shed roof: full height where it meets the cabin wall (+Z), tapering down to the outer edge.
-			-- Local +Z is the full-height end, so yaw = 0 points it at the wall.
-			size = { x = r.width + logT * 2, y = rise * 0.35, z = r.porchDepth + logT },
-			pos = { x = 0, y = postH + rise * 0.175, z = pz },
+			size = { x = r.width + logT * 2, y = porchRise, z = r.porchDepth + logT },
+			pos = { x = 0, y = porchTop - porchRise * 0.5, z = pz },
 			up = UP,
 			yaw = 0,
 			color = Rand.pick(st, r.roofColors),
@@ -1320,6 +1326,98 @@ function ArtGen.creature(r: Art.CreatureRecipe, seed: number): ModelDesc
 	-- groundPivot: how far the torso centre sits above the ground, so the Studio side can place a creature
 	-- standalone (set dressing) as well as welded to a hitbox. Same number the hitbox uses for its foot lift.
 	return { name = r.name, parts = out, groundPivot = { x = 0, y = -anatomy.footDrop, z = 0 } }
+end
+
+-- ── fishing bite marker ───────────────────────────────────────────────────────────────────────────────
+-- The thing a player looks at for the entire fishing loop. WorldServer spawns it as a queryable 2x2x2
+-- semi-transparent light-blue PLASTIC CUBE floating on the water — a programmer placeholder, and the single
+-- most-seen object in the loop.
+--
+-- This builds a surface disturbance instead: concentric spreading rings on the waterline, the fish's own
+-- dorsal fin and tail tip breaking the surface in ITS palette, and a few splash flecks. Two things fall out
+-- of that for free: a catfish bite reads differently from a salmon bite, and the marker SCALES with the
+-- species' length — so ring size telegraphs how big the fish is before the player commits to the cast.
+--
+-- Authored around the origin AT the water surface (y = 0), all parts non-collidable and non-queryable so the
+-- underlying cube keeps receiving the cast.
+function ArtGen.biteMarker(r: Art.CreatureRecipe, seed: number): ModelDesc
+	local st = Rand.stream(seed)
+	local out: { PartDesc } = {}
+	-- a 0.7-stud bluegill and a 5.2-stud leviathan should not disturb the water identically
+	local scale = Rand.clamp(r.length / 2, 0.5, 2.6)
+	local pale = ArtGen.blend(Rand.pick(st, r.belly), { 245, 250, 252 }, 0.45)
+
+	for i = 1, 3 do
+		local d = (3.4 + (i - 1) * 2.6) * scale
+		table.insert(out, {
+			name = "Ripple",
+			shape = Art.Shape.cylinder,
+			size = { x = 0.12, y = d, z = d },
+			pos = { x = 0, y = 0.06 + i * 0.02, z = 0 },
+			up = UP, -- cylinder convention: `up` is the axis, so a vertical axis lies the disc flat
+			yaw = Rand.range(st, 0, TAU),
+			color = pale,
+			material = Art.Material.SmoothPlastic,
+			transparency = 0.5 + i * 0.14,
+			castShadow = false,
+			canCollide = false,
+			canQuery = false,
+		})
+	end
+
+	-- dorsal fin breaking the surface, in the species' own back colour
+	local finH = (if r.fins ~= nil then r.fins.dorsal else 0.3) * scale * 1.6
+	local heading = Rand.range(st, 0, TAU)
+	table.insert(out, {
+		name = "BiteFin",
+		shape = Art.Shape.block,
+		size = { x = r.width * scale * 0.5, y = finH, z = r.length * scale * 0.28 },
+		pos = { x = 0, y = finH * 0.32, z = 0 },
+		up = UP,
+		yaw = heading,
+		color = ArtGen.jitterColor(st, Rand.pick(st, r.back), 0.05),
+		material = r.material,
+		castShadow = false,
+		canCollide = false,
+		canQuery = false,
+	})
+	-- tail tip, trailing behind the fin along the same heading
+	local trail = r.length * scale * 0.42
+	table.insert(out, {
+		name = "BiteTail",
+		shape = Art.Shape.block,
+		size = { x = r.width * scale * 0.32, y = finH * 0.7, z = r.length * scale * 0.18 },
+		pos = { x = -math.sin(heading) * trail, y = finH * 0.2, z = -math.cos(heading) * trail },
+		up = Vec.tilt(UP, 0.35, heading),
+		yaw = heading,
+		color = ArtGen.jitterColor(st, Rand.pick(st, r.back), 0.05),
+		material = r.material,
+		castShadow = false,
+		canCollide = false,
+		canQuery = false,
+	})
+
+	for _ = 1, 4 do
+		local az = Rand.range(st, 0, TAU)
+		local d = Rand.range(st, 0.8, 3.2) * scale
+		local s = Rand.range(st, 0.22, 0.5) * scale
+		table.insert(out, {
+			name = "Splash",
+			shape = Art.Shape.block,
+			size = { x = s, y = s * Rand.range(st, 0.8, 1.8), z = s },
+			pos = { x = math.cos(az) * d, y = Rand.range(st, 0.18, 0.8) * scale, z = math.sin(az) * d },
+			up = Vec.tilt(UP, Rand.range(st, 0, 0.5), az),
+			yaw = Rand.range(st, 0, TAU),
+			color = pale,
+			material = Art.Material.SmoothPlastic,
+			transparency = Rand.range(st, 0.2, 0.45),
+			castShadow = false,
+			canCollide = false,
+			canQuery = false,
+		})
+	end
+
+	return { name = "BiteMarker", parts = out, groundPivot = { x = 0, y = 0, z = 0 } }
 end
 
 -- ── aggregate helpers ─────────────────────────────────────────────────────────────────────────────────

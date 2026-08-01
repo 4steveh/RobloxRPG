@@ -666,9 +666,51 @@ end
 
 local UPGRADED_ATTR = "artUpgraded"
 
+-- A fishing BITE is not a Model — WorldServer spawns it as a single queryable Part carrying a `fishId`.
+-- It gets a surface-disturbance visual rather than a fish silhouette: the fish is hooked and underwater, so
+-- what the player should see is rings, a fin breaking the surface, and splash.
+function M.upgradeBite(part)
+	if typeof(part) ~= "Instance" or not part:IsA("BasePart") then
+		return
+	end
+	if part:GetAttribute(UPGRADED_ATTR) then
+		return
+	end
+	local id = part:GetAttribute("fishId") or part:GetAttribute("targetId")
+	if id == nil then
+		return
+	end
+	local recipe = ArtKit.fishArt[id]
+	if recipe == nil then
+		warn(("[WildWorldArt] no fish recipe for bite '%s' — it keeps its placeholder cube"):format(tostring(id)))
+		return
+	end
+	part:SetAttribute(UPGRADED_ATTR, true)
+	-- hide the cube but leave CanQuery alone: the cast has to keep hitting it
+	part.Transparency = 1
+	part.CastShadow = false
+
+	local seed = 0
+	local key = tostring(id)
+	for i = 1, #key do
+		seed += string.byte(key, i) * i
+	end
+	local desc = ArtGen.biteMarker(recipe, seed)
+	local visual = Instance.new("Folder")
+	visual.Name = "ArtVisual"
+	-- the marker sits on the waterline, not at the cube's centre
+	local surface = CFrame.new(part.Position.X, part.Position.Y - part.Size.Y * 0.5, part.Position.Z)
+	for _, d in ipairs(desc.parts) do
+		buildPart(d, surface, 1, visual)
+	end
+	visual.Parent = part
+	return visual
+end
+
 function M.upgradeCreature(model)
 	if typeof(model) ~= "Instance" or not model:IsA("Model") then
-		return
+		-- a bite marker arrives here too, since both folders share one listener
+		return M.upgradeBite(model)
 	end
 	if model:GetAttribute(UPGRADED_ATTR) then
 		return

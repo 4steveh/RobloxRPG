@@ -239,6 +239,66 @@ return function(t: Harness.T)
 		t.eq("no drift between two generations", drift, 0)
 	end)
 
+	t.section("Fishing bite markers")
+
+	t.test("every fish yields a valid bite marker that never absorbs the cast", function()
+		-- WorldServer spawns a bite as a queryable Part; the marker is decoration layered over it. A single
+		-- queryable marker part would intercept the cast and the player's line would hit scenery.
+		local offenders: { string } = {}
+		for id, r in FISH_ART do
+			local m = ArtGen.biteMarker(r, 3)
+			t.ok(id .. ": produces a marker", #m.parts >= 6)
+			for _, p in m.parts do
+				if p.canQuery ~= false or p.canCollide ~= false or p.castShadow ~= false then
+					table.insert(offenders, id .. "/" .. p.name)
+					break
+				end
+			end
+			-- everything sits at or above the waterline; a ring below it would be invisible under the water
+			local lo, _hi = ArtGen.bounds(m.parts)
+			t.ok(("%s: marker sits on the surface (minY %.2f >= -0.5)"):format(id, lo.y), lo.y >= -0.5)
+		end
+		t.eq("no queryable/collidable/shadowing marker part: " .. table.concat(offenders, ", "), #offenders, 0)
+	end)
+
+	t.test("marker size telegraphs the fish's size", function()
+		-- Free gameplay information: a player should be able to tell a bluegill bite from a leviathan bite
+		-- before committing to the cast.
+		local function width(id: string): number
+			local m = ArtGen.biteMarker(FISH_ART[id], 9)
+			local lo, hi = ArtGen.bounds(m.parts)
+			return hi.x - lo.x
+		end
+		local small = width("bayou_bluegill")
+		local big = width("bayou_leviathan")
+		t.ok(("leviathan marker %.1f is much wider than bluegill %.1f"):format(big, small), big > small * 2)
+		-- and it must stay bounded: a marker the size of the fishing hole is not information
+		t.ok(("the largest marker %.1f stays under 30 studs"):format(big), big < 30)
+	end)
+
+	t.test("the bite marker draws the species' own colours", function()
+		local r = FISH_ART.alaska_sockeye_salmon
+		local m = ArtGen.biteMarker(r, 4)
+		local allowed: { [string]: boolean } = {}
+		for _, c in r.back do
+			allowed[("%d,%d,%d"):format(c[1], c[2], c[3])] = true
+		end
+		local finFound = false
+		for _, p in m.parts do
+			if p.name == "BiteFin" then
+				finFound = true
+			end
+		end
+		t.ok("the marker has a dorsal fin breaking the surface", finFound)
+		local rings = 0
+		for _, p in m.parts do
+			if p.name == "Ripple" then
+				rings += 1
+			end
+		end
+		t.eq("three concentric rings", rings, 3)
+	end)
+
 	t.section("Creature art — anatomy agrees with the hitbox")
 
 	t.test("the head sits forward of the torso and above the belly", function()

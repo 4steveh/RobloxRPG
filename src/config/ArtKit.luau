@@ -39,7 +39,7 @@ local S = Art.Shape
 
 local ArtKit = {}
 
-ArtKit.version = 6
+ArtKit.version = 9
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════
 -- PALETTES. Each element type carries 4-6 hues; the generators pick per part. Values are RGB 0-255.
@@ -50,7 +50,7 @@ ArtKit.version = 6
 ArtKit.palettes = {
 	bayou = {
 		-- wet cypress bark: grey-brown, low saturation, wide value range for the buttressed base
-		bark = { { 87, 70, 60 }, { 100, 78, 63 }, { 114, 87, 65 }, { 128, 96, 65 } } :: { RGB },
+		bark = { { 65, 52, 45 }, { 75, 58, 47 }, { 86, 65, 49 }, { 96, 72, 49 } } :: { RGB },
 		-- cypress needle green: soft, slightly yellow, five steps
 		foliage = { { 111, 104, 74 }, { 124, 138, 122 }, { 118, 150, 63 }, { 101, 168, 66 }, { 146, 198, 80 } } :: { RGB },
 		-- Spanish moss: desaturated sage, the signature Bayou silhouette element
@@ -63,7 +63,7 @@ ArtKit.palettes = {
 		lilypad = { { 108, 116, 76 }, { 105, 137, 69 }, { 81, 159, 59 }, { 42, 180, 53 } } :: { RGB },
 	},
 	appalachia = {
-		bark = { { 92, 74, 62 }, { 105, 83, 64 }, { 119, 92, 65 }, { 133, 101, 65 } } :: { RGB },
+		bark = { { 72, 58, 48 }, { 82, 65, 50 }, { 93, 72, 51 }, { 104, 79, 51 } } :: { RGB },
 		birchBark = { { 194, 191, 186 }, { 207, 203, 195 }, { 221, 216, 203 }, { 235, 230, 211 } } :: { RGB },
 		-- late-summer hardwood: deep greens with two warm turning hues so the ridge reads with depth
 		foliage = { { 116, 113, 78 }, { 126, 140, 124 }, { 111, 152, 64 }, { 92, 170, 62 }, { 152, 200, 84 } } :: { RGB },
@@ -562,10 +562,10 @@ ArtKit.clusters = {
 		countMax = 14,
 		radius = 2.6,
 		shape = S.block,
-		size = { x = 0.22, y = 5.4, z = 0.22 },
+		size = { x = 0.26, y = 3.1, z = 0.26 },
 		sizeJitter = 0.35,
-		tilt = 0.18,
-		rise = -0.4,
+		tilt = 0.22,
+		rise = -0.35,
 		material = M.Grass,
 		colors = P.bayou.reed,
 		castShadow = false,
@@ -578,10 +578,10 @@ ArtKit.clusters = {
 		countMax = 12,
 		radius = 1.9,
 		shape = S.block,
-		size = { x = 0.85, y = 0.14, z = 2.3 },
+		size = { x = 0.8, y = 0.16, z = 1.7 },
 		sizeJitter = 0.3,
-		tilt = 1.15,
-		rise = 0.5,
+		tilt = 0.6,
+		rise = 0.3,
 		material = M.Grass,
 		colors = P.bayou.fern,
 		castShadow = false,
@@ -642,10 +642,10 @@ ArtKit.clusters = {
 		countMax = 11,
 		radius = 2.2,
 		shape = S.block,
-		size = { x = 0.3, y = 2.2, z = 0.3 },
+		size = { x = 0.32, y = 1.5, z = 0.32 },
 		sizeJitter = 0.4,
-		tilt = 0.35,
-		rise = -0.3,
+		tilt = 0.4,
+		rise = -0.25,
 		material = M.Grass,
 		colors = P.appalachia.grassTuft,
 		castShadow = false,
@@ -658,10 +658,10 @@ ArtKit.clusters = {
 		countMax = 12,
 		radius = 2.1,
 		shape = S.block,
-		size = { x = 0.8, y = 0.16, z = 2.1 },
+		size = { x = 0.75, y = 0.16, z = 1.6 },
 		sizeJitter = 0.3,
-		tilt = 1.2,
-		rise = 0.45,
+		tilt = 0.62,
+		rise = 0.28,
 		material = M.Grass,
 		colors = P.appalachia.fern,
 		castShadow = false,
