@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(./run-tests.sh)",
+      "Bash(luau:*)",
+      "Bash(luau-analyze:*)",
+      "Bash(rojo build:*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

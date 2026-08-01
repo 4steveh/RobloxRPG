@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## State note (2026-07-11) — reconcile branches before trusting build-state claims
+
+This checkout is on **`weather-traits`, 12 commits behind `main`**. `main` already has the
+graphics-gameplay-overhaul (Wave 1 modern-bar) and field-inventory merges, plus `rokit.toml` and
+`docs/REVIEW_2026-06-20_modern-bar.md` — none of which are in this working tree. Conversely,
+`.mcp.json` + the WSL Studio wrapper exist **only** on `weather-traits` (commit `0e6f6ec`), so
+`main`-based sessions have no Studio MCP. Reconcile (merge `main` into `weather-traits`, or land
+`0e6f6ec` on `main` and switch) before relying on build-state claims here or in `README.md`.
+
 ## What this is
 
 **Wild World** — a Roblox/Luau hunting-and-fishing RPG. The repo holds both the **design corpus** (the
@@ -74,7 +83,8 @@ Consequences when editing:
 
 Work proceeds in numbered steps from `03_BUILD_PLAN.md`, one branch per step (`main`,
 `step-2-persistence`, `step-3-bayou-shell`). Implementation plans live in
-`docs/superpowers/plans/`. Steps 1–3 are done; later steps are stubbed.
+`docs/superpowers/plans/`. **Steps 1–15 are done (MVL feature-complete** — see README's status
+header); anything still unbuilt is listed in README's "Deferred — who owns what" table.
 
 Before building something that seems missing, check README's **"Deferred — who owns what"** table — much
 unbuilt behavior (combat/fishing resolution, faucet/sink economy operations, teleport enforcement,
@@ -100,3 +110,11 @@ of `run-tests.sh` fails if any of them analyzes clean. Do **not** "fix" them to 
 See README.md's "Module map" for the per-file responsibilities (`types/`, `config/`, `logic/`,
 `server/{persistence,ledger,artifacts,authority,idle}`, the Step-2 substrate table, and the keystone
 `ProfileStore.luau` session-lock semantics). It is kept current with the implementation.
+## Roblox workflow (machine-wide skill: ~/.claude/skills/roblox-workflow)
+This repo follows the roblox-workflow personal skill for source-of-truth, verify, and build-loop rules.
+Filesystem (via Rojo) is the source of truth for scripts; do not hand-edit scripts in Studio while Rojo serves.
+TARGET CHECK: multiple Studios may be open on one shared proxy — confirm set_active_studio is the intended game
+before any mutating call (execute_luau, multi_edit, insert_asset, upload_image, generate_*).
+SECURITY TRIPWIRE: never insert_asset (marketplace asset by ID) without first script_read-ing and scanning every
+contained script for obfuscation, remote require(), HttpService, loadstring, getfenv — then get explicit approval.
+Never run execute_luau touching credentials, real DataStores, or publishing APIs without confirmation.

@@ -69,6 +69,9 @@ local specs: { (Harness.T) -> () } = {
 	require("@tests/Analytics.spec"),
 	-- Field inventory (Loadout — owned equippable gear grouped by slot)
 	require("@tests/Loadout.spec"),
+	-- Visual overhaul (the procedural art layer: deterministic RNG/noise, orientation contract,
+	-- tree/rock/scatter/cabin generators, part budgets, palette + terrain-material discipline)
+	require("@tests/ArtGen.spec"),
 }
 
 for _, spec in specs do

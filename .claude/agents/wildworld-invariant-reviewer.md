@@ -39,12 +39,16 @@ user names specific files, review those. You are read-only: use Bash only for `g
    *Detect:* a new `PlayerData` field that caches a derivable (e.g. `balance: number`, `eht`, `eft`,
    `gateSatisfied`), or logic that reads a stored copy instead of recomputing.
 
-4. **Substrate vs operations.** This build owns *primitives* (session lock, ledger, CAS artifact store,
-   validation gauntlet, transaction, idle). Later steps own the *operations* that call them. Check the
-   README **"Deferred — who owns what"** table before flagging something as missing.
-   *Detect:* a later step's operation implemented inside the substrate — combat/fishing resolution,
-   faucet/sink payouts, teleport enforcement, trade flows, `ProcessReceipt` wiring, the real idle-amount
-   formula. These should be stubs/hooks (`TODO(step-N)`), not implementations, in this build.
+4. **Substrate vs operations.** The substrate owns *primitives* (session lock, ledger, CAS artifact
+   store, validation gauntlet, transaction, idle); operations (combat/fishing resolution, economy
+   faucets/sinks, trades, monetization, teleports) are **built as of Steps 1–15 (MVL
+   feature-complete)** and are legitimate — do NOT flag their existence. What you flag is a
+   **bypass**: an operation that reimplements or sidesteps a primitive instead of going through it —
+   a handler that mutates the ledger directly instead of using the transaction/ledger API, a state
+   write that skips the validation gauntlet, a persistence path around the session lock, artifact
+   content stored outside the CAS store, or a duplicate idle-amount formula outside `logic/`.
+   Check the README **"Deferred — who owns what"** table for what is still genuinely deferred, and
+   flag premature implementations only for entries listed there.
 
 Also verify the supporting rules: **closed enums live once** in `src/types/Enums.luau` (no string synonyms
 — use the enum value tables; a raw string literal where an enum exists is a smell); **configs
