@@ -27,6 +27,7 @@ Builder.applyLook(ArtKit.looks.bayou)
 Builder.publishLooks()
 Builder.suppressPlaceholders()
 Builder.startCreatureUpgrades()
+Builder.startGaitLoop()
 
 local built = workspace:GetAttribute(BUILT_ATTR) == true
 local sameVersion = workspace:GetAttribute(VERSION_ATTR) == ArtKit.version

@@ -187,7 +187,15 @@ RunService.RenderStepped:Connect(function()
 			dir = Vector2.new(0, -1)
 		end
 		dir = dir.Unit
-		local margin = 64
+		-- On the first frames after joining, Camera.ViewportSize is still (0, 0). A fixed 64px margin then
+		-- produces math.clamp(x, 64, -64) — max below min — which THROWS, and the off-screen waypoint arrow
+		-- silently stopped working for the rest of the session. Cap the margin to a third of the viewport and
+		-- bail out entirely while it is degenerate.
+		if vp.X < 8 or vp.Y < 8 then
+			arrow.Visible = false
+			return
+		end
+		local margin = math.min(64, vp.X / 3, vp.Y / 3)
 		local ex = math.clamp(vp.X / 2 + dir.X * vp.X, margin, vp.X - margin)
 		local ey = math.clamp(vp.Y / 2 + dir.Y * vp.Y, margin, vp.Y - margin)
 		arrow.Position = UDim2.fromOffset(ex, ey)

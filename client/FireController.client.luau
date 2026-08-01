@@ -62,7 +62,8 @@ Net.fire.OnClientEvent:Connect(function(kind, targetId, extra)
 		end
 		Feel.onKill(extra.projection)
 	elseif kind == "hit" then
-		Hud.toast("hit " .. tostring(extra), Color3.fromRGB(230, 220, 140)) -- extra = per-shot damage
-		Feel.onHit()
+		-- The corner toast is gone: the confirmation is now a hit-marker under the crosshair plus a floating
+		-- damage number at the point of contact, which tells the player WHERE they hit as well as how hard.
+		Feel.onHit(extra) -- extra = per-shot damage
 	end
 end)

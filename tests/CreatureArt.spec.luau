@@ -343,6 +343,42 @@ return function(t: Harness.T)
 		t.eq("every drawn head is inside its vital zone: " .. table.concat(offenders, "; "), #offenders, 0)
 	end)
 
+	t.test("legs are named by station so the gait can pair them", function()
+		-- WorldArtBuilder's cosmetic leg swing groups legs by name and swings diagonal pairs together. If a
+		-- station name is missing, that leg silently stops animating while the others keep going.
+		local WANT = { ForeLegL = true, ForeLegR = true, HindLegL = true, HindLegR = true }
+		for id, r in CREATURE_ART do
+			if r.legs ~= nil then
+				local seen: { [string]: number } = {}
+				for _, p in ArtGen.creature(r, 6).parts do
+					if WANT[p.name] then
+						seen[p.name] = (seen[p.name] or 0) + 1
+					end
+				end
+				local missing: { string } = {}
+				for name in WANT do
+					if seen[name] == nil then
+						table.insert(missing, name)
+					end
+				end
+				t.eq(("%s: all four leg stations present (missing %s)"):format(id, table.concat(missing, ",")), #missing, 0)
+				-- every station must carry the same number of segments, or one leg is shorter than another
+				local counts: { number } = {}
+				for _, v in seen do
+					table.insert(counts, v)
+				end
+				local same = true
+				for _, v in counts do
+					if v ~= counts[1] then
+						same = false
+					end
+				end
+				t.ok(id .. ": every leg has the same segment count", same)
+				t.eq(id .. ": segment count matches the recipe", counts[1], math.max(1, math.floor(r.legs.segments)))
+			end
+		end
+	end)
+
 	t.section("Creature art — palette discipline")
 
 	t.test("every species is counter-shaded: the belly is lighter than the back", function()

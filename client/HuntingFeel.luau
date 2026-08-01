@@ -11,8 +11,11 @@ local SoundService = game:GetService("SoundService")
 local player = Players.LocalPlayer
 local cam = workspace.CurrentCamera
 
+local CameraFeel = require(script.Parent:WaitForChild("CameraFeel"))
+local Impact = require(script.Parent:WaitForChild("ImpactFeel"))
+local Hud = require(script.Parent:WaitForChild("Hud"))
+
 local M = {}
-local BASE_FOV = cam.FieldOfView
 
 -- ── sound (best-effort): engine-bundled rbxasset:// ids (load locally, no CDN); silent on any failure ──
 local SOUNDS = {
@@ -33,6 +36,65 @@ local function playSound(key, volume)
 		snd.Parent = SoundService
 		snd:Play()
 		Debris:AddItem(snd, 5)
+	end)
+end
+
+
+-- ── screen-space hit-marker ────────────────────────────────────────────────────────────────────────
+-- The old confirmation was the aim highlight's OUTLINE briefly turning red — a change to a thing the
+-- player is not looking at, on the target rather than under the crosshair. Four ticks that pop outward
+-- from screen centre put the confirmation exactly where the eye already is.
+local marker = Instance.new("Frame")
+marker.Name = "HitMarker"
+marker.AnchorPoint = Vector2.new(0.5, 0.5)
+marker.Position = UDim2.fromScale(0.5, 0.5)
+marker.Size = UDim2.fromOffset(48, 48)
+marker.BackgroundTransparency = 1
+marker.Visible = false
+marker.ZIndex = 40
+marker.Parent = Hud.gui
+
+local ticks = {}
+for i, spec in ipairs({
+	{ UDim2.new(0.5, 0, 0, 0), Vector2.new(0.5, 0), UDim2.fromOffset(3, 11) },
+	{ UDim2.new(0.5, 0, 1, 0), Vector2.new(0.5, 1), UDim2.fromOffset(3, 11) },
+	{ UDim2.new(0, 0, 0.5, 0), Vector2.new(0, 0.5), UDim2.fromOffset(11, 3) },
+	{ UDim2.new(1, 0, 0.5, 0), Vector2.new(1, 0.5), UDim2.fromOffset(11, 3) },
+}) do
+	local t = Instance.new("Frame")
+	t.BorderSizePixel = 0
+	t.Position = spec[1]
+	t.AnchorPoint = spec[2]
+	t.Size = spec[3]
+	t.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	t.Parent = marker
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 2)
+	corner.Parent = t
+	ticks[i] = t
+end
+
+local markerToken = 0
+local function popMarker(vital)
+	markerToken += 1
+	local token = markerToken
+	marker.Visible = true
+	marker.Size = UDim2.fromOffset(if vital then 30 else 34, if vital then 30 else 34)
+	local col = if vital then Color3.fromRGB(255, 222, 120) else Color3.fromRGB(255, 255, 255)
+	for _, t in ipairs(ticks) do
+		t.BackgroundColor3 = col
+		t.BackgroundTransparency = 0
+	end
+	TweenService:Create(marker, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Size = UDim2.fromOffset(if vital then 62 else 54, if vital then 62 else 54),
+	}):Play()
+	for _, t in ipairs(ticks) do
+		TweenService:Create(t, TweenInfo.new(0.22), { BackgroundTransparency = 1 }):Play()
+	end
+	task.delay(0.26, function()
+		if markerToken == token then
+			marker.Visible = false
+		end
 	end)
 end
 
@@ -124,21 +186,49 @@ function M.onFire(aimRay)
 	TweenService:Create(beam, TweenInfo.new(0.15), { Transparency = 1 }):Play()
 	Debris:AddItem(beam, 0.2)
 
-	-- recoil camera FOV punch is now owned by ArmRig (M.recoil) so it composes with the ADS zoom instead of
-	-- fighting it (a fixed BASE_FOV tween here would yank the camera out of aim). Muzzle/tracer/sound stay here.
+	-- recoil camera FOV punch is owned by ArmRig (M.recoil) so it composes with the ADS zoom instead of
+	-- fighting it. The ANGULAR kick is CameraFeel's, applied after the camera has been positioned.
+	CameraFeel.kick(1)
 	playSound("fire", 0.45)
+
+	-- Predicted impact, fired NOW rather than on the server's reply: a shot has to have a consequence at the
+	-- point of contact the same frame the trigger goes down, or it reads as lag. The server still owns the
+	-- outcome. `hit` is the same raycast the tracer endpoint came from, so this is free.
+	local info = Impact.classify(hit)
+	M.lastImpact = info
+	if info ~= nil then
+		local amount = Impact.burst(info.position, info.normal, info.material, { class = info.class })
+		CameraFeel.shakeCamera(amount)
+	end
 end
 
-function M.onHit()
-	-- hit-marker: flash the aim highlight outline red briefly
-	highlight.OutlineColor = Color3.fromRGB(255, 90, 80)
-	task.delay(0.12, function()
-		highlight.OutlineColor = Color3.fromRGB(255, 230, 150)
-	end)
+-- `damage` is the server's authoritative per-shot number; the impact position comes from the client's own
+-- predicted raycast at fire time, which is the same aim the server used.
+function M.onHit(damage)
+	local info = M.lastImpact
+	local vital = info ~= nil and info.zone == "vital"
+	popMarker(vital)
+	if info ~= nil then
+		Impact.damageNumber(info.position, tonumber(damage) or 0, vital)
+		if info.model ~= nil then
+			Impact.flinch(info.model, false)
+		end
+	end
+	CameraFeel.hitConfirm(if vital then 0.55 else 0.35)
 	playSound("hit", 0.5)
 end
 
 function M.onKill(_projection)
+	local info = M.lastImpact
+	popMarker(true)
+	if info ~= nil then
+		if info.model ~= nil then
+			Impact.flinch(info.model, true)
+		end
+		-- a heavier burst on the killing blow, at the same contact point
+		Impact.burst(info.position, info.normal, info.material, { class = info.class, scale = 1.7 })
+	end
+	CameraFeel.hitConfirm(0.8)
 	local adornee = highlight.Adornee
 	local pos = (adornee and adornee.Parent and adornee:GetPivot().Position)
 		or (cam.CFrame * CFrame.new(0, 0, -12)).Position

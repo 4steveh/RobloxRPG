@@ -1196,7 +1196,9 @@ function ArtGen.creature(r: Art.CreatureRecipe, seed: number): ModelDesc
 					local th = L.thickness * (1 - 0.18 * (i - 1))
 					creaturePart(
 						out,
-						if front then "ForeLeg" else "HindLeg",
+						-- Named by station (L/R, fore/hind) so WorldArtBuilder's gait can group each leg and
+						-- swing diagonal pairs together, the way a real quadruped walk does.
+						("%sLeg%s"):format(if front then "Fore" else "Hind", if sx < 0 then "L" else "R"),
 						{ x = th, y = len * 1.08, z = th },
 						Vec.add(cur, Vec.scale(dir, len * 0.5)),
 						dir,

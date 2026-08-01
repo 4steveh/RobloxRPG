@@ -735,13 +735,73 @@ for zoneId, area in huntingSpawn.areas do
 	end
 end
 
--- ── STUDIO FEEL: creature movement (wander + face direction; flee when shot at) ──────────────────────
--- SERVER-AUTHORITATIVE so the fire raycast always hits the live position (moving targets). A throttled
--- Heartbeat walks each creature toward a wander point in its zone, or away from a recent shot. Anchored-
--- part PivotTo replicates to all clients. The loop never yields, so it can't interleave with despawn.
+-- ── STUDIO FEEL: creature locomotion ────────────────────────────────────────────────────────────────
+-- SERVER-AUTHORITATIVE so the fire raycast always hits the live position. What changed and why:
+--
+-- The first version walked each creature at a FIXED speed in a straight line toward a random point and
+-- snapped its facing with CFrame.lookAt every tick. Three things read badly from that: an animal that
+-- reaches full sprint in one frame has no weight; one that pivots instantly has no mass; and one that never
+-- stops has no attention. Deer do not commute.
+--
+-- Now: velocity accelerates and decelerates, facing turns at a bounded rate, and each creature cycles
+-- through WALK -> GRAZE -> ALERT -> FLEE. Alert is the one that changes gameplay rather than just looks:
+-- a creature notices a nearby player, freezes and watches, and bolts if that player keeps closing — so
+-- stalking becomes a real activity instead of walking up to a wandering box.
+--
+-- The gait (body bob, roll, and lean into acceleration) is folded into the SAME PivotTo CFrame that was
+-- already being sent, so it costs nothing extra in replication. Leg swing is cosmetic and lives in
+-- WorldArtBuilder, which owns the visual.
+
+local ACCEL = 9 -- studs/s^2 toward the target speed
+local DECEL = 14 -- studs/s^2 when slowing (stopping is faster than starting)
+local TURN_RATE = 3.4 -- radians/sec, so a big animal cannot spin on the spot
+local FLEE_MULT = 2.5
+local FLEE_SECONDS = 4
+local GRAZE_MIN, GRAZE_MAX = 2.5, 7 -- seconds paused between wander legs
+local ALERT_RADIUS = 26 -- a player inside this makes the creature stop and watch
+local BOLT_RADIUS = 13 -- ...and inside this it runs
+local ALERT_SECONDS = 2.2
+local BOB_HEIGHT = 0.16 -- studs; the low point stays at ground level, so feet never sink
+local ROLL_MAX = math.rad(2.6)
+local LEAN_MAX = math.rad(4.5)
+
 local function zoneRandomPoint(zoneId)
 	local z = shell.zones[zoneId]
 	return vec(z.center) + Vector3.new((math.random() - 0.5) * z.size.x * 0.8, 0, (math.random() - 0.5) * z.size.z * 0.8)
+end
+
+-- Nearest player character position and its distance, or nil. One pass per tick, reused by every creature.
+local function nearestPlayerTo(pos)
+	local best, bestD = nil, math.huge
+	for _, plr in Players:GetPlayers() do
+		local char = plr.Character
+		local root = char and char.PrimaryPart
+		if root ~= nil then
+			local d = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(pos.X, 0, pos.Z)).Magnitude
+			if d < bestD then
+				best, bestD = root.Position, d
+			end
+		end
+	end
+	return best, bestD
+end
+
+-- Rotate `from` toward `to` by at most `maxRad`. Keeps a turn bounded so facing is a movement, not a snap.
+local function turnToward(from, to, maxRad)
+	if from.Magnitude < 1e-4 then
+		return to
+	end
+	local a, b = from.Unit, to.Unit
+	local dot = math.clamp(a:Dot(b), -1, 1)
+	local angle = math.acos(dot)
+	if angle <= maxRad or angle < 1e-4 then
+		return b
+	end
+	-- signed turn direction about Y
+	local cross = a:Cross(b).Y
+	local sign = if cross >= 0 then 1 else -1
+	local c, sn = math.cos(maxRad * sign), math.sin(maxRad * sign)
+	return Vector3.new(a.X * c + a.Z * sn, 0, -a.X * sn + a.Z * c).Unit
 end
 
 local function moveCreatures(dt)
@@ -752,33 +812,124 @@ local function moveCreatures(dt)
 			local pos = model:GetPivot().Position
 			local z = shell.zones[state.zoneId]
 			local center = vec(z.center)
-			local speed = state.speed or 5
-			local dir
-			if state.mode == "flee" and now < state.fleeUntil then
-				local from = state.fleeFrom or pos
-				dir = Vector3.new(pos.X - from.X, 0, pos.Z - from.Z)
-				speed = speed * 2.4
-			else
-				if state.mode == "flee" then
-					state.mode = "wander"
+			local baseSpeed = state.speed or 5
+
+			state.facing = state.facing or Vector3.new(0, 0, 1)
+			state.vel = state.vel or 0
+			state.phase = state.phase or math.random() * 6.28
+			state.behaviour = state.behaviour or "walk"
+
+			local playerPos, playerDist = nearestPlayerTo(pos)
+
+			-- ── behaviour selection ──
+			if state.mode == "flee" and now >= state.fleeUntil then
+				state.mode = "wander"
+				state.behaviour = "walk"
+				state.target = nil
+			end
+			if state.mode ~= "flee" then
+				if playerPos ~= nil and playerDist <= BOLT_RADIUS then
+					-- too close: bolt
+					state.mode = "flee"
+					state.behaviour = "flee"
+					state.fleeUntil = now + FLEE_SECONDS
+					state.fleeFrom = playerPos
 					state.target = nil
-				end
-				if state.target == nil or (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(state.target.X, 0, state.target.Z)).Magnitude < 2 then
+				elseif playerPos ~= nil and playerDist <= ALERT_RADIUS then
+					if state.behaviour ~= "alert" then
+						state.behaviour = "alert"
+						state.alertUntil = now + ALERT_SECONDS
+					elseif now >= (state.alertUntil or 0) then
+						-- watched long enough and the player is still there: leave, at a walk
+						state.behaviour = "walk"
+						state.target = zoneRandomPoint(state.zoneId)
+					end
+				elseif state.behaviour == "alert" then
+					state.behaviour = "walk"
+				elseif state.behaviour == "graze" and now >= (state.idleUntil or 0) then
+					state.behaviour = "walk"
 					state.target = zoneRandomPoint(state.zoneId)
 				end
-				dir = Vector3.new(state.target.X - pos.X, 0, state.target.Z - pos.Z)
 			end
-			if dir.Magnitude > 0.15 then
-				dir = dir.Unit
-				local step = pos + dir * speed * dt
-				local nx = math.clamp(step.X, center.X - z.size.x / 2, center.X + z.size.x / 2)
-				local nz = math.clamp(step.Z, center.Z - z.size.z / 2, center.Z + z.size.z / 2)
-				-- S3 GROUND CONTRACT: follow terrain elevation at the new (x, z) instead of sliding at a fixed Y.
-				local groundY = groundYAt(nx, nz, center.Y)
-				local ny = if groundY ~= nil then groundY + (state.footOffset or 0) else pos.Y
-				local newPos = Vector3.new(nx, ny, nz)
-				model:PivotTo(CFrame.lookAt(newPos, newPos + dir))
+
+			-- ── desired direction + speed ──
+			local desiredDir, targetSpeed
+			if state.mode == "flee" then
+				local from = state.fleeFrom or pos
+				local away = Vector3.new(pos.X - from.X, 0, pos.Z - from.Z)
+				desiredDir = if away.Magnitude > 0.15 then away.Unit else state.facing
+				targetSpeed = baseSpeed * FLEE_MULT
+			elseif state.behaviour == "alert" then
+				-- freeze, but turn to face the threat: the tell that the animal has noticed you
+				desiredDir = if playerPos ~= nil
+					then Vector3.new(playerPos.X - pos.X, 0, playerPos.Z - pos.Z)
+					else state.facing
+				if desiredDir.Magnitude > 0.15 then
+					desiredDir = desiredDir.Unit
+				else
+					desiredDir = state.facing
+				end
+				targetSpeed = 0
+			elseif state.behaviour == "graze" then
+				desiredDir = state.facing
+				targetSpeed = 0
+			else
+				if state.target == nil then
+					state.target = zoneRandomPoint(state.zoneId)
+				end
+				local toTarget = Vector3.new(state.target.X - pos.X, 0, state.target.Z - pos.Z)
+				if toTarget.Magnitude < 3 then
+					-- arrived: stop and graze for a while rather than immediately setting off again
+					state.behaviour = "graze"
+					state.idleUntil = now + GRAZE_MIN + math.random() * (GRAZE_MAX - GRAZE_MIN)
+					state.target = nil
+					desiredDir, targetSpeed = state.facing, 0
+				else
+					desiredDir, targetSpeed = toTarget.Unit, baseSpeed
+				end
 			end
+
+			-- ── integrate speed and facing ──
+			local prevVel = state.vel
+			if targetSpeed > state.vel then
+				state.vel = math.min(targetSpeed, state.vel + ACCEL * dt)
+			else
+				state.vel = math.max(targetSpeed, state.vel - DECEL * dt)
+			end
+			state.facing = turnToward(state.facing, desiredDir, TURN_RATE * dt)
+
+			-- ── step ──
+			local moved = state.vel * dt
+			local nx, nz = pos.X, pos.Z
+			if moved > 1e-4 then
+				local step = pos + state.facing * moved
+				nx = math.clamp(step.X, center.X - z.size.x / 2, center.X + z.size.x / 2)
+				nz = math.clamp(step.Z, center.Z - z.size.z / 2, center.Z + z.size.z / 2)
+			end
+			-- S3 GROUND CONTRACT: follow terrain elevation at the new (x, z) instead of sliding at a fixed Y.
+			local groundY = groundYAt(nx, nz, center.Y)
+			local baseY = if groundY ~= nil then groundY + (state.footOffset or 0) else pos.Y
+
+			-- ── gait, folded into the CFrame that was already being sent ──
+			-- Stride frequency scales with speed so a walk and a run are not the same cycle played faster
+			-- at the same amplitude. `(1 + sin) / 2` keeps the bob ABOVE the ground line, so feet never sink.
+			local gaitAmount = math.clamp(state.vel / math.max(baseSpeed, 0.001), 0, 1.6)
+			if state.vel > 0.05 then
+				state.phase += dt * (3.1 + 2.4 * gaitAmount) * math.pi
+			end
+			local bob = BOB_HEIGHT * gaitAmount * (1 + math.sin(state.phase)) * 0.5
+			local roll = ROLL_MAX * gaitAmount * math.sin(state.phase * 0.5)
+			-- lean into acceleration, and back out of braking — the body language of changing pace
+			local accelSign = math.clamp((state.vel - prevVel) / math.max(dt, 1e-4) / ACCEL, -1, 1)
+			local lean = LEAN_MAX * accelSign
+
+			local newPos = Vector3.new(nx, baseY + bob, nz)
+			model:PivotTo(CFrame.lookAt(newPos, newPos + state.facing) * CFrame.Angles(lean, 0, roll))
+			-- published for the cosmetic leg swing in WorldArtBuilder, which must not re-derive speed from
+			-- position deltas (it would read the bob as horizontal motion).
+			model:SetAttribute("gaitSpeed", state.vel)
+			model:SetAttribute("gaitPhase", state.phase)
+			model:SetAttribute("behaviour", state.behaviour)
 		end
 	end
 end
@@ -788,7 +939,8 @@ local function spookNear(impactPos, radius, fromPos)
 	for model, state in liveTargets do
 		if (model:GetPivot().Position - impactPos).Magnitude <= radius then
 			state.mode = "flee"
-			state.fleeUntil = os.clock() + 3
+			state.behaviour = "flee"
+			state.fleeUntil = os.clock() + FLEE_SECONDS
 			state.fleeFrom = fromPos or impactPos
 			state.target = nil
 		end

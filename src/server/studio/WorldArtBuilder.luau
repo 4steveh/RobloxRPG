@@ -36,6 +36,7 @@
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
+local Players = game:GetService("Players")
 local Terrain = workspace.Terrain
 
 -- Relative requires only: @-aliases do NOT resolve in Roblox (only in the headless luau CLI).
@@ -650,6 +651,110 @@ function M.suppressPlaceholders()
 	end)
 end
 
+-- ── cosmetic gait ─────────────────────────────────────────────────────────────────────────────────────
+-- Leg swing on the generated visual. WorldServer owns POSITION and the body gait (bob/roll/lean folded into
+-- its PivotTo); this owns only the legs.
+--
+-- WHY SERVER-SIDE AND NOT CLIENT-SIDE. Model:PivotTo writes every part's CFrame, so a client-side leg offset
+-- is overwritten on the next replication tick and jitters at the tick rate. The legs have to move on the same
+-- authority that moves the model.
+--
+-- WHY IT READS THE PUBLISHED gaitSpeed instead of differencing position. The body bob is vertical motion in
+-- the same CFrame, so a position delta reads the bob as travel and the legs would twitch while the animal
+-- stands still. WorldServer publishes its own integrated speed and stride phase as attributes.
+--
+-- Diagonal pairs swing together (fore-left with hind-right), which is what a real quadruped walk does; the
+-- alternative — both fore legs together — is a bunny hop.
+local GAIT_SWING = math.rad(26) -- peak hip rotation at full speed
+local GAIT_DISTANCE = 170 -- studs from the nearest player; past this nobody can see a leg move
+local gaitRigs = {} -- model -> { { parts = {{part, offset}}, hip = Vector3, phase = number } }
+
+local LEG_PHASE = { ForeLegL = 0, HindLegR = 0, ForeLegR = math.pi, HindLegL = math.pi }
+
+-- Record each leg's parts in MODEL-LOCAL space once, at upgrade time. Doing it per frame would mean
+-- inverting the model pivot for every part on every tick.
+local function buildGaitRig(model, visual)
+	local pivot = model:GetPivot()
+	local groups = {}
+	for _, d in ipairs(visual:GetDescendants()) do
+		if d:IsA("BasePart") and LEG_PHASE[d.Name] ~= nil then
+			local g = groups[d.Name]
+			if g == nil then
+				g = { parts = {}, phase = LEG_PHASE[d.Name], hipY = -math.huge }
+				groups[d.Name] = g
+			end
+			local localCF = pivot:ToObjectSpace(d.CFrame)
+			table.insert(g.parts, { part = d, localCF = localCF })
+			-- the hip is the top of the highest segment in the group
+			local topY = localCF.Position.Y + d.Size.Y * 0.5
+            if topY > g.hipY then
+				g.hipY = topY
+				g.hipX = localCF.Position.X
+				g.hipZ = localCF.Position.Z
+			end
+		end
+	end
+	local list = {}
+	for _, g in pairs(groups) do
+		if #g.parts > 0 then
+			g.hip = Vector3.new(g.hipX or 0, g.hipY, g.hipZ or 0)
+			table.insert(list, g)
+		end
+	end
+	if #list == 0 then
+		return nil
+	end
+	return list
+end
+
+function M.startGaitLoop()
+	local accum = 0
+	RunService.Heartbeat:Connect(function(dt)
+		accum += dt
+		if accum < 1 / 20 then -- 20 Hz is well past the point a swinging leg reads as continuous
+			return
+		end
+		accum = 0
+		-- nearest-player distance gate: with no players nearby this loop costs one distance check per creature
+		local heads = {}
+		for _, plr in ipairs(Players:GetPlayers()) do
+			local char = plr.Character
+			local root = char and char.PrimaryPart
+			if root then
+				table.insert(heads, root.Position)
+			end
+		end
+		for model, rig in pairs(gaitRigs) do
+			if model.Parent == nil then
+				gaitRigs[model] = nil
+			else
+				local pivot = model:GetPivot()
+				local near = #heads == 0
+				for _, h in ipairs(heads) do
+					if (h - pivot.Position).Magnitude <= GAIT_DISTANCE then
+						near = true
+						break
+					end
+				end
+				if near then
+					local speed = model:GetAttribute("gaitSpeed") or 0
+					local phase = model:GetAttribute("gaitPhase") or 0
+					local amount = math.clamp(speed / 6, 0, 1.3)
+					for _, g in ipairs(rig) do
+						local angle = GAIT_SWING * amount * math.sin(phase + g.phase)
+						-- rotate the whole leg rigidly about its hip, in model-local space
+						local hipCF = CFrame.new(g.hip)
+						local swing = hipCF * CFrame.Angles(angle, 0, 0) * hipCF:Inverse()
+						for _, entry in ipairs(g.parts) do
+							entry.part.CFrame = pivot * swing * entry.localCF
+						end
+					end
+				end
+			end
+		end
+	end)
+end
+
 -- ── creature visuals ──────────────────────────────────────────────────────────────────────────────────
 -- WorldServer spawns a coarse THREE-BOX hitbox per creature: torso (hitZone "body"), head ("vital") and
 -- sometimes a tail ("limb"), all CanQuery = true so the hunting raycast and Combat.zoneMultiplier work.
@@ -751,6 +856,11 @@ function M.upgradeCreature(model)
 		buildPart(d, originCF, 1, visual)
 	end
 	visual.Parent = model
+	-- record the leg rig for the cosmetic gait loop; a creature with no legs (fish, bite marker) yields nil
+	local rig = buildGaitRig(model, visual)
+	if rig ~= nil then
+		gaitRigs[model] = rig
+	end
 	return visual
 end
 
