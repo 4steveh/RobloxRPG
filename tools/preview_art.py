@@ -9,6 +9,12 @@ What it is NOT: a substitute for a Studio playtest. There is no Roblox lighting 
 Atmosphere, no shadows, no terrain, no post-processing. It answers exactly one question —
 "does this geometry read as the thing it is meant to be" — and nothing about how it will feel in game.
 
+KNOWN LIMITATION — it reports FALSE defects on adjacent or coplanar surfaces. Faces are drawn with a
+painter's algorithm sorted by centroid depth, which mis-orders geometry that meets at a shared plane. It
+showed the Lodge's gable courses punching through the roof as a staircase; a raycast grid over the
+built model in Studio proved the gable never rises above the slope at any point. So: trust this tool for
+SILHOUETTE and PALETTE, and go to Studio for anything where two surfaces meet.
+
 Usage:
     luau tools/dump_art.luau > /tmp/art.json
     python3 tools/preview_art.py /tmp/art.json out_dir
@@ -52,22 +58,23 @@ def box_faces(half):
 
 
 def wedge_faces(half):
-    """A WedgePart: full height at -Z, tapering to nothing at +Z.
+    """A WedgePart: ZERO height at local -Z, FULL height at local +Z.
 
-    NOTE: if Roblox's wedge taper runs the other way, roofs will appear mirrored HERE only — the
-    engine is the authority and this is a preview. Flagged rather than silently assumed.
+    This is measured, not assumed — probed live in Studio with a raycast grid across a 4x8x12 wedge.
+    The first version of this function had it backwards, which meant the offline preview agreed with a
+    generator that was ALSO backwards, and the broken roof only showed up in Studio.
     """
     hx, hy, hz = half
     v = [
         (-hx, -hy, -hz), (hx, -hy, -hz), (hx, -hy, hz), (-hx, -hy, hz),  # 0-3 base
-        (-hx, hy, -hz), (hx, hy, -hz),                                    # 4-5 top edge
+        (-hx, hy, hz), (hx, hy, hz),                                      # 4-5 top edge, at +Z
     ]
-    slope_n = np.array([0.0, hz, hy])
+    slope_n = np.array([0.0, hz, -hy])
     slope_n = slope_n / np.linalg.norm(slope_n)
     faces = [
         ([0, 3, 2, 1], (0, -1, 0)),        # bottom
-        ([0, 1, 5, 4], (0, 0, -1)),        # vertical back
-        ([4, 5, 2, 3], tuple(slope_n)),    # the slope
+        ([3, 2, 5, 4], (0, 0, 1)),         # vertical face at +Z
+        ([0, 1, 5, 4], tuple(slope_n)),    # the slope, rising from -Z to +Z
         ([1, 2, 5], (1, 0, 0)),            # +X triangle
         ([3, 0, 4], (-1, 0, 0)),           # -X triangle
     ]

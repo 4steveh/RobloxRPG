@@ -273,7 +273,10 @@ return function(t: Harness.T)
 		-- from a guess, so a landmark is allowed real mass while canopy trees stay cheap.
 		oldCypress = 620,
 		-- canopy trees: scattered by the hundred, so each must stay near the reference template's ~40-60
-		baldCypress = 110,
+		-- A cypress carries two silhouette elements the reference's savanna tree does not: a buttressed
+		-- root flare (7 wedges) and hanging moss. That is species character, not waste, so its ceiling sits
+		-- above the other canopy trees'.
+		baldCypress = 130,
 		oak = 110,
 		maple = 100,
 		pine = 110,

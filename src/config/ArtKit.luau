@@ -39,7 +39,7 @@ local S = Art.Shape
 
 local ArtKit = {}
 
-ArtKit.version = 2
+ArtKit.version = 6
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════
 -- PALETTES. Each element type carries 4-6 hues; the generators pick per part. Values are RGB 0-255.
@@ -52,32 +52,32 @@ ArtKit.palettes = {
 		-- wet cypress bark: grey-brown, low saturation, wide value range for the buttressed base
 		bark = { { 87, 70, 60 }, { 100, 78, 63 }, { 114, 87, 65 }, { 128, 96, 65 } } :: { RGB },
 		-- cypress needle green: soft, slightly yellow, five steps
-		foliage = { { 87, 81, 58 }, { 98, 102, 56 }, { 92, 117, 49 }, { 72, 133, 39 }, { 33, 148, 25 } } :: { RGB },
+		foliage = { { 111, 104, 74 }, { 124, 138, 122 }, { 118, 150, 63 }, { 101, 168, 66 }, { 146, 198, 80 } } :: { RGB },
 		-- Spanish moss: desaturated sage, the signature Bayou silhouette element
 		moss = { { 138, 135, 121 }, { 150, 150, 123 }, { 155, 163, 124 }, { 157, 176, 123 }, { 152, 189, 121 } } :: { RGB },
-		reed = { { 97, 89, 61 }, { 111, 112, 58 }, { 107, 128, 51 }, { 90, 143, 41 }, { 57, 158, 27 } } :: { RGB },
-		fern = { { 78, 79, 52 }, { 80, 93, 50 }, { 72, 107, 45 }, { 51, 121, 36 }, { 24, 135, 34 } } :: { RGB },
-		duckweed = { { 92, 89, 58 }, { 97, 109, 53 }, { 84, 126, 44 }, { 51, 143, 30 } } :: { RGB },
+		reed = { { 118, 109, 74 }, { 132, 146, 128 }, { 131, 156, 62 }, { 116, 176, 62 }, { 158, 204, 86 } } :: { RGB },
+		fern = { { 101, 103, 68 }, { 112, 128, 112 }, { 94, 139, 58 }, { 78, 158, 58 }, { 134, 186, 76 } } :: { RGB },
+		duckweed = { { 114, 110, 72 }, { 120, 135, 66 }, { 104, 156, 55 }, { 63, 177, 37 } } :: { RGB },
 		log = { { 88, 74, 58 }, { 72, 60, 46 }, { 102, 88, 70 } } :: { RGB },
 		stone = { { 77, 75, 73 }, { 94, 91, 86 }, { 111, 107, 98 }, { 128, 124, 108 } } :: { RGB },
-		lilypad = { { 86, 92, 60 }, { 83, 109, 55 }, { 64, 126, 47 }, { 33, 143, 42 } } :: { RGB },
+		lilypad = { { 108, 116, 76 }, { 105, 137, 69 }, { 81, 159, 59 }, { 42, 180, 53 } } :: { RGB },
 	},
 	appalachia = {
 		bark = { { 92, 74, 62 }, { 105, 83, 64 }, { 119, 92, 65 }, { 133, 101, 65 } } :: { RGB },
 		birchBark = { { 194, 191, 186 }, { 207, 203, 195 }, { 221, 216, 203 }, { 235, 230, 211 } } :: { RGB },
 		-- late-summer hardwood: deep greens with two warm turning hues so the ridge reads with depth
-		foliage = { { 102, 99, 68 }, { 108, 117, 64 }, { 97, 133, 56 }, { 70, 148, 44 }, { 28, 163, 32 } } :: { RGB },
+		foliage = { { 116, 113, 78 }, { 126, 140, 124 }, { 111, 152, 64 }, { 92, 170, 62 }, { 152, 200, 84 } } :: { RGB },
 		autumn = { { 140, 67, 58 }, { 157, 84, 51 }, { 173, 108, 42 }, { 190, 140, 29 }, { 207, 184, 14 } } :: { RGB },
 		needle = { { 48, 61, 43 }, { 45, 74, 44 }, { 42, 87, 48 }, { 36, 99, 56 }, { 28, 112, 70 } } :: { RGB },
 		stone = { { 82, 79, 76 }, { 99, 94, 88 }, { 116, 110, 100 }, { 133, 126, 110 } } :: { RGB },
-		fern = { { 81, 84, 55 }, { 82, 98, 53 }, { 73, 112, 47 }, { 52, 126, 38 }, { 27, 140, 38 } } :: { RGB },
+		fern = { { 96, 99, 65 }, { 97, 116, 63 }, { 86, 132, 55 }, { 61, 149, 45 }, { 32, 165, 45 } } :: { RGB },
 		log = { { 92, 78, 62 }, { 76, 64, 50 }, { 106, 92, 74 } } :: { RGB },
-		grassTuft = { { 99, 96, 63 }, { 107, 115, 60 }, { 96, 131, 52 }, { 69, 146, 40 }, { 30, 161, 30 } } :: { RGB },
+		grassTuft = { { 113, 109, 72 }, { 126, 140, 122 }, { 109, 149, 59 }, { 88, 166, 60 }, { 150, 196, 82 } } :: { RGB },
 	},
 	alaska = {
 		bark = { { 66, 54, 48 }, { 80, 63, 54 }, { 94, 72, 57 }, { 107, 81, 59 } } :: { RGB },
 		-- frosted spruce: cold, dark, low chroma — the cue that reads "north" before any snow does
-		needle = { { 40, 54, 39 }, { 40, 65, 42 }, { 38, 77, 48 }, { 34, 88, 58 }, { 28, 99, 73 } } :: { RGB },
+		needle = { { 30, 72, 40 }, { 46, 84, 54 }, { 62, 106, 72 }, { 112, 146, 80 }, { 124, 150, 126 } } :: { RGB },
 		snow = { { 228, 232, 235 }, { 233, 239, 245 }, { 237, 245, 255 } } :: { RGB },
 		ice = { { 177, 196, 204 }, { 182, 204, 218 }, { 186, 210, 231 }, { 188, 215, 245 } } :: { RGB },
 		stone = { { 82, 84, 87 }, { 95, 98, 104 }, { 107, 110, 121 }, { 117, 120, 138 } } :: { RGB },
@@ -143,10 +143,10 @@ ArtKit.trees = {
 		},
 		foliage = {
 			kind = "slab" :: Art.FoliageKind,
-			countMin = 1,
+			countMin = 2,
 			countMax = 2,
-			size = { x = 7.2, y = 2.0, z = 7.2 },
-			sizeJitter = 0.32,
+			size = { x = 5.6, y = 1.7, z = 5.6 },
+			sizeJitter = 0.34,
 			spread = 7.5,
 			rise = 1.6,
 			tilt = 0.4,
@@ -190,10 +190,10 @@ ArtKit.trees = {
 		},
 		foliage = {
 			kind = "slab" :: Art.FoliageKind,
-			countMin = 1,
+			countMin = 2,
 			countMax = 2,
-			size = { x = 8.5, y = 2.3, z = 8.5 },
-			sizeJitter = 0.32,
+			size = { x = 6.6, y = 1.9, z = 6.6 },
+			sizeJitter = 0.34,
 			spread = 9.5,
 			rise = 2,
 			tilt = 0.38,
@@ -273,10 +273,10 @@ ArtKit.trees = {
 		},
 		foliage = {
 			kind = "slab" :: Art.FoliageKind,
-			countMin = 1,
+			countMin = 2,
 			countMax = 2,
-			size = { x = 7.8, y = 2.4, z = 7.8 },
-			sizeJitter = 0.34,
+			size = { x = 6.1, y = 1.9, z = 6.1 },
+			sizeJitter = 0.36,
 			spread = 8.5,
 			rise = 1.4,
 			tilt = 0.45,
@@ -310,10 +310,10 @@ ArtKit.trees = {
 		},
 		foliage = {
 			kind = "slab" :: Art.FoliageKind,
-			countMin = 1,
+			countMin = 2,
 			countMax = 2,
-			size = { x = 6.4, y = 2.2, z = 6.4 },
-			sizeJitter = 0.32,
+			size = { x = 5.0, y = 1.8, z = 5.0 },
+			sizeJitter = 0.34,
 			spread = 5.6,
 			rise = 2.6,
 			tilt = 0.46,
@@ -574,14 +574,14 @@ ArtKit.clusters = {
 	} :: ClusterRecipe,
 	swampFern = {
 		name = "SwampFern",
-		countMin = 5,
-		countMax = 9,
-		radius = 1.7,
+		countMin = 7,
+		countMax = 12,
+		radius = 1.9,
 		shape = S.block,
-		size = { x = 2.6, y = 0.18, z = 2.6 },
+		size = { x = 0.85, y = 0.14, z = 2.3 },
 		sizeJitter = 0.3,
-		tilt = 0.5,
-		rise = 0.25,
+		tilt = 1.15,
+		rise = 0.5,
 		material = M.Grass,
 		colors = P.bayou.fern,
 		castShadow = false,
@@ -654,14 +654,14 @@ ArtKit.clusters = {
 	} :: ClusterRecipe,
 	mountainFern = {
 		name = "MountainFern",
-		countMin = 5,
-		countMax = 10,
-		radius = 2,
+		countMin = 7,
+		countMax = 12,
+		radius = 2.1,
 		shape = S.block,
-		size = { x = 2.4, y = 0.2, z = 2.4 },
+		size = { x = 0.8, y = 0.16, z = 2.1 },
 		sizeJitter = 0.3,
-		tilt = 0.55,
-		rise = 0.2,
+		tilt = 1.2,
+		rise = 0.45,
 		material = M.Grass,
 		colors = P.appalachia.fern,
 		castShadow = false,
@@ -685,14 +685,14 @@ ArtKit.clusters = {
 	} :: ClusterRecipe,
 	snowDrift = {
 		name = "SnowDrift",
-		countMin = 3,
-		countMax = 6,
-		radius = 5,
+		countMin = 2,
+		countMax = 4,
+		radius = 6,
 		shape = S.ball,
-		size = { x = 9, y = 2.6, z = 7 },
+		size = { x = 15, y = 2.4, z = 11 },
 		sizeJitter = 0.4,
-		tilt = 0.1,
-		rise = -1.1,
+		tilt = 0.08,
+		rise = -1.5,
 		material = M.Snow,
 		colors = P.alaska.snow,
 		canCollide = FREE.canCollide,
@@ -836,7 +836,7 @@ export type Look = {
 ArtKit.looks = {
 	-- Bayou, early morning: warm low sun, humid haze, black water. The hero look.
 	bayou = {
-		clockTime = 7.1,
+		clockTime = 7.7,
 		geographicLatitude = 29,
 		brightness = 2.5,
 		exposureCompensation = 0.1,
@@ -848,19 +848,19 @@ ArtKit.looks = {
 		environmentDiffuseScale = 1,
 		environmentSpecularScale = 1,
 		fogColor = { 206, 192, 158 },
-		fogStart = 120,
-		fogEnd = 720,
+		fogStart = 420,
+		fogEnd = 2600,
 		atmosphere = {
-			density = 0.36,
+			density = 0.3,
 			offset = 0.25,
-			color = { 208, 196, 164 },
-			decay = { 124, 110, 84 },
-			glare = 0.22,
-			haze = 1.5,
+			color = { 204, 202, 194 },
+			decay = { 118, 122, 138 },
+			glare = 0.06,
+			haze = 0.15,
 		},
 		clouds = { cover = 0.5, density = 0.16, color = { 248, 240, 224 } },
 		bloom = { intensity = 0.85, size = 24, threshold = 1.4 },
-		colorCorrection = { contrast = 0.1, saturation = 0.06, brightness = 0, tint = { 255, 248, 234 } },
+		colorCorrection = { contrast = 0.1, saturation = 0.06, brightness = 0, tint = { 255, 252, 246 } },
 		sunRays = { intensity = 0.22, spread = 0.9 },
 		depthOfField = { focusDistance = 40, inFocusRadius = 110, farIntensity = 0.06, nearIntensity = 0 },
 		water = { color = { 46, 58, 40 }, transparency = 0.24, reflectance = 0.6, waveSize = 0.05, waveSpeed = 4 },
@@ -881,15 +881,15 @@ ArtKit.looks = {
 		environmentDiffuseScale = 1,
 		environmentSpecularScale = 1,
 		fogColor = { 168, 186, 190 },
-		fogStart = 240,
-		fogEnd = 1400,
+		fogStart = 600,
+		fogEnd = 3200,
 		atmosphere = {
 			density = 0.3,
 			offset = 0.25,
 			color = { 196, 200, 198 },
 			decay = { 106, 116, 128 },
 			glare = 0.05,
-			haze = 0.7,
+			haze = 0.1,
 		},
 		clouds = { cover = 0.42, density = 0.12, color = { 252, 252, 252 } },
 		bloom = { intensity = 1, size = 24, threshold = 2 },
@@ -914,15 +914,15 @@ ArtKit.looks = {
 		environmentDiffuseScale = 1,
 		environmentSpecularScale = 1,
 		fogColor = { 214, 224, 236 },
-		fogStart = 160,
-		fogEnd = 1100,
+		fogStart = 380,
+		fogEnd = 2400,
 		atmosphere = {
-			density = 0.44,
+			density = 0.38,
 			offset = 0.3,
 			color = { 216, 226, 238 },
 			decay = { 152, 168, 188 },
 			glare = 0.02,
-			haze = 2,
+			haze = 0.6,
 		},
 		clouds = { cover = 0.82, density = 0.24, color = { 226, 232, 240 } },
 		bloom = { intensity = 0.7, size = 28, threshold = 1.8 },
@@ -976,14 +976,14 @@ ArtKit.looks = {
 
 ArtKit.terrainColors = {
 	-- Bayou
-	LeafyGrass = { 76, 92, 50 },
-	Mud = { 72, 58, 42 },
-	Ground = { 88, 74, 54 },
-	Sand = { 168, 154, 118 },
+	LeafyGrass = { 100, 120, 62 },
+	Mud = { 88, 72, 52 },
+	Ground = { 108, 92, 66 },
+	Sand = { 196, 182, 146 },
 	-- Appalachia
-	Grass = { 96, 114, 58 },
+	Grass = { 116, 136, 70 },
 	Rock = { 100, 96, 88 },
-	Sandstone = { 138, 116, 88 },
+	Sandstone = { 158, 136, 104 },
 	Slate = { 86, 84, 80 },
 	-- Alaska
 	Snow = { 238, 244, 250 },
@@ -1077,10 +1077,10 @@ ArtKit.scatterPlans = {
 		{ kind = "tree", recipes = { "baldCypress" }, center = { x = 55, z = 110 }, radius = 60, count = 14, spacing = 15, scale = { min = 0.9, max = 1.15 }, seed = 1104, minGroundY = -1.5, minGroundNormalY = 0.55 },
 		{ kind = "tree", recipes = { "baldCypress", "snag" }, center = { x = 0, z = 200 }, radius = 86, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 1105, minGroundY = -1.5, minGroundNormalY = 0.55 },
 		-- reed beds at the hunting zones (sunny_levee / reed_edges)
-		{ kind = "cluster", recipes = { "cattail", "cattail", "swampFern" }, center = { x = 0, z = -50 }, radius = 44, count = 34, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1201, minGroundY = -1, minGroundNormalY = 0.6 },
-		{ kind = "cluster", recipes = { "cattail", "swampFern", "grassTuft" }, center = { x = -45, z = -45 }, radius = 40, count = 32, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1202, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "cattail", "swampFern" }, center = { x = 0, z = -50 }, radius = 44, count = 44, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1201, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "swampFern", "grassTuft" }, center = { x = -45, z = -45 }, radius = 40, count = 42, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1202, minGroundY = -1, minGroundNormalY = 0.6 },
 		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 24, z = 12 }, radius = 46, count = 30, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1203, minGroundY = -1, minGroundNormalY = 0.6 },
-		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 0, z = 0 }, radius = 34, count = 16, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 1204, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "swampFern", "grassTuft" }, center = { x = 0, z = 0 }, radius = 34, count = 26, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 1204, minGroundY = -1, minGroundNormalY = 0.6 },
 		{ kind = "cluster", recipes = { "swampFern", "cattail" }, center = { x = 0, z = 250 }, radius = 50, count = 26, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1205, minGroundY = -1, minGroundNormalY = 0.6 },
 		-- floating cover, placed only on water
 		{ kind = "cluster", recipes = { "lilyPad", "duckweed" }, center = { x = 60, z = 60 }, radius = 110, count = 34, spacing = 12, scale = { min = 0.9, max = 1.3 }, seed = 1301, waterOnly = true },
@@ -1094,14 +1094,14 @@ ArtKit.scatterPlans = {
 	-- Appalachia: a hardwood ridge. Conifers hold the high ground, hardwoods the hollows, autumn maples
 	-- salted through so the season reads. Nothing above the lookout ridge's treeline.
 	appalachia = {
-		{ kind = "tree", recipes = { "oak", "oak", "maple" }, center = { x = 0, z = 80 }, radius = 80, count = 18, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2101, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
-		{ kind = "tree", recipes = { "oak", "maple", "birch" }, center = { x = -120, z = 60 }, radius = 82, count = 21, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 2102, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "oak", "oak", "maple" }, center = { x = 0, z = 80 }, radius = 80, count = 17, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2101, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "oak", "maple", "birch" }, center = { x = -120, z = 60 }, radius = 82, count = 20, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 2102, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
 		{ kind = "tree", recipes = { "oak", "birch", "maple" }, center = { x = 110, z = 50 }, radius = 78, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2103, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
-		{ kind = "tree", recipes = { "pine", "pine", "oak" }, center = { x = 0, z = -130 }, radius = 96, count = 26, spacing = 15, scale = { min = 0.85, max = 1.25 }, seed = 2104, minGroundY = 8, maxGroundY = 120, minGroundNormalY = 0.45 },
+		{ kind = "tree", recipes = { "pine", "pine", "oak" }, center = { x = 0, z = -130 }, radius = 96, count = 21, spacing = 15, scale = { min = 0.85, max = 1.25 }, seed = 2104, minGroundY = 8, maxGroundY = 120, minGroundNormalY = 0.45 },
 		{ kind = "tree", recipes = { "pine", "birch" }, center = { x = -60, z = -40 }, radius = 90, count = 20, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 2105, minGroundY = 2, maxGroundY = 90, minGroundNormalY = 0.45 },
-		{ kind = "tree", recipes = { "oak", "maple" }, center = { x = 100, z = -60 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2106, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "oak", "maple" }, center = { x = 100, z = -60 }, radius = 66, count = 13, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2106, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
 		{ kind = "tree", recipes = { "pine", "oak" }, center = { x = -90, z = -80 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2107, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
-		{ kind = "cluster", recipes = { "grassTuft", "grassTuft", "mountainFern" }, center = { x = 0, z = 80 }, radius = 70, count = 44, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2201, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "grassTuft", "grassTuft", "mountainFern" }, center = { x = 0, z = 80 }, radius = 70, count = 56, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2201, minGroundY = 0.3, minGroundNormalY = 0.55 },
 		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = -120, z = 60 }, radius = 68, count = 38, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2202, minGroundY = 0.3, minGroundNormalY = 0.55 },
 		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = 110, z = 50 }, radius = 66, count = 36, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2203, minGroundY = 0.3, minGroundNormalY = 0.55 },
 		{ kind = "cluster", recipes = { "grassTuft" }, center = { x = 0, z = -110 }, radius = 90, count = 34, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 2204, minGroundY = 4, minGroundNormalY = 0.5 },
@@ -1117,7 +1117,7 @@ ArtKit.scatterPlans = {
 		{ kind = "tree", recipes = { "snowSpruce", "spruce" }, center = { x = 0, z = 50 }, radius = 88, count = 22, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3102, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
 		{ kind = "tree", recipes = { "snowSpruce", "snowSpruce", "snag" }, center = { x = -60, z = -90 }, radius = 72, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3103, minGroundY = 0.5, maxGroundY = 80, minGroundNormalY = 0.45 },
 		{ kind = "tree", recipes = { "spruce", "snowSpruce" }, center = { x = 60, z = -20 }, radius = 76, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3104, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
-		{ kind = "cluster", recipes = { "tundraTuft", "tundraTuft", "snowDrift" }, center = { x = 0, z = 50 }, radius = 92, count = 46, spacing = 6, scale = { min = 0.85, max = 1.25 }, seed = 3201, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "tundraTuft", "tundraTuft", "snowDrift" }, center = { x = 0, z = 50 }, radius = 92, count = 58, spacing = 6, scale = { min = 0.85, max = 1.25 }, seed = 3201, minGroundY = 0.3, minGroundNormalY = 0.55 },
 		{ kind = "cluster", recipes = { "tundraTuft", "snowDrift" }, center = { x = -110, z = 30 }, radius = 78, count = 34, spacing = 6, scale = { min = 0.85, max = 1.2 }, seed = 3202, minGroundY = 0.3, minGroundNormalY = 0.55 },
 		{ kind = "cluster", recipes = { "snowDrift", "tundraTuft" }, center = { x = 90, z = -70 }, radius = 82, count = 30, spacing = 7, scale = { min = 0.9, max = 1.35 }, seed = 3203, minGroundY = 0.3, minGroundNormalY = 0.5 },
 		{ kind = "cluster", recipes = { "driftwood" }, center = { x = 150, z = -110 }, radius = 120, count = 22, spacing = 18, scale = { min = 0.85, max = 1.3 }, seed = 3301, minGroundY = -0.5, maxGroundY = 8, minGroundNormalY = 0.6 },
@@ -1172,16 +1172,20 @@ ArtKit.terrainSpecs = {
 		shoreFalloff = 60,
 		-- DRY flats (walkable zones) and WET flats (height below waterLevel = a flat-bottomed pool).
 		-- Both are the same mechanism; the sign of `height` is what makes a zone land or water.
+		--
+		-- WET FLATS MUST SIT AT LEAST ONE VOXEL (4 studs) BELOW waterLevel. A terrain voxel holds ONE
+		-- material, so the voxel containing the lake bed cannot also hold water: a bed at -3 leaves the
+		-- whole [-4, 0] band as ground and the lake renders BONE DRY. Asserted in tests/TerrainGen.spec.
 		flats = {
 			{ x = 0, z = 0, radius = 15, falloff = 16, height = 2.6 }, -- arrival_clearing
 			{ x = 0, z = -50, radius = 30, falloff = 26, height = 3.0 }, -- sunny_levee
 			{ x = -45, z = -45, radius = 28, falloff = 24, height = 2.2 }, -- reed_edges
-			{ x = 0, z = 255, radius = 36, falloff = 30, height = 3.2 }, -- the_landing (vendor + travel)
+			{ x = 0, z = 255, radius = 30, falloff = 12, height = 3.2 }, -- the_landing (vendor + travel; tight falloff keeps its reach clear of the dock water 47 studs north)
 			{ x = 55, z = 110, radius = 20, falloff = 18, height = 1.6 }, -- the_old_cypress island
-			{ x = 0, z = 302, radius = 24, falloff = 32, height = -5 }, -- open water off the Landing dock
-			{ x = 24, z = 12, radius = 11, falloff = 17, height = -4 }, -- channel_banks (shore fishing)
+			{ x = 0, z = 302, radius = 24, falloff = 32, height = -7 }, -- open water off the Landing dock
+			{ x = 24, z = 12, radius = 11, falloff = 17, height = -6 }, -- channel_banks (shore fishing)
 			{ x = 120, z = 70, radius = 30, falloff = 26, height = -9 }, -- catfish_hole
-			{ x = -110, z = 80, radius = 28, falloff = 24, height = -5 }, -- cottonmouth_slough (rare site)
+			{ x = -110, z = 80, radius = 28, falloff = 24, height = -7 }, -- cottonmouth_slough (rare site)
 		},
 		-- natural depressions layered onto the noise BEFORE the flats, purely for texture
 		basins = {
@@ -1218,7 +1222,7 @@ ArtKit.terrainSpecs = {
 			{ x = 110, z = 50, radius = 32, falloff = 30, height = 20 }, -- creek_bottoms
 			{ x = 0, z = -130, radius = 30, falloff = 44, height = 74 }, -- lookout_ridge (the high beacon)
 			{ x = 0, z = 200, radius = 34, falloff = 30, height = 12 }, -- outpost_cabin (ARRIVAL + vendor, Shells apOutpostAnchor)
-			{ x = 100, z = -60, radius = 24, falloff = 30, height = -5 }, -- hollow_creek (wet)
+			{ x = 100, z = -60, radius = 24, falloff = 30, height = -7 }, -- hollow_creek (wet)
 			{ x = -90, z = -80, radius = 28, falloff = 32, height = -7 }, -- mill_pond (wet)
 		},
 		basins = {
@@ -1256,10 +1260,10 @@ ArtKit.terrainSpecs = {
 			{ x = -60, z = -90, radius = 22, falloff = 24, height = 14 }, -- salmon_falls (rare site)
 			{ x = 0, z = 180, radius = 34, falloff = 30, height = 7 }, -- harbor_camp (ARRIVAL + vendor, Shells akOutpostAnchor)
 			{ x = 0, z = 232, radius = 28, falloff = 34, height = -8 }, -- the harbour itself: open water off the dock
-			{ x = 60, z = -50, radius = 21, falloff = 14, height = -5 }, -- interior_river (wet; reach 35 < the 36 studs to the_crags)
+			{ x = 60, z = -50, radius = 21, falloff = 14, height = -7 }, -- interior_river (wet; reach 35 < the 36 studs to the_crags)
 			{ x = 140, z = -120, radius = 34, falloff = 38, height = -13 }, -- coastal_inlet (wet)
 			{ x = 200, z = -200, radius = 54, falloff = 56, height = -24 }, -- open_gulf (wet, deep)
-			{ x = -150, z = -160, radius = 36, falloff = 30, height = -3 }, -- frozen_lake (wet, shallow)
+			{ x = -150, z = -160, radius = 36, falloff = 30, height = -7 }, -- frozen_lake (wet, shallow)
 		},
 		basins = {
 			{ x = -40, z = -20, radius = 50, falloff = 50, depth = 6 }, -- interior swale

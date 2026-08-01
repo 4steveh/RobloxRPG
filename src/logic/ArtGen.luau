@@ -720,13 +720,16 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 		table.insert(out, {
 			name = "RoofSlope",
 			shape = Art.Shape.wedge,
-			-- A WedgePart tapers along its local Z and rises along local Y. yaw = -sgn*pi/2 sends local Z
-			-- to world +/-X, so each slope tapers from the ridge (x = 0) out to its eave, while local X
-			-- (size.x = slopeLen) spans the building's depth.
+			-- MEASURED, not assumed: a WedgePart is ZERO height at its local -Z and FULL height at its
+			-- local +Z (probed live in Studio with a raycast grid). The first version had this backwards, so
+			-- both slopes rose toward the EAVE instead of the ridge — the roof formed a valley, the gable
+			-- in-fill stuck up through it, and the chimney sat inside an open cavity.
+			-- yaw = +sgn*pi/2 points local +Z at the ridge (x = 0) from either side, so each slope is full
+			-- height at the peak and tapers to nothing at its eave. size.x spans the building's depth.
 			size = { x = slopeLen, y = rise, z = slopeRun },
 			pos = { x = sgn * slopeRun * 0.5, y = r.wallHeight + rise * 0.5, z = 0 },
 			up = UP,
-			yaw = -sgn * math.pi * 0.5,
+			yaw = sgn * math.pi * 0.5,
 			color = Rand.pick(st, r.roofColors),
 			material = r.roofMaterial,
 		})
@@ -749,19 +752,29 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 		material = r.logMaterial,
 	})
 	-- gable in-fill so the roof triangle is closed at both ends
+	-- Gable in-fill, closing the roof triangle at each end of the ridge.
+	--
+	-- Each course's width is DERIVED from the roof plane rather than tapered linearly against it. The naive
+	-- `width * (1 - t)` taper put every block's top corners slightly proud of the slope, so the gable poked
+	-- through the roof as a visible staircase (caught in the offline preview). The roof surface at distance x
+	-- from the ridge sits at wallHeight + rise*(1 - x/slopeRun); solving that for the course's TOP height
+	-- gives the half-width at which its corners land exactly on the slope.
 	for _, sgn in { 1, -1 } do
 		local steps = math.max(2, r.logCourses)
+		local courseH = rise / steps
 		for i = 0, steps - 1 do
 			local t = i / steps
-			local w = r.width * (1 - t)
-			table.insert(out, {
-				name = "Gable",
-				shape = Art.Shape.block,
-				size = { x = w, y = rise / steps, z = logT },
-				pos = { x = 0, y = r.wallHeight + rise * (t + 0.5 / steps), z = sgn * (hd + logT * 0.5) },
-				color = ArtGen.jitterColor(st, r.logColors[(i % #r.logColors) + 1], 0.05),
-				material = r.logMaterial,
-			})
+			local halfW = slopeRun * (1 - t - 1 / steps)
+			if halfW > 0.25 then
+				table.insert(out, {
+					name = "Gable",
+					shape = Art.Shape.block,
+					size = { x = halfW * 2, y = courseH, z = logT },
+					pos = { x = 0, y = r.wallHeight + rise * t + courseH * 0.5, z = sgn * (hd + logT * 0.5) },
+					color = ArtGen.jitterColor(st, r.logColors[(i % #r.logColors) + 1], 0.05),
+					material = r.logMaterial,
+				})
+			end
 		end
 	end
 
@@ -806,10 +819,12 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 		table.insert(out, {
 			name = "PorchRoof",
 			shape = Art.Shape.wedge,
+			-- shed roof: full height where it meets the cabin wall (+Z), tapering down to the outer edge.
+			-- Local +Z is the full-height end, so yaw = 0 points it at the wall.
 			size = { x = r.width + logT * 2, y = rise * 0.35, z = r.porchDepth + logT },
 			pos = { x = 0, y = postH + rise * 0.175, z = pz },
 			up = UP,
-			yaw = math.pi,
+			yaw = 0,
 			color = Rand.pick(st, r.roofColors),
 			material = r.roofMaterial,
 		})

@@ -21,9 +21,9 @@ while IFS= read -r f; do
   else
     echo "  ✗ $f"; echo "$out" | sed 's/^/      /'; fail=1
   fi
-done < <(find src tests -name '*.luau' -not -path '*/negative/*' -not -name '*.server.luau' -not -name '*.client.luau' | sort)
+done < <(find src tests -name '*.luau' -not -path '*/negative/*' -not -path '*/studio/*' -not -name '*.server.luau' -not -name '*.client.luau' | sort)
 echo "  ── Studio-only (NOT headless-analyzed; see README playtest checklist) ──"
-find src client \( -name '*.server.luau' -o -name '*.client.luau' \) 2>/dev/null | sort | sed 's/^/    ⌂ /'
+find src client \( -name '*.server.luau' -o -name '*.client.luau' -o -path '*/studio/*' \) 2>/dev/null | sort | sed 's/^/    ⌂ /'
 
 hr; echo "2) UNIT TESTS (luau tests/run.luau)"; hr
 if luau tests/run.luau; then echo "  ✓ all specs passed"; else echo "  ✗ test failures"; fail=1; fi

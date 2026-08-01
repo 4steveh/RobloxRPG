@@ -118,6 +118,56 @@ return function(t: Harness.T)
 		end
 	end)
 
+	t.test("every wet flat sits at least one voxel below the water line", function()
+		-- A terrain voxel holds exactly ONE material, so the voxel containing a lake bed cannot also hold
+		-- water. A bed authored at -3 leaves the whole [-4, 0] band as ground and the lake renders BONE DRY —
+		-- which is precisely what the Alaskan frozen lake did: a live probe reported Basalt at -0.4 with no
+		-- water anywhere in it. Any wet flat must therefore clear a full voxel.
+		local shallow = {}
+		for name, spec in SPECS do
+			for i, f in spec.flats do
+				if f.height < spec.waterLevel then
+					local clearance = spec.waterLevel - f.height
+					if clearance < RES then
+						table.insert(
+							shallow,
+							("%s flat %d at %.1f is only %.1f below the water line (needs %d)"):format(
+								name,
+								i,
+								f.height,
+								clearance,
+								RES
+							)
+						)
+					end
+				end
+			end
+		end
+		t.eq("no wet flat is shallower than one voxel: " .. table.concat(shallow, "; "), #shallow, 0)
+	end)
+
+	t.test("the resolved surface of every fishing zone clears a voxel below the water line", function()
+		-- The authored flat height is not the whole story: neighbouring flats blend in by weighted average,
+		-- so a wet flat can be pulled up above the waterline by a nearby dry one. That happened — the
+		-- Landing's flat reached 66 studs and dragged the dock water from -7 up to -2.9. This asserts the
+		-- RESOLVED height, which is what actually gets built.
+		local dry = {}
+		for destId, shell in Shells.byDestination do
+			local spec = SPECS[destId]
+			if spec ~= nil then
+				for _, zone in (shell.zones :: { [string]: Schema.Zone }) do
+					if WET_KINDS[zone.kind] then
+						local h = TerrainGen.heightAt(spec, zone.center.x, zone.center.z)
+						if h > spec.waterLevel - RES then
+							table.insert(dry, ("%s/%s resolves to %.1f"):format(destId, zone.id, h))
+						end
+					end
+				end
+			end
+		end
+		t.eq("every fishing zone clears a voxel: " .. table.concat(dry, "; "), #dry, 0)
+	end)
+
 	t.test("the world is bounded by water, not by a wall", function()
 		for name, spec in SPECS do
 			local hx = spec.extent.x * 0.5 + spec.shoreFalloff + RES
