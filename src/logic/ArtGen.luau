@@ -841,6 +841,452 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 	return { name = r.name, parts = out, groundPivot = { x = 0, y = 0, z = 0 } }
 end
 
+-- ── creatures ─────────────────────────────────────────────────────────────────────────────────────────
+-- Authored with the TORSO CENTRE at the origin and -Z forward, so the Studio side can weld the visual
+-- straight onto WorldServer's hitbox PrimaryPart with no offset arithmetic. Every part is non-collidable
+-- and NON-QUERYABLE: the hunting raycast must keep hitting the underlying hitZone-tagged boxes, or the
+-- headshot multiplier silently stops working.
+
+local BONE: RGB = { 232, 228, 216 }
+
+local function creaturePart(
+	out: { PartDesc },
+	name: string,
+	size: Vec3,
+	pos: Vec3,
+	up: Vec3?,
+	yaw: number?,
+	color: RGB,
+	material: Art.MaterialName,
+	shape: Art.Shape?
+)
+	table.insert(out, {
+		name = name,
+		shape = shape or Art.Shape.block,
+		size = size,
+		pos = pos,
+		up = up,
+		yaw = yaw,
+		color = color,
+		material = material,
+		canCollide = false,
+		-- LOAD-BEARING: a queryable visual part would absorb the shot meant for the hitbox underneath.
+		canQuery = false,
+	})
+end
+
+-- The coarse anatomy of a creature: where its torso, head and tail sit, and how far the torso centre is
+-- above the ground. This exists so the GAMEPLAY hitbox and the VISUAL mesh are derived from one place.
+--
+-- Why that matters: WorldServer builds a 3-box hitbox whose head carries hitZone = "vital", and
+-- Combat.zoneMultiplier pays a headshot bonus off it. If the hitbox head and the visible head disagree, the
+-- player aims at the head they can see and silently gets a body hit — the gun feels broken and nothing in
+-- the logs says why. Both now read these numbers.
+export type CreatureAnatomy = {
+	torso: { size: Vec3, pos: Vec3 },
+	head: { size: Vec3, pos: Vec3 },
+	tail: { size: Vec3, pos: Vec3 }?,
+	footDrop: number, -- studs from the torso centre down to the ground contact
+	forward: Vec3, -- the direction the creature faces in its own space
+}
+
+function ArtGen.creatureAnatomy(r: Art.CreatureRecipe): CreatureAnatomy
+	local FWD = -1
+	local halfLen, halfH = r.length * 0.5, r.height * 0.5
+	local n = r.neck
+	local neckDir = Vec.unit({ x = 0, y = math.sin(n.angle), z = FWD * math.cos(n.angle) })
+	local neckBase: Vec3 = { x = 0, y = halfH * 0.45 + r.shoulderHump * r.height * 0.5, z = FWD * halfLen * 0.9 }
+	local headPos = Vec.add(neckBase, Vec.scale(neckDir, n.length + r.head.length * 0.4))
+	-- the head hitbox swallows the snout, so a nose shot still counts as a head shot
+	local snoutLen = if r.snout ~= nil then r.snout.length else 0
+	local headSize: Vec3 = {
+		x = math.max(r.head.width, if r.snout ~= nil then r.snout.width else 0),
+		y = r.head.height,
+		z = r.head.length + snoutLen,
+	}
+	local headCentre = Vec.add(headPos, { x = 0, y = 0, z = FWD * snoutLen * 0.5 })
+
+	local tail = nil
+	if r.tail ~= nil then
+		local T = r.tail
+		local dir = Vec.unit({ x = 0, y = math.sin(T.angle), z = -FWD * math.cos(T.angle) })
+		local base: Vec3 = { x = 0, y = halfH * 0.2, z = -FWD * halfLen * 0.95 }
+		tail = {
+			size = { x = T.thickness * 1.2, y = T.thickness * 1.2, z = T.length },
+			pos = Vec.add(base, Vec.scale(dir, T.length * 0.5)),
+		}
+	end
+
+	local footDrop = halfH * 0.6 + (if r.legs ~= nil then r.legs.length * math.cos(r.legs.splay) else halfH * 0.4)
+	return {
+		torso = {
+			size = { x = r.width, y = r.height * (1 + r.shoulderHump * 0.5), z = r.length },
+			pos = { x = 0, y = 0, z = 0 },
+		},
+		head = { size = headSize, pos = headCentre },
+		tail = tail,
+		footDrop = footDrop,
+		forward = { x = 0, y = 0, z = FWD },
+	}
+end
+
+function ArtGen.creature(r: Art.CreatureRecipe, seed: number): ModelDesc
+	local st = Rand.stream(seed)
+	local out: { PartDesc } = {}
+	local pale = r.pale or 0
+	local function tone(set: { RGB }, jitter: number): RGB
+		local c = ArtGen.jitterColor(st, Rand.pick(st, set), jitter)
+		if pale > 0 then
+			c = ArtGen.blend(c, BONE, pale)
+		end
+		return c
+	end
+	local FWD = -1 -- forward is -Z
+
+	local halfLen = r.length * 0.5
+	local halfH = r.height * 0.5
+
+	-- ── torso: segments along the body axis, tapering toward the hip, with an optional shoulder hump ──
+	local segs = math.max(1, math.floor(r.torsoSegments))
+	for i = 1, segs do
+		local t = (i - 0.5) / segs -- 0 at the nose end, 1 at the hip
+		local z = FWD * (halfLen - t * r.length)
+		-- girth peaks just behind the shoulder, which is what stops a part-built animal reading as a crate
+		local girth = 1 - 0.28 * math.abs(t - 0.35) / 0.65
+		local hump = r.shoulderHump * r.height * math.max(0, 1 - t * 2.4)
+		creaturePart(
+			out,
+			"Torso",
+			{ x = r.width * girth, y = r.height * girth + hump, z = r.length / segs * 1.06 },
+			{ x = 0, y = hump * 0.5, z = z },
+			nil,
+			0,
+			tone(r.back, 0.05),
+			r.material
+		)
+		-- counter-shaded belly: real animals are pale underneath, and faking it is most of what makes a
+		-- flat-lit part animal read as a volume
+		creaturePart(
+			out,
+			"Belly",
+			{ x = r.width * girth * 0.82, y = r.height * 0.3, z = r.length / segs * 1.02 },
+			{ x = 0, y = -halfH * 0.72, z = z },
+			nil,
+			0,
+			tone(r.belly, 0.05),
+			r.material
+		)
+	end
+
+	if r.shell ~= nil then
+		local sh = r.shell
+		local plates = math.max(1, math.floor(sh.plates))
+		for i = 1, plates do
+			local t = (i - 0.5) / plates
+			local dome = math.sin(t * math.pi)
+			creaturePart(
+				out,
+				"Shell",
+				{ x = sh.width * (0.55 + 0.45 * dome), y = sh.height * (0.4 + 0.6 * dome), z = sh.length / plates * 1.1 },
+				{ x = 0, y = halfH * 0.5 + sh.height * 0.3 * dome, z = FWD * (sh.length * 0.5 - t * sh.length) },
+				nil,
+				0,
+				tone(r.accent, 0.07),
+				r.material
+			)
+		end
+	end
+
+	-- ── neck + head ──
+	-- The head position comes from creatureAnatomy, the same function the gameplay hitbox reads, so the
+	-- visible head and the "vital" hit zone can never drift apart.
+	local anatomy = ArtGen.creatureAnatomy(r)
+	local n = r.neck
+	local neckDir = Vec.unit({ x = 0, y = math.sin(n.angle), z = FWD * math.cos(n.angle) })
+	local neckBase: Vec3 = { x = 0, y = halfH * 0.45 + r.shoulderHump * r.height * 0.5, z = FWD * halfLen * 0.9 }
+	local neckSegs = 2
+	local cursor = neckBase
+	for i = 1, neckSegs do
+		local len = n.length / neckSegs
+		local mid = Vec.add(cursor, Vec.scale(neckDir, len * 0.5))
+		creaturePart(
+			out,
+			"Neck",
+			{ x = n.thickness * (1 - 0.12 * i), y = n.thickness * (1 - 0.12 * i), z = len * 1.1 },
+			mid,
+			neckDir,
+			0,
+			tone(r.back, 0.05),
+			r.material
+		)
+		cursor = Vec.add(cursor, Vec.scale(neckDir, len))
+	end
+
+	local h = r.head
+	local headPos = Vec.add(neckBase, Vec.scale(neckDir, n.length + h.length * 0.4))
+	creaturePart(out, "Head", { x = h.width, y = h.height, z = h.length }, headPos, nil, 0, tone(r.back, 0.04), r.material)
+
+	if r.snout ~= nil then
+		local s = r.snout
+		creaturePart(
+			out,
+			"Snout",
+			{ x = s.width, y = s.height, z = s.length },
+			Vec.add(headPos, { x = 0, y = -s.droop, z = FWD * (h.length * 0.5 + s.length * 0.45) }),
+			nil,
+			0,
+			tone(r.back, 0.05),
+			r.material
+		)
+		-- nose/beak tip in the accent tone: a tiny part that reads as a face from 40 studs away
+		creaturePart(
+			out,
+			"Nose",
+			{ x = s.width * 0.55, y = s.height * 0.5, z = s.length * 0.24 },
+			Vec.add(headPos, { x = 0, y = -s.droop, z = FWD * (h.length * 0.5 + s.length * 0.98) }),
+			nil,
+			0,
+			tone(r.accent, 0.05),
+			r.material
+		)
+	end
+
+	if r.ears ~= nil then
+		local e = r.ears
+		local count = math.max(1, math.floor(e.count))
+		for i = 1, count do
+			local side = if i % 2 == 1 then -1 else 1
+			creaturePart(
+				out,
+				"Ear",
+				{ x = e.width, y = e.length, z = e.width * 0.5 },
+				Vec.add(headPos, { x = side * h.width * 0.42, y = h.height * 0.5 + e.length * 0.4, z = 0 }),
+				Vec.tilt(UP, e.angle, if side < 0 then math.pi * 0.5 else math.pi * 1.5),
+				0,
+				tone(r.back, 0.06),
+				r.material
+			)
+		end
+	end
+
+	if r.antlers ~= nil then
+		local a = r.antlers
+		for _, side in { -1, 1 } do
+			local base = Vec.add(headPos, { x = side * h.width * 0.32, y = h.height * 0.5, z = FWD * -h.length * 0.1 })
+			local beamDir = Vec.unit({ x = side * math.sin(a.sweep), y = math.cos(a.sweep), z = FWD * 0.25 })
+			local beamSegs = 3
+			local cur = base
+			for i = 1, beamSegs do
+				local len = a.beamLength / beamSegs
+				local th = a.thickness * (1 - 0.16 * i)
+				creaturePart(
+					out,
+					"Antler",
+					{ x = th, y = len * 1.08, z = th },
+					Vec.add(cur, Vec.scale(beamDir, len * 0.5)),
+					beamDir,
+					0,
+					tone(r.accent, 0.05),
+					r.material
+				)
+				cur = Vec.add(cur, Vec.scale(beamDir, len))
+				beamDir = Vec.unit(Vec.add(beamDir, { x = side * 0.16, y = -0.08, z = 0 }))
+			end
+			if a.palmate then
+				-- moose: one broad paddle per side rather than a tine rack
+				creaturePart(
+					out,
+					"Palm",
+					{ x = a.beamLength * 0.85, y = a.thickness * 1.4, z = a.pointLength * 1.5 },
+					Vec.add(cur, { x = side * a.beamLength * 0.3, y = 0, z = 0 }),
+					nil,
+					0,
+					tone(r.accent, 0.05),
+					r.material
+				)
+				for p = 1, math.max(1, math.floor(a.points)) do
+					local frac = p / (a.points + 1)
+					creaturePart(
+						out,
+						"Tine",
+						{ x = a.thickness * 0.8, y = a.pointLength * 0.7, z = a.thickness * 0.8 },
+						Vec.add(cur, {
+							x = side * a.beamLength * (0.05 + frac * 0.55),
+							y = a.pointLength * 0.4,
+							z = FWD * a.pointLength * 0.5,
+						}),
+						nil,
+						0,
+						tone(r.accent, 0.05),
+						r.material
+					)
+				end
+			else
+				local pts = math.max(1, math.floor(a.points))
+				for p = 1, pts do
+					local frac = p / (pts + 1)
+					local from = Vec.lerp(base, cur, 0.25 + frac * 0.7)
+					creaturePart(
+						out,
+						"Tine",
+						{ x = a.thickness * 0.75, y = a.pointLength * (1.1 - frac * 0.4), z = a.thickness * 0.75 },
+						Vec.add(from, { x = side * a.thickness, y = a.pointLength * 0.5, z = 0 }),
+						Vec.tilt(UP, 0.32, if side < 0 then math.pi * 0.5 else math.pi * 1.5),
+						0,
+						tone(r.accent, 0.05),
+						r.material
+					)
+				end
+			end
+		end
+	end
+
+	-- ── legs ──
+	if r.legs ~= nil then
+		local L = r.legs
+		local segCount = math.max(1, math.floor(L.segments))
+		for _, sx in { -1, 1 } do
+			for _, front in { true, false } do
+				local zBase = FWD * (if front then halfLen * 0.62 else -halfLen * 0.62)
+				local dir = Vec.unit({ x = sx * math.sin(L.splay), y = -math.cos(L.splay), z = 0 })
+				local cur: Vec3 = { x = sx * r.width * 0.36, y = -halfH * 0.6, z = zBase }
+				for i = 1, segCount do
+					local len = L.length / segCount
+					local th = L.thickness * (1 - 0.18 * (i - 1))
+					creaturePart(
+						out,
+						if front then "ForeLeg" else "HindLeg",
+						{ x = th, y = len * 1.08, z = th },
+						Vec.add(cur, Vec.scale(dir, len * 0.5)),
+						dir,
+						0,
+						tone(r.back, 0.05),
+						r.material
+					)
+					cur = Vec.add(cur, Vec.scale(dir, len))
+					-- lower segments angle back under the body, the way a real leg does
+					dir = Vec.unit(Vec.add(dir, { x = -sx * 0.1, y = 0, z = (if front then 0.12 else -0.12) }))
+				end
+				if L.hoof > 0 then
+					creaturePart(
+						out,
+						"Hoof",
+						{ x = L.thickness * L.hoof, y = L.thickness * 0.6, z = L.thickness * L.hoof * 1.2 },
+						cur,
+						nil,
+						0,
+						tone(r.accent, 0.04),
+						r.material
+					)
+				end
+			end
+		end
+	end
+
+	-- ── tail ──
+	if r.tail ~= nil then
+		local T = r.tail
+		local dir = Vec.unit({ x = 0, y = math.sin(T.angle), z = -FWD * math.cos(T.angle) })
+		local cur: Vec3 = { x = 0, y = halfH * 0.2, z = -FWD * halfLen * 0.95 }
+		local segCount = math.max(1, math.floor(T.segments))
+		local th = T.thickness
+		for i = 1, segCount do
+			local len = T.length / segCount
+			creaturePart(
+				out,
+				"Tail",
+				{ x = th, y = th, z = len * 1.08 },
+				Vec.add(cur, Vec.scale(dir, len * 0.5)),
+				dir,
+				0,
+				tone(r.back, 0.05),
+				r.material
+			)
+			cur = Vec.add(cur, Vec.scale(dir, len))
+			th *= T.taper
+			dir = Vec.unit(Vec.add(dir, { x = 0, y = -0.06, z = 0 }))
+		end
+		if T.tuft > 0 then
+			creaturePart(out, "Tuft", { x = T.tuft, y = T.tuft, z = T.tuft }, cur, nil, 0, tone(r.belly, 0.06), r.material)
+		end
+	end
+
+	-- ── wings ──
+	if r.wings ~= nil then
+		local W = r.wings
+		for _, sx in { -1, 1 } do
+			creaturePart(
+				out,
+				"Wing",
+				{ x = W.thickness, y = W.width, z = W.length },
+				{ x = sx * (r.width * 0.5 + W.thickness * 0.5), y = halfH * 0.15, z = FWD * -r.length * 0.05 },
+				Vec.tilt(UP, W.fold, if sx < 0 then math.pi * 0.5 else math.pi * 1.5),
+				0,
+				tone(r.back, 0.06),
+				r.material
+			)
+		end
+	end
+
+	-- ── fins (fish) ──
+	if r.fins ~= nil then
+		local F = r.fins
+		-- caudal: the tail fin, a vertical plate at the rear
+		creaturePart(
+			out,
+			"CaudalFin",
+			{ x = r.width * 0.18, y = F.caudal, z = F.caudal * 0.85 },
+			{ x = 0, y = 0, z = -FWD * (halfLen + F.caudal * 0.4) },
+			nil,
+			0,
+			tone(r.accent, 0.06),
+			r.material
+		)
+		if F.dorsal > 0 then
+			creaturePart(
+				out,
+				"DorsalFin",
+				{ x = r.width * 0.16, y = F.dorsal, z = r.length * 0.34 },
+				{ x = 0, y = halfH + F.dorsal * 0.42, z = 0 },
+				nil,
+				0,
+				tone(r.accent, 0.06),
+				r.material
+			)
+		end
+		if F.anal > 0 then
+			creaturePart(
+				out,
+				"AnalFin",
+				{ x = r.width * 0.14, y = F.anal, z = r.length * 0.2 },
+				{ x = 0, y = -halfH - F.anal * 0.4, z = -FWD * r.length * 0.22 },
+				nil,
+				0,
+				tone(r.accent, 0.06),
+				r.material
+			)
+		end
+		if F.pectoral > 0 then
+			for _, sx in { -1, 1 } do
+				creaturePart(
+					out,
+					"PectoralFin",
+					{ x = F.pectoral * 0.9, y = r.height * 0.12, z = F.pectoral * 0.6 },
+					{ x = sx * (r.width * 0.5 + F.pectoral * 0.3), y = -halfH * 0.3, z = FWD * r.length * 0.2 },
+					Vec.tilt(UP, 1.1, if sx < 0 then math.pi * 0.5 else math.pi * 1.5),
+					0,
+					tone(r.accent, 0.06),
+					r.material
+				)
+			end
+		end
+	end
+
+	-- groundPivot: how far the torso centre sits above the ground, so the Studio side can place a creature
+	-- standalone (set dressing) as well as welded to a hitbox. Same number the hitbox uses for its foot lift.
+	return { name = r.name, parts = out, groundPivot = { x = 0, y = -anatomy.footDrop, z = 0 } }
+end
+
 -- ── aggregate helpers ─────────────────────────────────────────────────────────────────────────────────
 
 -- Total part count of a model — the budget instrument the tests assert against.

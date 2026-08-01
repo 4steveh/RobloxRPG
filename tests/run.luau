@@ -73,6 +73,7 @@ local specs: { (Harness.T) -> () } = {
 	-- tree/rock/scatter/cabin generators, part budgets, palette + terrain-material discipline)
 	require("@tests/ArtGen.spec"),
 	require("@tests/TerrainGen.spec"),
+	require("@tests/CreatureArt.spec"),
 }
 
 for _, spec in specs do

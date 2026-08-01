@@ -352,6 +352,74 @@ export type CabinRecipe = {
 	glassColor: RGB,
 }
 
+-- ── CREATURES ─────────────────────────────────────────────────────────────────────────────────────────
+-- Wild World has 26 huntable creatures and 25 fish. As shipped, only FOUR creature ids had a silhouette
+-- archetype; the other 22 — moose, grizzly, whitetail, cougar, catamount — all fell through to one generic
+-- box with a single ear. These recipes give every species its own silhouette from parts.
+--
+-- AXIS CONVENTION: authored with the TORSO CENTRE at the origin and -Z as FORWARD, matching the PrimaryPart
+-- that WorldServer's hitbox model uses, so the visual welds straight on with no offset arithmetic.
+
+export type CreatureForm = "quadruped" | "bird" | "fish"
+
+export type NeckRecipe = { length: number, thickness: number, angle: number } -- angle: radians above horizontal
+export type HeadRecipe = { length: number, height: number, width: number }
+export type SnoutRecipe = { length: number, height: number, width: number, droop: number }
+export type EarRecipe = { length: number, width: number, angle: number, count: number }
+export type AntlerRecipe = {
+	beamLength: number,
+	thickness: number,
+	sweep: number, -- radians the beam leaves vertical, outward
+	points: number, -- tines per side
+	pointLength: number,
+	palmate: boolean, -- true = moose paddle, false = whitetail tine rack
+}
+export type LegRecipe = {
+	length: number,
+	thickness: number,
+	splay: number, -- radians outward from vertical; a gator splays wide, a deer barely at all
+	segments: number,
+	hoof: number, -- extra width at the foot, 0 for none
+}
+export type TailRecipe = {
+	length: number,
+	thickness: number,
+	angle: number, -- radians above horizontal at the base
+	segments: number,
+	taper: number,
+	tuft: number, -- terminal tuft size, 0 for none
+}
+export type ShellRecipe = { length: number, height: number, width: number, plates: number }
+export type WingRecipe = { length: number, width: number, thickness: number, fold: number }
+export type FinRecipe = { dorsal: number, caudal: number, pectoral: number, anal: number }
+
+export type CreatureRecipe = {
+	name: string,
+	form: CreatureForm,
+	length: number, -- torso length, nose-to-hip proportions derive from it
+	height: number, -- torso height
+	width: number,
+	torsoSegments: number,
+	shoulderHump: number, -- 0..1 extra torso height at the shoulder (bear, boar, moose)
+	neck: NeckRecipe,
+	head: HeadRecipe,
+	snout: SnoutRecipe?,
+	ears: EarRecipe?,
+	antlers: AntlerRecipe?,
+	legs: LegRecipe?,
+	tail: TailRecipe?,
+	shell: ShellRecipe?,
+	wings: WingRecipe?,
+	fins: FinRecipe?,
+	back: { RGB }, -- dorsal colour set
+	belly: { RGB }, -- ventral counter-shading
+	accent: { RGB }, -- beak/hoof/antler/marking
+	material: MaterialName,
+	-- Rare leucistic variants (Ghost Gator, Spirit Moose, Ghost Buck, Pale Drake, Glacier Grizzly): every
+	-- colour is pulled toward bone-white by this fraction, so a marquee target reads instantly at distance.
+	pale: number?,
+}
+
 -- One cell of a generated heightfield: the surface height and what the column is made of.
 export type TerrainColumn = {
 	x: number,

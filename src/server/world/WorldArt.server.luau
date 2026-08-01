@@ -595,6 +595,94 @@ function M.suppressPlaceholders()
 	end)
 end
 
+-- ── creature visuals ──────────────────────────────────────────────────────────────────────────────────
+-- WorldServer spawns a coarse THREE-BOX hitbox per creature: torso (hitZone "body"), head ("vital") and
+-- sometimes a tail ("limb"), all CanQuery = true so the hunting raycast and Combat.zoneMultiplier work.
+-- This pass leaves that contract completely alone: it hides the boxes (Transparency = 1, CanQuery
+-- UNTOUCHED) and adds a generated silhouette whose every part is canQuery = false.
+--
+-- No welds and no Motor6D. The visual parts are parented into the SAME Model, and WorldServer moves
+-- creatures with model:PivotTo — which moves every part in the model rigidly. The earlier
+-- Motor6D-off-the-PrimaryPart approach was solving a problem that does not exist here, and it added a
+-- physics constraint per creature.
+--
+-- Both the hitbox and this visual are generated from ArtGen.creatureAnatomy, so the vital zone sits where
+-- the head is drawn.
+
+local UPGRADED_ATTR = "artUpgraded"
+
+function M.upgradeCreature(model)
+	if typeof(model) ~= "Instance" or not model:IsA("Model") then
+		return
+	end
+	if model:GetAttribute(UPGRADED_ATTR) then
+		return
+	end
+	local id = model:GetAttribute("creatureId") or model:GetAttribute("fishId") or model:GetAttribute("targetId")
+	local pp = model.PrimaryPart
+	if id == nil or pp == nil then
+		return
+	end
+	local recipe = ArtKit.creatureArt[id] or ArtKit.fishArt[id]
+	if recipe == nil then
+		-- Surfaced, not swallowed: a silent box fallback is exactly how 22 unmapped creatures stayed grey
+		-- for an entire build without anyone noticing.
+		warn(("[WildWorldArt] no art recipe for '%s' — it will render as its hitbox boxes"):format(tostring(id)))
+		return
+	end
+	model:SetAttribute(UPGRADED_ATTR, true)
+
+	-- hide the hitboxes; CanQuery is deliberately NOT touched
+	for _, d in ipairs(model:GetDescendants()) do
+		if d:IsA("BasePart") then
+			d.Transparency = 1
+			d.CastShadow = false
+		end
+	end
+
+	-- a stable per-instance seed so the same creature keeps the same colour jitter across sessions
+	local seed = 0
+	for i = 1, #tostring(id) do
+		seed += string.byte(tostring(id), i) * i
+	end
+	local desc = ArtGen.creature(recipe, seed)
+
+	local visual = Instance.new("Folder")
+	visual.Name = "ArtVisual"
+	local originCF = pp.CFrame
+	for _, d in ipairs(desc.parts) do
+		buildPart(d, originCF, 1, visual)
+	end
+	visual.Parent = model
+	return visual
+end
+
+function M.startCreatureUpgrades()
+	task.spawn(function()
+		for _, folderName in ipairs({ "HuntingTargets", "FishingBites" }) do
+			local f = workspace:WaitForChild(folderName, 30)
+			if f then
+				for _, m in ipairs(f:GetChildren()) do
+					task.spawn(function()
+						local ok, err = pcall(M.upgradeCreature, m)
+						if not ok then
+							warn("[WildWorldArt] creature upgrade failed: " .. tostring(err))
+						end
+					end)
+				end
+				f.ChildAdded:Connect(function(m)
+					task.defer(function()
+						local ok, err = pcall(M.upgradeCreature, m)
+						if not ok then
+							warn("[WildWorldArt] creature upgrade failed: " .. tostring(err))
+						end
+					end)
+				end)
+			end
+		end
+	end)
+end
+
 -- ── publish the looks to the client ───────────────────────────────────────────────────────────────────
 -- A LocalScript cannot require anything under ServerScriptService, so the per-biome looks are published as
 -- one JSON StringValue in ReplicatedStorage and client/BiomeLook.client.luau applies them. This keeps the
@@ -687,6 +775,7 @@ M.applyTerrainColors()
 M.applyLook(ArtKit.looks.bayou)
 M.publishLooks()
 M.suppressPlaceholders()
+M.startCreatureUpgrades()
 
 local built = workspace:GetAttribute(BUILT_ATTR) == true
 local sameVersion = workspace:GetAttribute(VERSION_ATTR) == ArtKit.version

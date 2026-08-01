@@ -528,13 +528,20 @@ local liveTargets = {}
 -- distinct animal: a body + a VITAL head + archetype limbs. The hitZone tags make the existing headshot
 -- multiplier (Combat.zoneMultiplier, via zoneOfHit) live. All parts anchored + non-colliding; PrimaryPart =
 -- torso. maxHealth/currentHealth attrs drive the client health bar (CreatureLabels) + the death anim.
-local CREATURE_ARCHETYPES = {
-	bayou_american_alligator = { kind = "reptile", scale = 1.6, color = Color3.fromRGB(70, 92, 64) },
-	bayou_swamp_rabbit       = { kind = "small_mammal", scale = 0.6, color = Color3.fromRGB(150, 140, 120) },
-	bayou_nutria             = { kind = "small_mammal", scale = 0.95, color = Color3.fromRGB(110, 86, 64) },
-	bayou_wood_duck          = { kind = "bird", scale = 0.8, color = Color3.fromRGB(96, 120, 150) },
-}
-local DEFAULT_ARCHETYPE = { kind = "small_mammal", scale = 1.0, color = Color3.fromRGB(120, 110, 100) }
+-- HITBOXES ARE DERIVED FROM THE ART RECIPE. The previous table covered FOUR creature ids; the other 22 —
+-- moose, grizzly, whitetail, cougar, catamount, caribou — fell through to one generic 1.6x1.5x2.6 box with a
+-- single ear stick, so a bull moose and a swamp rabbit had the same silhouette and the same hitbox.
+--
+-- Worse for feel: a hand-placed hitbox head drifts from wherever the visual head actually is, and since
+-- Combat.zoneMultiplier pays its bonus off the "vital" zone, the player aims at the head they can SEE and
+-- silently gets a body hit. Both the hitbox and the visual overlay now read ArtGen.creatureAnatomy, so they
+-- align by construction for all 26 species.
+local ArtKit = require("../../config/ArtKit")
+local ArtGen = require("../../logic/ArtGen")
+
+local function artFor(creatureId)
+	return ArtKit.creatureArt[creatureId]
+end
 
 local function fxPart(fxName, size, color, hitZone, parent)
 	local pt = Instance.new("Part")
@@ -552,40 +559,33 @@ local function fxPart(fxName, size, color, hitZone, parent)
 	return pt
 end
 
-local function buildBody(model, arch)
-	local s, c = arch.scale, arch.color
-	local headC = c:Lerp(Color3.new(1, 1, 1), 0.12)
-	if arch.kind == "reptile" then
-		local torso = fxPart("Torso", Vector3.new(2.2 * s, 1.1 * s, 5.0 * s), c, "body", model)
-		fxPart("Head", Vector3.new(1.2 * s, 1.0 * s, 1.8 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.1 * s, -3.0 * s)
-		fxPart("Tail", Vector3.new(1.0 * s, 0.7 * s, 3.0 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 0, 3.4 * s)
-		for _, dx in ipairs({ -1.2 * s, 1.2 * s }) do
-			for _, dz in ipairs({ -1.6 * s, 1.6 * s }) do
-				fxPart("Leg", Vector3.new(0.5 * s, 1.0 * s, 0.5 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, -0.9 * s, dz)
-			end
-		end
-		return torso
-	elseif arch.kind == "bird" then
-		local torso = fxPart("Torso", Vector3.new(1.4 * s, 1.4 * s, 2.2 * s), c, "body", model)
-		fxPart("Head", Vector3.new(0.9 * s, 0.9 * s, 0.9 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.9 * s, -1.2 * s)
-		for _, dx in ipairs({ -1.0 * s, 1.0 * s }) do
-			fxPart("Wing", Vector3.new(0.3 * s, 0.9 * s, 1.6 * s), c, "limb", model).CFrame = torso.CFrame * CFrame.new(dx, 0.2 * s, 0)
-		end
-		return torso
-	else
-		local torso = fxPart("Torso", Vector3.new(1.6 * s, 1.5 * s, 2.6 * s), c, "body", model)
-		fxPart("Head", Vector3.new(1.1 * s, 1.1 * s, 1.1 * s), headC, "vital", model).CFrame = torso.CFrame * CFrame.new(0, 0.7 * s, -1.5 * s)
-		fxPart("Ear", Vector3.new(0.3 * s, 1.1 * s, 0.3 * s), headC, "limb", model).CFrame = torso.CFrame * CFrame.new(0, 1.6 * s, -1.5 * s)
-		return torso
+-- Three coarse boxes straight off the shared anatomy: torso (body), head (vital, swallowing the snout so a
+-- nose shot still counts), and the tail where the species has a substantial one (limb). Anything finer is the
+-- visual overlay's job — the hitbox only has to agree with what the player sees.
+local function buildBody(model, recipe)
+	local anatomy = ArtGen.creatureAnatomy(recipe)
+	local bodyColor = Color3.fromRGB(recipe.back[1][1], recipe.back[1][2], recipe.back[1][3])
+	local function v3(t) return Vector3.new(t.x, t.y, t.z) end
+
+	local torso = fxPart("Torso", v3(anatomy.torso.size), bodyColor, "body", model)
+	torso.CFrame = CFrame.new(v3(anatomy.torso.pos))
+
+	local head = fxPart("Head", v3(anatomy.head.size), bodyColor, "vital", model)
+	head.CFrame = torso.CFrame * CFrame.new(v3(anatomy.head.pos))
+
+	if anatomy.tail ~= nil and anatomy.tail.size.z > recipe.length * 0.4 then
+		local tail = fxPart("Tail", v3(anatomy.tail.size), bodyColor, "limb", model)
+		tail.CFrame = torso.CFrame * CFrame.new(v3(anatomy.tail.pos))
 	end
+	return torso
 end
 
 local function buildCreatureModel(creatureId, originCFrame)
 	local creature = Catalog.creatures[creatureId]
-	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
+	local recipe = artFor(creatureId)
 	local model = Instance.new("Model")
 	model.Name = creature.name
-	local torso = buildBody(model, arch)
+	local torso = buildBody(model, recipe)
 	model.PrimaryPart = torso
 	-- S3 GROUND CONTRACT: originCFrame already carries the resolved torso-center Y (groundY + footOffset from
 	-- spawnTarget). The old fixed +1.2*scale lift is GONE — placement Y now lives in one place: the ground raycast.
@@ -597,11 +597,31 @@ local function buildCreatureModel(creatureId, originCFrame)
 	return model
 end
 
--- STUDIO FEEL: per-archetype wander speed (studs/sec). Gators slow, rabbits quick.
-local MOVE_SPEED = { reptile = 3, small_mammal = 7, bird = 6 }
+-- STUDIO FEEL: wander speed (studs/sec), DERIVED from the silhouette rather than a per-id table — small
+-- animals are quick, heavy ones are slow, and a splay-legged crocodilian belly-crawls. Deriving it means a
+-- newly added creature gets a sensible speed instead of the old flat default of 5.
 local function creatureSpeed(creatureId)
-	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
-	return MOVE_SPEED[arch.kind] or 5
+	local recipe = artFor(creatureId)
+	if recipe == nil then
+		return 5
+	end
+	if recipe.legs ~= nil and recipe.legs.splay > 0.5 then
+		return 3 -- gator: belly-crawl
+	end
+	if recipe.form == "bird" then
+		return 6
+	end
+	local len = recipe.length
+	if len < 1.2 then
+		return 9
+	elseif len < 2.2 then
+		return 8
+	elseif len < 3.2 then
+		return 7
+	elseif len < 4.0 then
+		return 5.5
+	end
+	return 4.5
 end
 
 -- STUDIO FEEL (S3 GROUND CONTRACT): per-archetype FOOT OFFSET = distance from the PrimaryPart (torso center)
@@ -609,9 +629,14 @@ end
 -- sits on the ground: a reptile rests LOW (belly near the ground; its short legs splay/clip — a gator
 -- belly-crawls), a small mammal / bird (no separate legs in the silhouette) stands on its body. One formula
 -- keyed on the archetype's kind+scale — never hand-tuned per creature. Mirrors buildBody's torso Size.Y.
-local TORSO_HEIGHT = { reptile = 1.1, bird = 1.4, small_mammal = 1.5 }
-local function footOffset(arch)
-	return (TORSO_HEIGHT[arch.kind] or 1.5) * 0.5 * arch.scale
+-- Now EXACT rather than a keyed guess: ArtGen.creatureAnatomy reports the distance from the torso centre to
+-- the ground contact for that species, and the visual overlay is authored around the same number.
+local function footOffset(creatureId)
+	local recipe = artFor(creatureId)
+	if recipe == nil then
+		return 0.75
+	end
+	return ArtGen.creatureAnatomy(recipe).footDrop
 end
 
 -- STUDIO FEEL (S3 GROUND CONTRACT): resolve the Y of the surface the PLAYER SEES & WALKS ON at (x, z), so a
@@ -643,8 +668,7 @@ end
 
 local function spawnTarget(creatureId, zoneId)
 	local zone = shell.zones[zoneId]
-	local arch = CREATURE_ARCHETYPES[creatureId] or DEFAULT_ARCHETYPE
-	local foot = footOffset(arch)
+	local foot = footOffset(creatureId)
 	local x = zone.center.x + (math.random() - 0.5) * zone.size.x
 	local z = zone.center.z + (math.random() - 0.5) * zone.size.z
 	-- Rest the creature ON the surface the player sees, not at a fixed height above an old flat placeholder.
