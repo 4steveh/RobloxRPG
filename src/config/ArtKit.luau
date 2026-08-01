@@ -1056,7 +1056,7 @@ export type ScatterPatch = {
 	seed: number,
 	minGroundY: number?, -- reject candidates whose ground is below this (keeps trees out of open water)
 	maxGroundY: number?, -- reject above this (keeps forest off the peaks and the glacier)
-	maxSlope: number?, -- reject where the ground normal's Y is below this (nothing on a cliff face)
+	minGroundNormalY: number?, -- reject where the ground normal's Y is BELOW this (keeps props off cliff faces)
 	waterOnly: boolean?, -- invert the ground test: place only ON water (lily pads, duckweed)
 }
 
@@ -1065,59 +1065,59 @@ ArtKit.scatterPlans = {
 	-- the arrival clearing keeps its sightline to the Landing (§2.6.2).
 	bayou = {
 		-- cypress grove, ringing the fishing water (channel_banks / catfish_hole)
-		{ kind = "tree", recipes = { "baldCypress", "baldCypress", "snag" }, center = { x = 24, z = 12 }, radius = 70, count = 22, spacing = 13, scale = { min = 0.85, max = 1.2 }, seed = 1101, minGroundY = -1.5, maxSlope = 0.55 },
-		{ kind = "tree", recipes = { "baldCypress", "baldCypress", "snag" }, center = { x = 120, z = 70 }, radius = 78, count = 24, spacing = 13, scale = { min = 0.85, max = 1.25 }, seed = 1102, minGroundY = -1.5, maxSlope = 0.55 },
-		{ kind = "tree", recipes = { "baldCypress", "snag" }, center = { x = -110, z = 80 }, radius = 74, count = 22, spacing = 13, scale = { min = 0.9, max = 1.3 }, seed = 1103, minGroundY = -1.5, maxSlope = 0.55 },
-		{ kind = "tree", recipes = { "baldCypress" }, center = { x = 55, z = 110 }, radius = 60, count = 14, spacing = 15, scale = { min = 0.9, max = 1.15 }, seed = 1104, minGroundY = -1.5, maxSlope = 0.55 },
-		{ kind = "tree", recipes = { "baldCypress", "snag" }, center = { x = 0, z = 200 }, radius = 86, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 1105, minGroundY = -1.5, maxSlope = 0.55 },
+		{ kind = "tree", recipes = { "baldCypress", "baldCypress", "snag" }, center = { x = 24, z = 12 }, radius = 70, count = 22, spacing = 13, scale = { min = 0.85, max = 1.2 }, seed = 1101, minGroundY = -1.5, minGroundNormalY = 0.55 },
+		{ kind = "tree", recipes = { "baldCypress", "baldCypress", "snag" }, center = { x = 120, z = 70 }, radius = 78, count = 24, spacing = 13, scale = { min = 0.85, max = 1.25 }, seed = 1102, minGroundY = -1.5, minGroundNormalY = 0.55 },
+		{ kind = "tree", recipes = { "baldCypress", "snag" }, center = { x = -110, z = 80 }, radius = 74, count = 22, spacing = 13, scale = { min = 0.9, max = 1.3 }, seed = 1103, minGroundY = -1.5, minGroundNormalY = 0.55 },
+		{ kind = "tree", recipes = { "baldCypress" }, center = { x = 55, z = 110 }, radius = 60, count = 14, spacing = 15, scale = { min = 0.9, max = 1.15 }, seed = 1104, minGroundY = -1.5, minGroundNormalY = 0.55 },
+		{ kind = "tree", recipes = { "baldCypress", "snag" }, center = { x = 0, z = 200 }, radius = 86, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 1105, minGroundY = -1.5, minGroundNormalY = 0.55 },
 		-- reed beds at the hunting zones (sunny_levee / reed_edges)
-		{ kind = "cluster", recipes = { "cattail", "cattail", "swampFern" }, center = { x = 0, z = -50 }, radius = 44, count = 34, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1201, minGroundY = -1, maxSlope = 0.6 },
-		{ kind = "cluster", recipes = { "cattail", "swampFern", "grassTuft" }, center = { x = -45, z = -45 }, radius = 40, count = 32, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1202, minGroundY = -1, maxSlope = 0.6 },
-		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 24, z = 12 }, radius = 46, count = 30, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1203, minGroundY = -1, maxSlope = 0.6 },
-		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 0, z = 0 }, radius = 34, count = 16, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 1204, minGroundY = -1, maxSlope = 0.6 },
-		{ kind = "cluster", recipes = { "swampFern", "cattail" }, center = { x = 0, z = 250 }, radius = 50, count = 26, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1205, minGroundY = -1, maxSlope = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "cattail", "swampFern" }, center = { x = 0, z = -50 }, radius = 44, count = 34, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1201, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "swampFern", "grassTuft" }, center = { x = -45, z = -45 }, radius = 40, count = 32, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1202, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 24, z = 12 }, radius = 46, count = 30, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1203, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "cattail", "swampFern" }, center = { x = 0, z = 0 }, radius = 34, count = 16, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 1204, minGroundY = -1, minGroundNormalY = 0.6 },
+		{ kind = "cluster", recipes = { "swampFern", "cattail" }, center = { x = 0, z = 250 }, radius = 50, count = 26, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 1205, minGroundY = -1, minGroundNormalY = 0.6 },
 		-- floating cover, placed only on water
 		{ kind = "cluster", recipes = { "lilyPad", "duckweed" }, center = { x = 60, z = 60 }, radius = 110, count = 34, spacing = 12, scale = { min = 0.9, max = 1.3 }, seed = 1301, waterOnly = true },
 		{ kind = "cluster", recipes = { "duckweed", "lilyPad" }, center = { x = -90, z = 110 }, radius = 92, count = 26, spacing = 12, scale = { min = 0.9, max = 1.3 }, seed = 1302, waterOnly = true },
 		{ kind = "cluster", recipes = { "lilyPad" }, center = { x = 20, z = 170 }, radius = 90, count = 20, spacing = 12, scale = { min = 0.9, max = 1.2 }, seed = 1303, waterOnly = true },
 		-- deadfall + stone, the mid-ground detail that stops the banks reading as bare terrain
-		{ kind = "cluster", recipes = { "fallenLog" }, center = { x = 10, z = 20 }, radius = 150, count = 22, spacing = 22, scale = { min = 0.85, max = 1.3 }, seed = 1401, minGroundY = -0.8, maxSlope = 0.6 },
-		{ kind = "rock", recipes = { "bayouStone" }, center = { x = 0, z = 40 }, radius = 160, count = 20, spacing = 20, scale = { min = 0.8, max = 1.4 }, seed = 1501, minGroundY = -0.8, maxSlope = 0.5 },
+		{ kind = "cluster", recipes = { "fallenLog" }, center = { x = 10, z = 20 }, radius = 150, count = 22, spacing = 22, scale = { min = 0.85, max = 1.3 }, seed = 1401, minGroundY = -0.8, minGroundNormalY = 0.6 },
+		{ kind = "rock", recipes = { "bayouStone" }, center = { x = 0, z = 40 }, radius = 160, count = 20, spacing = 20, scale = { min = 0.8, max = 1.4 }, seed = 1501, minGroundY = -0.8, minGroundNormalY = 0.5 },
 	} :: { ScatterPatch },
 
 	-- Appalachia: a hardwood ridge. Conifers hold the high ground, hardwoods the hollows, autumn maples
 	-- salted through so the season reads. Nothing above the lookout ridge's treeline.
 	appalachia = {
-		{ kind = "tree", recipes = { "oak", "oak", "maple" }, center = { x = 0, z = 80 }, radius = 80, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2101, minGroundY = 0.5, maxGroundY = 60, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "oak", "maple", "birch" }, center = { x = -120, z = 60 }, radius = 82, count = 24, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 2102, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "oak", "birch", "maple" }, center = { x = 110, z = 50 }, radius = 78, count = 22, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2103, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "pine", "pine", "oak" }, center = { x = 0, z = -130 }, radius = 96, count = 26, spacing = 15, scale = { min = 0.85, max = 1.25 }, seed = 2104, minGroundY = 8, maxGroundY = 120, maxSlope = 0.45 },
-		{ kind = "tree", recipes = { "pine", "birch" }, center = { x = -60, z = -40 }, radius = 90, count = 22, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 2105, minGroundY = 2, maxGroundY = 90, maxSlope = 0.45 },
-		{ kind = "tree", recipes = { "oak", "maple" }, center = { x = 100, z = -60 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2106, minGroundY = 0.5, maxGroundY = 60, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "pine", "oak" }, center = { x = -90, z = -80 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2107, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "cluster", recipes = { "grassTuft", "grassTuft", "mountainFern" }, center = { x = 0, z = 80 }, radius = 70, count = 44, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2201, minGroundY = 0.3, maxSlope = 0.55 },
-		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = -120, z = 60 }, radius = 68, count = 38, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2202, minGroundY = 0.3, maxSlope = 0.55 },
-		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = 110, z = 50 }, radius = 66, count = 36, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2203, minGroundY = 0.3, maxSlope = 0.55 },
-		{ kind = "cluster", recipes = { "grassTuft" }, center = { x = 0, z = -110 }, radius = 90, count = 34, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 2204, minGroundY = 4, maxSlope = 0.5 },
-		{ kind = "cluster", recipes = { "mossyLog" }, center = { x = -20, z = 20 }, radius = 170, count = 20, spacing = 24, scale = { min = 0.85, max = 1.3 }, seed = 2301, minGroundY = 0.5, maxSlope = 0.55 },
-		{ kind = "rock", recipes = { "boulder", "boulder", "outcrop" }, center = { x = 0, z = -100 }, radius = 130, count = 22, spacing = 26, scale = { min = 0.8, max = 1.35 }, seed = 2401, minGroundY = 1, maxSlope = 0.35 },
-		{ kind = "rock", recipes = { "boulder" }, center = { x = 60, z = 40 }, radius = 150, count = 16, spacing = 26, scale = { min = 0.8, max = 1.3 }, seed = 2402, minGroundY = 0.5, maxSlope = 0.4 },
+		{ kind = "tree", recipes = { "oak", "oak", "maple" }, center = { x = 0, z = 80 }, radius = 80, count = 20, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2101, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "oak", "maple", "birch" }, center = { x = -120, z = 60 }, radius = 82, count = 24, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 2102, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "oak", "birch", "maple" }, center = { x = 110, z = 50 }, radius = 78, count = 22, spacing = 14, scale = { min = 0.85, max = 1.2 }, seed = 2103, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "pine", "pine", "oak" }, center = { x = 0, z = -130 }, radius = 96, count = 26, spacing = 15, scale = { min = 0.85, max = 1.25 }, seed = 2104, minGroundY = 8, maxGroundY = 120, minGroundNormalY = 0.45 },
+		{ kind = "tree", recipes = { "pine", "birch" }, center = { x = -60, z = -40 }, radius = 90, count = 22, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 2105, minGroundY = 2, maxGroundY = 90, minGroundNormalY = 0.45 },
+		{ kind = "tree", recipes = { "oak", "maple" }, center = { x = 100, z = -60 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2106, minGroundY = 0.5, maxGroundY = 60, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "pine", "oak" }, center = { x = -90, z = -80 }, radius = 66, count = 14, spacing = 15, scale = { min = 0.85, max = 1.15 }, seed = 2107, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "cluster", recipes = { "grassTuft", "grassTuft", "mountainFern" }, center = { x = 0, z = 80 }, radius = 70, count = 44, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2201, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = -120, z = 60 }, radius = 68, count = 38, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2202, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "mountainFern", "grassTuft" }, center = { x = 110, z = 50 }, radius = 66, count = 36, spacing = 5, scale = { min = 0.85, max = 1.2 }, seed = 2203, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "grassTuft" }, center = { x = 0, z = -110 }, radius = 90, count = 34, spacing = 6, scale = { min = 0.8, max = 1.1 }, seed = 2204, minGroundY = 4, minGroundNormalY = 0.5 },
+		{ kind = "cluster", recipes = { "mossyLog" }, center = { x = -20, z = 20 }, radius = 170, count = 20, spacing = 24, scale = { min = 0.85, max = 1.3 }, seed = 2301, minGroundY = 0.5, minGroundNormalY = 0.55 },
+		{ kind = "rock", recipes = { "boulder", "boulder", "outcrop" }, center = { x = 0, z = -100 }, radius = 130, count = 22, spacing = 26, scale = { min = 0.8, max = 1.35 }, seed = 2401, minGroundY = 1, minGroundNormalY = 0.35 },
+		{ kind = "rock", recipes = { "boulder" }, center = { x = 60, z = 40 }, radius = 150, count = 16, spacing = 26, scale = { min = 0.8, max = 1.3 }, seed = 2402, minGroundY = 0.5, minGroundNormalY = 0.4 },
 	} :: { ScatterPatch },
 
 	-- Alaska: boreal coast. Spruce in the river bottoms, snow-laden spruce near the drifts, ice and erratics
 	-- on the crags. Deliberately sparser than the other two — emptiness is the biome's character.
 	alaska = {
-		{ kind = "tree", recipes = { "spruce", "spruce", "snag" }, center = { x = -110, z = 30 }, radius = 84, count = 24, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 3101, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "snowSpruce", "spruce" }, center = { x = 0, z = 50 }, radius = 88, count = 22, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3102, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "tree", recipes = { "snowSpruce", "snowSpruce", "snag" }, center = { x = -60, z = -90 }, radius = 72, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3103, minGroundY = 0.5, maxGroundY = 80, maxSlope = 0.45 },
-		{ kind = "tree", recipes = { "spruce", "snowSpruce" }, center = { x = 60, z = -20 }, radius = 76, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3104, minGroundY = 0.5, maxGroundY = 70, maxSlope = 0.5 },
-		{ kind = "cluster", recipes = { "tundraTuft", "tundraTuft", "snowDrift" }, center = { x = 0, z = 50 }, radius = 92, count = 46, spacing = 6, scale = { min = 0.85, max = 1.25 }, seed = 3201, minGroundY = 0.3, maxSlope = 0.55 },
-		{ kind = "cluster", recipes = { "tundraTuft", "snowDrift" }, center = { x = -110, z = 30 }, radius = 78, count = 34, spacing = 6, scale = { min = 0.85, max = 1.2 }, seed = 3202, minGroundY = 0.3, maxSlope = 0.55 },
-		{ kind = "cluster", recipes = { "snowDrift", "tundraTuft" }, center = { x = 90, z = -70 }, radius = 82, count = 30, spacing = 7, scale = { min = 0.9, max = 1.35 }, seed = 3203, minGroundY = 0.3, maxSlope = 0.5 },
-		{ kind = "cluster", recipes = { "driftwood" }, center = { x = 150, z = -110 }, radius = 120, count = 22, spacing = 18, scale = { min = 0.85, max = 1.3 }, seed = 3301, minGroundY = -0.5, maxGroundY = 8, maxSlope = 0.6 },
-		{ kind = "rock", recipes = { "glacialErratic", "glacialErratic", "iceShard" }, center = { x = 90, z = -70 }, radius = 110, count = 22, spacing = 24, scale = { min = 0.8, max = 1.35 }, seed = 3401, minGroundY = 0.5, maxSlope = 0.35 },
-		{ kind = "rock", recipes = { "iceShard", "glacialErratic" }, center = { x = 0, z = -230 }, radius = 96, count = 18, spacing = 24, scale = { min = 0.85, max = 1.4 }, seed = 3402, minGroundY = 1, maxSlope = 0.4 },
-		{ kind = "rock", recipes = { "glacialErratic" }, center = { x = -140, z = -150 }, radius = 90, count = 12, spacing = 26, scale = { min = 0.8, max = 1.2 }, seed = 3403, minGroundY = 0.5, maxSlope = 0.4 },
+		{ kind = "tree", recipes = { "spruce", "spruce", "snag" }, center = { x = -110, z = 30 }, radius = 84, count = 24, spacing = 14, scale = { min = 0.85, max = 1.25 }, seed = 3101, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "snowSpruce", "spruce" }, center = { x = 0, z = 50 }, radius = 88, count = 22, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3102, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "tree", recipes = { "snowSpruce", "snowSpruce", "snag" }, center = { x = -60, z = -90 }, radius = 72, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3103, minGroundY = 0.5, maxGroundY = 80, minGroundNormalY = 0.45 },
+		{ kind = "tree", recipes = { "spruce", "snowSpruce" }, center = { x = 60, z = -20 }, radius = 76, count = 18, spacing = 15, scale = { min = 0.85, max = 1.2 }, seed = 3104, minGroundY = 0.5, maxGroundY = 70, minGroundNormalY = 0.5 },
+		{ kind = "cluster", recipes = { "tundraTuft", "tundraTuft", "snowDrift" }, center = { x = 0, z = 50 }, radius = 92, count = 46, spacing = 6, scale = { min = 0.85, max = 1.25 }, seed = 3201, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "tundraTuft", "snowDrift" }, center = { x = -110, z = 30 }, radius = 78, count = 34, spacing = 6, scale = { min = 0.85, max = 1.2 }, seed = 3202, minGroundY = 0.3, minGroundNormalY = 0.55 },
+		{ kind = "cluster", recipes = { "snowDrift", "tundraTuft" }, center = { x = 90, z = -70 }, radius = 82, count = 30, spacing = 7, scale = { min = 0.9, max = 1.35 }, seed = 3203, minGroundY = 0.3, minGroundNormalY = 0.5 },
+		{ kind = "cluster", recipes = { "driftwood" }, center = { x = 150, z = -110 }, radius = 120, count = 22, spacing = 18, scale = { min = 0.85, max = 1.3 }, seed = 3301, minGroundY = -0.5, maxGroundY = 8, minGroundNormalY = 0.6 },
+		{ kind = "rock", recipes = { "glacialErratic", "glacialErratic", "iceShard" }, center = { x = 90, z = -70 }, radius = 110, count = 22, spacing = 24, scale = { min = 0.8, max = 1.35 }, seed = 3401, minGroundY = 0.5, minGroundNormalY = 0.35 },
+		{ kind = "rock", recipes = { "iceShard", "glacialErratic" }, center = { x = 0, z = -230 }, radius = 96, count = 18, spacing = 24, scale = { min = 0.85, max = 1.4 }, seed = 3402, minGroundY = 1, minGroundNormalY = 0.4 },
+		{ kind = "rock", recipes = { "glacialErratic" }, center = { x = -140, z = -150 }, radius = 90, count = 12, spacing = 26, scale = { min = 0.8, max = 1.2 }, seed = 3403, minGroundY = 0.5, minGroundNormalY = 0.4 },
 	} :: { ScatterPatch },
 } :: { [string]: { ScatterPatch } }
 
