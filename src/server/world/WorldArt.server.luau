@@ -349,10 +349,36 @@ end
 -- The visible surface Y at a world point. Raycast is authoritative (it reports the voxel surface the
 -- player will actually stand on, which is what earlier placement bugs got wrong by assuming a flat Y),
 -- with the generator's own heightAt as the fallback when the ray misses.
+-- WorldServer's placeholder blockout keeps a collidable part named "Ground" as a safety floor (usually a
+-- flat slab near Y = 0). suppressPlaceholders makes everything ELSE non-collidable, so a RespectCanCollide
+-- ray ignores the rest — but that Ground slab would be hit wherever the real terrain sits BELOW it, which is
+-- every water basin. The prop would then be placed at Y = 0, the `submerged` test would read false, and
+-- cypress trees would grow out of open water. Excluding the placeholder folders is the fix.
+local PLACEHOLDER_FOLDERS = {
+	"BayouShell_Placeholder",
+	"AppalachiaShell_Placeholder",
+	"AlaskaShell_Placeholder",
+	"Lodge_Placeholder",
+}
+local function placeholderExclusions()
+	local out = {}
+	for _, name in ipairs(PLACEHOLDER_FOLDERS) do
+		local f = workspace:FindFirstChild(name)
+		if f then
+			table.insert(out, f)
+		end
+	end
+	return out
+end
+
 local function groundInfo(worldX, worldZ, spec, localX, localZ, ignore)
 	local rp = RaycastParams.new()
 	rp.FilterType = Enum.RaycastFilterType.Exclude
-	rp.FilterDescendantsInstances = ignore or {}
+	local exclude = placeholderExclusions()
+	for _, inst in ipairs(ignore or {}) do
+		table.insert(exclude, inst)
+	end
+	rp.FilterDescendantsInstances = exclude
 	rp.IgnoreWater = true -- we want the BED, then compare against the water line ourselves
 	rp.RespectCanCollide = true
 	local from = Vector3.new(worldX, 400, worldZ)
