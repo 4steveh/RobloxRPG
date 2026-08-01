@@ -29,6 +29,56 @@ gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 M.gui = gui
 
+
+local TweenService = game:GetService("TweenService")
+local UISound = require(script.Parent:WaitForChild("UISound"))
+M.sound = UISound
+
+-- ── UI MOTION ──────────────────────────────────────────────────────────────────────────────────────
+-- Every panel in this game appeared and disappeared as a hard cut: Visible = true. Nothing moved, so
+-- nothing had weight, and a UI where nothing moves reads as a debug overlay no matter how it is styled.
+-- These are the two primitives every surface now goes through.
+local EASE_OUT = TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+local EASE_IN = TweenInfo.new(0.13, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+-- Show a frame with a small scale-and-fade pop. `baseSize` is remembered per instance, so repeated calls
+-- do not compound the scale-down and shrink the panel away to nothing.
+local baseSizes = {}
+function M.popIn(frame, sound)
+	if frame == nil then
+		return
+	end
+	local base = baseSizes[frame]
+	if base == nil then
+		base = frame.Size
+		baseSizes[frame] = base
+	end
+	frame.Visible = true
+	frame.Size = UDim2.new(base.X.Scale * 0.94, base.X.Offset * 0.94, base.Y.Scale * 0.94, base.Y.Offset * 0.94)
+	TweenService:Create(frame, EASE_OUT, { Size = base }):Play()
+	if sound ~= false then
+		UISound.play(sound or "open")
+	end
+end
+
+function M.popOut(frame, sound)
+	if frame == nil or not frame.Visible then
+		return
+	end
+	local base = baseSizes[frame] or frame.Size
+    local t = TweenService:Create(frame, EASE_IN, {
+		Size = UDim2.new(base.X.Scale * 0.94, base.X.Offset * 0.94, base.Y.Scale * 0.94, base.Y.Offset * 0.94),
+	})
+	t:Play()
+	t.Completed:Once(function()
+		frame.Visible = false
+		frame.Size = base
+	end)
+	if sound ~= false then
+		UISound.play(sound or "close")
+	end
+end
+
 local function label(parent, name, pos, size, textSize)
 	local l = Instance.new("TextLabel")
 	l.Name = name
@@ -145,15 +195,37 @@ local toast = label(gui, "Toast", UDim2.new(0.5, -200, 0.16, 0), UDim2.fromOffse
 toast.TextXAlignment = Enum.TextXAlignment.Center
 toast.TextStrokeTransparency = 0.4
 local toastToken = 0
+local TOAST_HOME = toast.Position
 function M.toast(text, color)
 	toastToken += 1
 	local mine = toastToken
 	toast.Text = text
 	toast.TextColor3 = color or Color3.fromRGB(235, 235, 220)
-	task.delay(2.5, function()
-		if toastToken == mine then
-			toast.Text = ""
+	-- rise into place and fade out on the way up: a line that simply blinks on and off is easy to miss
+	-- entirely, which is exactly what happened to the old payout toast.
+	toast.Position = TOAST_HOME + UDim2.fromOffset(0, 14)
+	toast.TextTransparency = 1
+	toast.TextStrokeTransparency = 1
+	TweenService:Create(toast, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = TOAST_HOME,
+		TextTransparency = 0,
+		TextStrokeTransparency = 0.4,
+	}):Play()
+	task.delay(2.2, function()
+		if toastToken ~= mine then
+			return
 		end
+		local out = TweenService:Create(toast, TweenInfo.new(0.45), {
+			Position = TOAST_HOME - UDim2.fromOffset(0, 16),
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+		})
+		out:Play()
+		out.Completed:Once(function()
+			if toastToken == mine then
+				toast.Text = ""
+			end
+		end)
 	end)
 end
 
@@ -174,10 +246,21 @@ gaugeFill.Size = UDim2.fromScale(0, 1)
 gaugeFill.BackgroundColor3 = Color3.fromRGB(90, 180, 220)
 gaugeFill.BorderSizePixel = 0
 gaugeFill.Parent = gaugeBack
+local gaugeShown = false
 function M.setGauge(visible, fraction)
-	gaugeBack.Visible = visible
+	if visible and not gaugeShown then
+		gaugeShown = true
+		M.popIn(gaugeBack, false)
+	elseif not visible and gaugeShown then
+		gaugeShown = false
+		M.popOut(gaugeBack, false)
+	end
 	if fraction ~= nil then
-		gaugeFill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
+		-- tension is a continuous quantity; snapping the bar to each sampled value throws away the fact
+		-- that it is RISING, which is the only thing the player is reading off it.
+		TweenService:Create(gaugeFill, TweenInfo.new(0.09, Enum.EasingStyle.Linear), {
+			Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1),
+		}):Play()
 	end
 end
 
@@ -187,6 +270,18 @@ end
 -- kill/catch controllers fire their own "Down!"/"Landed!" toast, so the first payout is still visible.
 -- (A login-time projection push would let the first payout show its +$ delta too — deferred, see spec §9.)
 local lastBalance = nil
+local cashToken = 0
+-- A brief scale-and-colour pulse on the cash header, so a payout registers even if the player's eyes are
+-- on the animal rather than the corner of the screen.
+local function cashPulse()
+	cashLabel.TextColor3 = Color3.fromRGB(168, 240, 150)
+	local base = cashLabel.TextSize
+	cashLabel.TextSize = base + 4
+	TweenService:Create(cashLabel, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		TextSize = base,
+		TextColor3 = Color3.fromRGB(235, 235, 220),
+	}):Play()
+end
 -- Weather countdown chip (top-center): "Storm · next 02:14" — a server-time target, client display only.
 local RunService = game:GetService("RunService")
 local weatherChip = label(gui, "WeatherChip", UDim2.new(0.5, -110, 0, 10), UDim2.fromOffset(220, 22), 15)
@@ -276,10 +371,36 @@ function M.applyProjection(proj)
 		return
 	end
 	if proj.balance ~= nil then
-		if lastBalance ~= nil and proj.balance > lastBalance then
+		local gained = lastBalance ~= nil and proj.balance > lastBalance
+		if gained then
 			M.toast("+$" .. tostring(proj.balance - lastBalance), Color3.fromRGB(150, 230, 140))
+			-- a payout is the game's core reward beat and it happened in silence
+			UISound.rewardFlourish(3)
 		end
-		cashLabel.Text = "$ " .. commafmt(proj.balance)
+		-- Count the number UP rather than swapping it. The balance is the single number this whole economy
+		-- exists to move, and an instant replacement makes earning it feel like a variable assignment.
+		if gained and lastBalance ~= nil then
+			cashToken += 1
+			local mine = cashToken
+			local from, to = lastBalance, proj.balance
+			local t0 = os.clock()
+			local DURATION = 0.45
+			task.spawn(function()
+				while cashToken == mine do
+					local a = math.min(1, (os.clock() - t0) / DURATION)
+					-- ease out so it decelerates onto the final value instead of stopping dead
+					local eased = 1 - (1 - a) * (1 - a)
+					cashLabel.Text = "$ " .. commafmt(from + (to - from) * eased)
+					if a >= 1 then
+						break
+					end
+					task.wait()
+				end
+			end)
+			cashPulse()
+		else
+			cashLabel.Text = "$ " .. commafmt(proj.balance)
+		end
 		lastBalance = proj.balance
 	end
 	tierLabel.Text = string.format("EHT %s · EFT %s", tostring(proj.eht), tostring(proj.eft))
@@ -322,7 +443,41 @@ function M.button(opts)
 	b.TextSize = opts.textSize or 18
 	b.TextColor3 = Color3.fromRGB(240, 240, 230)
 	b.Text = opts.text or ""
+	b.AutoButtonColor = false -- we drive the press state ourselves, below
 	b.Parent = opts.parent or gui
+
+	-- Rounded corners and a stroke, on the factory rather than per controller. Square hard-edged buttons are
+	-- one of the most recognisable "unfinished Roblox UI" tells, and every on-screen input in the game is
+	-- built here.
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, opts.radius or 10)
+	corner.Parent = b
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(220, 232, 210)
+	stroke.Thickness = 1
+	stroke.Transparency = 0.72
+	stroke.Parent = b
+
+	-- Every controller builds its on-screen inputs through this factory, so wiring feedback here gives the
+	-- whole UI audio and press response in one place, rather than six controllers each remembering to.
+	b.Activated:Connect(function()
+		UISound.play("click")
+	end)
+	-- A press must visibly depress. On mobile there is no hover state to fall back on, so a button that does
+	-- not move on touch reads as unresponsive even when it fired correctly.
+	local function press()
+		TweenService:Create(b, TweenInfo.new(0.06), { BackgroundTransparency = 0.32 }):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.06), { Transparency = 0.35 }):Play()
+	end
+	local function release()
+		TweenService:Create(b, TweenInfo.new(0.14), { BackgroundTransparency = 0.1 }):Play()
+		TweenService:Create(stroke, TweenInfo.new(0.14), { Transparency = 0.72 }):Play()
+	end
+	b.MouseButton1Down:Connect(press)
+	b.MouseButton1Up:Connect(release)
+	b.MouseLeave:Connect(release)
+	b.TouchLongPress:Connect(release)
+
 	return b
 end
 

@@ -39,7 +39,7 @@ local S = Art.Shape
 
 local ArtKit = {}
 
-ArtKit.version = 9
+ArtKit.version = 10
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════
 -- PALETTES. Each element type carries 4-6 hues; the generators pick per part. Values are RGB 0-255.
@@ -2292,5 +2292,46 @@ ArtKit.fishArt = {
 		accent = FA.finDark,
 	} :: CreatureRecipe,
 } :: { [string]: CreatureRecipe }
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+-- AMBIENCE. Positional looping beds, one per biome, plus the Lodge hearth.
+--
+-- These ids came from src/config/ArtAssets.luau, the manifest the previous art pipeline used. Unlike the
+-- MODEL assets in that manifest — which InsertService cannot re-authorise and which this rewrite therefore
+-- discarded — AUDIO ids resolve straight from a Sound.SoundId with no LoadAsset step, so they are safe to
+-- keep and are the one part of the old manifest worth carrying forward.
+--
+-- Positional rather than a client-side bed keyed on biome: the three destinations sit 2000 studs apart, so a
+-- LINEAR rolloff whose maxDistance is well under that spacing keeps each biome's sound local by construction,
+-- with no code deciding which bed to play. Several emitters per biome so the bed does not collapse to a point
+-- source you can walk away from.
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+ArtKit.ambience = {
+	bayou = {
+		id = "9112810059", -- frog/insect chorus
+		volume = 0.5,
+		minDistance = 70,
+		maxDistance = 440,
+		points = { { x = 0, z = 10 }, { x = 60, z = 130 }, { x = -95, z = 85 }, { x = 0, z = 250 } },
+	},
+	appalachia = {
+		id = "9112806424", -- woodland birds and insects
+		volume = 0.44,
+		minDistance = 90,
+		maxDistance = 620,
+		points = { { x = 0, z = 80 }, { x = -115, z = 60 }, { x = 105, z = 45 }, { x = 0, z = -120 } },
+	},
+	alaska = {
+		id = "9114057128", -- wind gusts
+		volume = 0.42,
+		minDistance = 110,
+		maxDistance = 880,
+		points = { { x = 0, z = 50 }, { x = 90, z = -70 }, { x = -110, z = 25 }, { x = 0, z = -240 } },
+	},
+} :: { [string]: { id: string, volume: number, minDistance: number, maxDistance: number, points: { { x: number, z: number } } } }
+
+-- The hearth. Deliberately tight rolloff so it reads as a fire in a room, not as weather.
+ArtKit.hearthSound = { id = "9112780193", volume = 0.6, minDistance = 8, maxDistance = 58 }
 
 return table.freeze(ArtKit)

@@ -3,11 +3,12 @@
 -- breathing sway.
 --
 -- WHY IT IS ADDITIVE. Wild World already has two things driving the camera: Roblox's default camera module
--- and ArmRig's ADS zoom. Anything that WRITES cam.CFrame directly fights them (the earlier FOV punch in
+-- and ArmRig's ADS zoom. Anything that WRITES cam.CFrame outright fights them (the earlier FOV punch in
 -- HuntingFeel did exactly that and had to be moved into ArmRig). This binds AFTER the camera has been
--- positioned for the frame — RenderPriority.Camera + 1 — and POST-MULTIPLIES a small offset onto whatever
--- CFrame the camera arrived at. So it composes with the default camera, with ADS, and with any future
--- camera work, and it can never take control away from them.
+-- positioned for the frame — RenderPriority.Camera + 1 — and contributes a small rotation on top of
+-- whatever CFrame the camera arrived at, as a per-frame DELTA (see the note at the bottom: the module does
+-- not rewrite CFrame from scratch, so a plain post-multiply compounds). It composes with the default
+-- camera, with ADS, and with any future camera work, and can never take control away from them.
 --
 -- WHY SUM-OF-SINES AND NOT RANDOM. Per-frame white noise reads as a glitch, not as weight: it has energy at
 -- every frequency including ones the eye reads as tearing. Three incommensurate sine pairs give continuous,
@@ -29,6 +30,8 @@ local kickRoll, kickRollVel = 0, 0
 local shake = 0
 local shakeDecay = 6
 local swayEnabled = true
+-- the net rotation we are currently contributing; the per-frame delta is measured against it
+local appliedOffset = CFrame.identity
 
 -- Spring constants. STIFFNESS sets how fast the camera returns to centre, DAMPING how much it overshoots.
 -- Tuned so a rifle shot recovers in roughly a third of a second with one small overshoot — the recovery is
@@ -113,9 +116,23 @@ local function onRender(dt)
 		yaw += breathe * 1.3 * math.sin(t * 0.77)
 	end
 
-	if pitch ~= 0 or yaw ~= 0 or roll ~= 0 then
-		camera.CFrame = camera.CFrame * CFrame.Angles(pitch, yaw, roll)
-	end
+	local offset = CFrame.Angles(pitch, yaw, roll)
+
+	-- APPLY THE DELTA, NOT THE OFFSET.
+	--
+	-- The obvious `cam.CFrame = cam.CFrame * offset` is only safe if the camera module rewrites CFrame from
+	-- scratch every frame. It does NOT: writing a deliberately wrong CFrame and reading it back one frame
+	-- later showed it moved only 0.23 degrees — the module preserves and adjusts the existing CFrame rather
+	-- than replacing it. So a per-frame post-multiply stacks on its own previous result, and idle breathing
+	-- sway alone measured 17.9 degrees of drift per second.
+	--
+	-- Applying `prevOffset:Inverse() * offset` instead means the NET rotation we have contributed is always
+	-- exactly `offset`, never a running sum. When the impulses decay to nothing the delta unwinds whatever
+	-- we last added, so the camera returns precisely to where the module put it — and if the module DOES
+	-- write on some frame, the error is bounded by one frame's delta and self-corrects.
+	local delta = appliedOffset:Inverse() * offset
+	camera.CFrame = camera.CFrame * delta
+	appliedOffset = offset
 end
 
 -- Bound one step AFTER the camera so the offset lands on the final camera CFrame for the frame. Binding

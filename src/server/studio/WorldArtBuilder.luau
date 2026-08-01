@@ -890,6 +890,55 @@ function M.startCreatureUpgrades()
 	end)
 end
 
+-- ── ambience ──────────────────────────────────────────────────────────────────────────────────────────
+-- REGRESSION NOTE: the pre-rewrite WorldArt had a buildSoundscape pass and this rewrite dropped it, so the
+-- world shipped silent for several builds. Restored here, driven from ArtKit.ambience.
+--
+-- Linear rolloff with a maxDistance well under the 2000-stud biome spacing is what keeps each bed local
+-- without any code deciding which one to play.
+function M.buildSoundscape(parent)
+	local placed = 0
+	local function emit(name, position, spec)
+		if spec == nil or spec.id == nil then
+			return
+		end
+		local anchor = Instance.new("Part")
+		anchor.Name = name
+		anchor.Anchored, anchor.Transparency, anchor.CanCollide, anchor.CanQuery, anchor.CanTouch =
+			true, 1, false, false, false
+		anchor.Size = Vector3.one
+		anchor.CastShadow = false
+		anchor.Position = position
+		anchor.Parent = parent
+		local snd = Instance.new("Sound")
+		snd.Name = "Ambience"
+		snd.SoundId = "rbxassetid://" .. tostring(spec.id)
+		snd.Looped = true
+		snd.Volume = spec.volume
+		snd.RollOffMode = Enum.RollOffMode.Linear
+		snd.RollOffMinDistance = spec.minDistance
+		snd.RollOffMaxDistance = spec.maxDistance
+		snd.Playing = true
+		snd.Parent = anchor
+		placed += 1
+	end
+
+	for biome, spec in pairs(ArtKit.ambience) do
+		local offsetX = WORLD_OFFSET[biome] or 0
+		local terrain = ArtKit.terrainSpecs[biome]
+		for i, pt in ipairs(spec.points) do
+			-- lift the emitter above the local ground so it is never buried inside terrain
+			local y = 8
+			if terrain ~= nil then
+				y = TerrainGen.heightAt(terrain, pt.x, pt.z) + 8
+			end
+			emit(("Ambience_%s_%d"):format(biome, i), Vector3.new(pt.x + offsetX, y, pt.z), spec)
+		end
+	end
+	emit("Ambience_lodge_hearth", LODGE_ANCHOR + Vector3.new(0, 4, ArtKit.cabins.lodge.depth * 0.5 - 4), ArtKit.hearthSound)
+	print(("[WildWorldArt] soundscape: %d emitters"):format(placed))
+end
+
 -- ── publish the looks to the client ───────────────────────────────────────────────────────────────────
 -- A LocalScript cannot require anything under ServerScriptService, so the per-biome looks are published as
 -- one JSON StringValue in ReplicatedStorage and client/BiomeLook.client.luau applies them. This keeps the
@@ -1042,6 +1091,11 @@ function M.buildAll()
 	lodgeFolder.Name = "lodge"
 	lodgeFolder.Parent = root
 	M.buildLodge(lodgeFolder)
+
+	local soundFolder = Instance.new("Folder")
+	soundFolder.Name = "ambience"
+	soundFolder.Parent = root
+	M.buildSoundscape(soundFolder)
 
 	print(("[WildWorldArt] BUILD COMPLETE — %d scatter parts, budget %d"):format(totalParts, ArtKit.budget.maxPartsTotal))
 	if totalParts > ArtKit.budget.maxPartsTotal then

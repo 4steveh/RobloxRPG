@@ -4,6 +4,7 @@
 -- XOR). Auto-dismisses; a rapid second catch cancels the prior card. "MOUNT IT" routes the mountTrophy intent
 -- through the server (Net.lodge), which the gauntlet validates — the card never mints or changes disposition.
 local Hud = require(script.Parent:WaitForChild("Hud"))
+local UISound = require(script.Parent:WaitForChild("UISound"))
 
 local M = {}
 
