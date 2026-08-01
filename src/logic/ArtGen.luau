@@ -154,8 +154,10 @@ ArtGen.heightOf = heightOf
 
 -- ── trees ─────────────────────────────────────────────────────────────────────────────────────────────
 
-local function emitSlabFoliage(out: { PartDesc }, st: Stream, tip: Vec3, f: FoliageRecipe)
-	local n = Rand.int(st, f.countMin, f.countMax)
+-- `density` scales both the plate count and the plate size, so an inner-canopy pass costs less and reads
+-- as smaller leaf clusters deeper in the tree.
+local function emitSlabFoliage(out: { PartDesc }, st: Stream, tip: Vec3, f: FoliageRecipe, density: number)
+	local n = math.max(1, math.floor(Rand.int(st, f.countMin, f.countMax) * density + 0.5))
 	for _ = 1, n do
 		local az = Rand.range(st, 0, TAU)
 		local d = Rand.range(st, 0, f.spread)
@@ -164,7 +166,11 @@ local function emitSlabFoliage(out: { PartDesc }, st: Stream, tip: Vec3, f: Foli
 		table.insert(out, {
 			name = "Leaf",
 			shape = Art.Shape.block,
-			size = { x = f.size.x * jit, y = f.size.y * jit, z = f.size.z * jit },
+			size = {
+				x = f.size.x * jit * (0.55 + 0.45 * density),
+				y = f.size.y * jit,
+				z = f.size.z * jit * (0.55 + 0.45 * density),
+			},
 			pos = pos,
 			up = Vec.tilt(UP, Rand.range(st, 0, f.tilt), Rand.range(st, 0, TAU)),
 			yaw = Rand.range(st, 0, TAU),
@@ -304,11 +310,17 @@ local function limb(
 
 	if level >= L.levels then
 		if r.foliage.kind == "slab" then
-			emitSlabFoliage(out, st, tip, r.foliage)
+			emitSlabFoliage(out, st, tip, r.foliage, 1)
 		elseif r.foliage.kind == "frond" then
 			emitFrondFoliage(out, st, tip, r.foliage)
 		end
 		return
+	end
+	-- Canopy DEPTH: also hang a thinner set of plates off the second-to-last level. Terminal-only foliage
+	-- piles every plate at the same height and reads as a lollipop on a bare pole; the reference template's
+	-- trees carry leaf mass through the whole branch volume.
+	if r.foliage.kind == "slab" and level == L.levels - 1 and L.levels >= 2 then
+		emitSlabFoliage(out, st, tip, r.foliage, 0.55)
 	end
 
 	local n = Rand.int(st, L.childMin, L.childMax)
@@ -393,7 +405,8 @@ function ArtGen.tree(r: TreeRecipe, seed: number): ModelDesc
 	-- conifer rings run up the whole trunk, so they are emitted once against its measured extent
 	if r.foliage.kind == "tier" then
 		local trunkTop = pos.y
-		emitTierFoliage(out, st, { x = 0, y = 0, z = 0 }, trunkTop, trunkTop * Rand.clamp(L.branchStart, 0, 1), r.foliage)
+		local tierStart = r.foliage.tierStart or 0.25
+		emitTierFoliage(out, st, { x = 0, y = 0, z = 0 }, trunkTop, trunkTop * Rand.clamp(tierStart, 0, 0.95), r.foliage)
 	elseif r.foliage.kind == "frond" then
 		emitFrondFoliage(out, st, pos, r.foliage)
 	end
@@ -951,8 +964,15 @@ function ArtGen.creature(r: Art.CreatureRecipe, seed: number): ModelDesc
 	for i = 1, segs do
 		local t = (i - 0.5) / segs -- 0 at the nose end, 1 at the hip
 		local z = FWD * (halfLen - t * r.length)
-		-- girth peaks just behind the shoulder, which is what stops a part-built animal reading as a crate
-		local girth = 1 - 0.28 * math.abs(t - 0.35) / 0.65
+		-- Girth peaks just behind the shoulder. Fish need a far stronger spindle than a quadruped: a
+		-- constant-width tube with a block head on it reads as a crate, which is exactly how the first pass
+		-- rendered. sin(pi * t^0.75) gives a rounded shoulder and a genuinely pointed tail.
+		local girth
+		if r.form == "fish" then
+			girth = 0.22 + 0.78 * math.sin(math.pi * (t ^ 0.75))
+		else
+			girth = 1 - 0.28 * math.abs(t - 0.35) / 0.65
+		end
 		local hump = r.shoulderHump * r.height * math.max(0, 1 - t * 2.4)
 		creaturePart(
 			out,

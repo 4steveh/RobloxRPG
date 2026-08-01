@@ -256,6 +256,10 @@ export type FoliageRecipe = {
 	spread: number, -- lateral studs the cluster fans out from the limb tip
 	rise: number, -- studs the cluster centre sits above the tip
 	tilt: number, -- max radians of random plate tilt
+	-- "tier" only: fraction UP THE TRUNK where the lowest whorl sits. Separate from limb.branchStart, which
+	-- conifers set to 1 to mean "no side branches" — reusing it collapsed every tier onto the treetop and
+	-- rendered a spruce as a bare pole with one umbrella.
+	tierStart: number?,
 	material: MaterialName,
 	colors: { RGB },
 }

@@ -268,8 +268,10 @@ return function(t: Harness.T)
 	t.section("ArtGen — trees")
 
 	local TREE_BUDGET: { [string]: number } = {
-		-- hero landmark: one instance in the world, so it may be dense
-		oldCypress = 460,
+		-- Hero landmark: ONE instance in the world, so it may be dense. The ceiling is set from the
+		-- reference template's own hero tree — Pirate Island's largest Redwood is 603 parts — rather than
+		-- from a guess, so a landmark is allowed real mass while canopy trees stay cheap.
+		oldCypress = 620,
 		-- canopy trees: scattered by the hundred, so each must stay near the reference template's ~40-60
 		baldCypress = 110,
 		oak = 110,
