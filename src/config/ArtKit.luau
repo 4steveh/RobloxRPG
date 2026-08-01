@@ -39,7 +39,7 @@ local S = Art.Shape
 
 local ArtKit = {}
 
-ArtKit.version = 10
+ArtKit.version = 11
 
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════
 -- PALETTES. Each element type carries 4-6 hues; the generators pick per part. Values are RGB 0-255.
@@ -2333,5 +2333,49 @@ ArtKit.ambience = {
 
 -- The hearth. Deliberately tight rolloff so it reads as a fire in a room, not as weather.
 ArtKit.hearthSound = { id = "9112780193", volume = 0.6, minDistance = 8, maxDistance = 58 }
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+-- WEAPONS. Authored in the grip frame (origin at the trigger grip, muzzle down -Z). Dimensions are in studs
+-- and are deliberately close to a real scoped bolt-action: a ~24in barrel is about 2.4 studs at Roblox's
+-- rough 1 stud ≈ 1 foot, and the numbers below hold that proportion so the weapon reads as a rifle rather
+-- than a prop.
+--
+-- `scope.eyeRelief` and `scope.height` are the load-bearing values: they place the CAMERA on the optical
+-- axis during aim-down-sights, which is what makes aiming read as shouldering a rifle instead of zooming a
+-- third-person camera.
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+ArtKit.weapons = {
+	huntingRifle = {
+		name = "HuntingRifle",
+		receiver = { length = 1.05, height = 0.34, width = 0.24 },
+		barrel = { length = 2.35, diameter = 0.14, muzzleDiameter = 0.105, height = 0.30 },
+		stock = { length = 1.30, height = 0.44, width = 0.26, drop = 0.16, combHeight = 0.15, buttPad = 0.12 },
+		foreEnd = { length = 1.15, height = 0.24, width = 0.22 },
+		grip = { length = 0.30, height = 0.46, width = 0.21, angle = 0.32 },
+		magazine = { length = 0.42, height = 0.30, width = 0.17 },
+		bolt = { length = 0.30, diameter = 0.075, knobDiameter = 0.10 },
+		scope = {
+			tubeLength = 0.95,
+			tubeDiameter = 0.145,
+			objectiveDiameter = 0.22,
+			objectiveLength = 0.20,
+			eyepieceDiameter = 0.19,
+			eyepieceLength = 0.16,
+			height = 0.60,
+			forward = 0.18,
+			eyeRelief = 0.62,
+			turretSize = 0.10,
+			magnification = 4,
+		},
+		ironSights = { frontHeight = 0.09, rearHeight = 0.07, postWidth = 0.035 },
+		metal = { { 46, 48, 54 }, { 54, 56, 62 }, { 62, 64, 70 }, { 38, 40, 46 } } :: { RGB },
+		wood = { { 78, 52, 33 }, { 90, 61, 39 }, { 102, 70, 45 }, { 68, 45, 29 } } :: { RGB },
+		accent = { { 24, 25, 28 }, { 30, 31, 35 }, { 36, 37, 42 } } :: { RGB },
+		glass = { 132, 176, 200 } :: RGB,
+		metalMaterial = M.Metal,
+		woodMaterial = M.Wood,
+	} :: Art.RifleRecipe,
+}
 
 return table.freeze(ArtKit)

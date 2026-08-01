@@ -25,6 +25,7 @@ Builder.applyTerrainColors()
 -- then overrides it per biome via client/BiomeLook.client.luau.
 Builder.applyLook(ArtKit.looks.bayou)
 Builder.publishLooks()
+Builder.publishWeapons()
 Builder.suppressPlaceholders()
 Builder.startCreatureUpgrades()
 Builder.startGaitLoop()

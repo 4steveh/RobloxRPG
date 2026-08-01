@@ -939,6 +939,61 @@ function M.buildSoundscape(parent)
 	print(("[WildWorldArt] soundscape: %d emitters"):format(placed))
 end
 
+-- ── weapons ───────────────────────────────────────────────────────────────────────────────────────────
+-- Built ONCE on the server and published to ReplicatedStorage as a template the client clones — for both the
+-- third-person weapon in the character's hand AND the first-person view model used while aiming.
+--
+-- WHY PUBLISH A MODEL RATHER THAN DATA. A LocalScript cannot require ArtKit (it lives under
+-- ServerScriptService), so the client would otherwise need its own copy of the recipe or its own
+-- instantiator. One published template means there is exactly one definition of where the muzzle and the
+-- SIGHT LINE are, and the third-person weapon and the view model physically cannot disagree about them.
+function M.publishWeapons()
+	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local root = ReplicatedStorage:FindFirstChild("WildWorldWeapons")
+	if root then
+		root:Destroy()
+	end
+	root = Instance.new("Folder")
+	root.Name = "WildWorldWeapons"
+
+	for _, recipe in pairs(ArtKit.weapons) do
+		local build = ArtGen.rifle(recipe)
+		local model = Instance.new("Model")
+		-- Named from the RECIPE, not the ArtKit table key. The key is camelCase (`huntingRifle`) and the
+		-- clients look up the canonical name (`HuntingRifle`); using the key published a model nothing could
+		-- find, and the only symptom was a hunter with empty hands.
+		model.Name = recipe.name
+		local first
+		for _, d in ipairs(build.model.parts) do
+			local p = buildPart(d, CFrame.new(), 1, model)
+			p.Massless = true
+			first = first or p
+		end
+		model.PrimaryPart = first
+		-- THE PIVOT MUST BE THE GRIP ORIGIN, not the PrimaryPart. Model:PivotTo places the model's PIVOT at
+		-- the given CFrame, and by default that is the PrimaryPart — here the receiver, which sits 0.14 studs
+		-- above and 0.1 forward of the grip frame's origin. Aiming with that pivot put the scope 0.143 studs
+		-- below the camera axis: horizontally perfect, vertically wrong, which is exactly the kind of near-miss
+		-- that reads as "the sights don't line up" without being obviously broken.
+		-- The template's parts are authored around the origin, so the identity CFrame IS the grip frame.
+		model.WorldPivot = CFrame.new()
+		-- Anchor points as attributes on the model, in the GRIP FRAME. The consumer positions the whole
+		-- model, so these stay valid however it is welded or parented.
+		model:SetAttribute("muzzle", Vector3.new(build.muzzle.x, build.muzzle.y, build.muzzle.z))
+		model:SetAttribute("sightPoint", Vector3.new(build.sightPoint.x, build.sightPoint.y, build.sightPoint.z))
+		model:SetAttribute("sightHeight", build.sightHeight)
+		model:SetAttribute("magnification", build.magnification)
+		model:SetAttribute("hasScope", build.hasScope)
+		model.Parent = root
+	end
+	root.Parent = ReplicatedStorage
+	local n = 0
+	for _ in pairs(ArtKit.weapons) do
+		n += 1
+	end
+	print(("[WildWorldArt] published %d weapon template(s)"):format(n))
+end
+
 -- ── publish the looks to the client ───────────────────────────────────────────────────────────────────
 -- A LocalScript cannot require anything under ServerScriptService, so the per-biome looks are published as
 -- one JSON StringValue in ReplicatedStorage and client/BiomeLook.client.luau applies them. This keeps the

@@ -56,6 +56,11 @@ for _, k in ipairs({ "alaska_king_salmon", "bayou_blue_catfish", "appalachia_tro
 	add("fish:" .. k, ArtGen.creature(ArtKit.fishArt[k], 1234))
 end
 
+do
+	local rifle = ArtGen.rifle(ArtKit.weapons.huntingRifle)
+	add("weapon:huntingRifle", rifle.model)
+end
+
 -- a grove: many trees scattered, to judge DENSITY and palette variety in aggregate
 local grove = { parts = {} }
 local plan = ArtGen.scatter({

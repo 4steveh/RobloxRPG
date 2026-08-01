@@ -23,6 +23,9 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+-- Stance owns crouch; its camera drop is composed into the ONE CameraOffset write below rather than being a
+-- second writer that fights this one frame to frame.
+local Stance = require(script.Parent:WaitForChild("Stance"))
 
 local M = {}
 
@@ -100,6 +103,29 @@ local function bindJoints(c)
 	end
 end
 
+-- Report the rig kind ONCE. On an AnimationConstraint avatar the engine's animator rewrites joint
+-- .Transform after every RenderStep priority, so the procedural pose below is inert — the arms keep playing
+-- the stock locomotion animation. That is not a bug we can fix from a script: overriding this rig needs an
+-- uploaded Animation asset. Logging it means the next person does not spend an hour discovering it again.
+local rigReported = false
+local function reportRig()
+	if rigReported then
+		return
+	end
+	local j = joints.RightShoulder
+	if j == nil then
+		return
+	end
+	rigReported = true
+	if j:IsA("AnimationConstraint") then
+		warn(
+			"[ArmRig] this avatar is an AnimationConstraint rig — procedural ARM posing is inert (the engine's "
+				.. "animator wins). Camera/ADS still applies; the rifle is torso-mounted by ViewModel and the "
+				.. "shouldering feel comes from the first-person WeaponView."
+		)
+	end
+end
+
 local function currentPoses()
 	if mode == "rifle" then
 		return RIFLE.idle, RIFLE.aim
@@ -122,6 +148,7 @@ local function onStep(dt)
 
 	-- ── arms ── (lazy-bind each frame so the joints resolve once they assemble / after a respawn)
 	if char ~= nil then bindJoints(char) end
+	reportRig()
 	local idlePose, hotPose = currentPoses()
 	if idlePose ~= nil then
 		local t = os.clock()
@@ -151,14 +178,22 @@ local function onStep(dt)
 
 	-- ── camera (FOV zoom + over-shoulder offset + face-the-aim) ──
 	if humanoid ~= nil and humanoid.Parent ~= nil then
-		local goalFov = (BASE_FOV + (ADS_FOV - BASE_FOV) * blend) + camRecoil
-		camera.FieldOfView = goalFov
-		curOffset = curOffset:Lerp(HIP_OFFSET:Lerp(ADS_OFFSET, blend), math.clamp(dt * 10, 0, 1))
+		-- FieldOfView is now WeaponView's: it derives the aim FOV from the scope's magnification. ArmRig
+		-- keeps only the transient recoil punch, applied on top of whatever WeaponView set this frame.
+		if camRecoil ~= 0 then
+			camera.FieldOfView = camera.FieldOfView + camRecoil
+		end
+		-- The over-the-shoulder offset fades OUT as the aim blend rises, because WeaponView dollies the
+		-- camera to first person over the same blend; holding a shoulder offset there would push the eye off
+		-- the optical axis and the sight picture would never line up.
+		local shoulder = HIP_OFFSET:Lerp(ADS_OFFSET, math.clamp(blend * 2, 0, 1) * (1 - blend))
+		curOffset = curOffset:Lerp(shoulder + Stance.cameraOffset(), math.clamp(dt * 10, 0, 1))
 		humanoid.CameraOffset = curOffset
+		Stance.setAimBlend(blend)
 		-- while aiming, face the character toward the camera's horizontal look so the rifle points downrange.
 		-- (workspace attr "WW_NoFaceAim" disables this — a debug/verification escape hatch so the aim pose can
 		-- be viewed from the side; harmless in production, defaults off.)
-		if (not workspace:GetAttribute("WW_NoFaceAim")) and blend > 0.04 and hrp ~= nil and hrp.Parent ~= nil then
+		if (not workspace:GetAttribute("WW_NoFaceAim")) and blend > 0.04 and blend < 0.9 and hrp ~= nil and hrp.Parent ~= nil then
 			humanoid.AutoRotate = false
 			local look = camera.CFrame.LookVector
 			local flat = Vector3.new(look.X, 0, look.Z)

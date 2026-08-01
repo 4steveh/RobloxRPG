@@ -424,6 +424,65 @@ export type CreatureRecipe = {
 	pale: number?,
 }
 
+-- ── WEAPONS ───────────────────────────────────────────────────────────────────────────────────────────
+-- A rifle is authored in its own GRIP FRAME: origin at the trigger grip, muzzle down -Z, up +Y. That frame
+-- is what both the third-person weld (into the character's right hand) and the first-person view model are
+-- positioned by, so the two can never disagree about where the weapon is.
+--
+-- SIGHT LINE is the load-bearing output. True aim-down-sights needs the CAMERA placed on the optical axis
+-- behind the eyepiece, not an over-the-shoulder offset with a narrower field of view. `sightHeight` and
+-- `eyeRelief` define that axis, and ArtGen.rifle returns the resolved point so the view model does not
+-- re-derive it from part positions.
+
+export type ScopeRecipe = {
+	tubeLength: number,
+	tubeDiameter: number,
+	objectiveDiameter: number,
+	objectiveLength: number,
+	eyepieceDiameter: number,
+	eyepieceLength: number,
+	height: number, -- optical axis above the grip-frame origin
+	forward: number, -- how far down -Z the tube centre sits
+	eyeRelief: number, -- +Z distance from the eyepiece the eye sits at
+	turretSize: number,
+	magnification: number, -- drives the ADS field of view and the overlay
+}
+
+export type IronSightRecipe = {
+	frontHeight: number,
+	rearHeight: number,
+	postWidth: number,
+}
+
+export type RifleRecipe = {
+	name: string,
+	receiver: { length: number, height: number, width: number },
+	barrel: { length: number, diameter: number, muzzleDiameter: number, height: number },
+	stock: { length: number, height: number, width: number, drop: number, combHeight: number, buttPad: number },
+	foreEnd: { length: number, height: number, width: number },
+	grip: { length: number, height: number, width: number, angle: number },
+	magazine: { length: number, height: number, width: number },
+	bolt: { length: number, diameter: number, knobDiameter: number },
+	scope: ScopeRecipe?,
+	ironSights: IronSightRecipe?,
+	metal: { RGB },
+	wood: { RGB },
+	accent: { RGB },
+	glass: RGB,
+	metalMaterial: MaterialName,
+	woodMaterial: MaterialName,
+}
+
+-- What ArtGen.rifle returns: the parts plus the anchor points every consumer needs, resolved once.
+export type RifleBuild = {
+	model: ModelDesc,
+	muzzle: Vec3, -- where the muzzle flash and tracer originate
+	sightPoint: Vec3, -- where the aiming eye sits, on the optical axis
+	sightHeight: number,
+	magnification: number,
+	hasScope: boolean,
+}
+
 -- One cell of a generated heightfield: the surface height and what the column is made of.
 export type TerrainColumn = {
 	x: number,

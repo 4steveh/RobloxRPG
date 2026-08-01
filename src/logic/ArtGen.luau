@@ -761,7 +761,7 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 	-- gives the half-width at which its corners land exactly on the slope.
 	for _, sgn in { 1, -1 } do
 		local steps = math.max(2, r.logCourses)
-		local courseH = rise / steps
+		local gableCourseH = rise / steps
 		for i = 0, steps - 1 do
 			local t = i / steps
 			local halfW = slopeRun * (1 - t - 1 / steps)
@@ -769,8 +769,8 @@ function ArtGen.cabin(r: CabinRecipe): ModelDesc
 				table.insert(out, {
 					name = "Gable",
 					shape = Art.Shape.block,
-					size = { x = halfW * 2, y = courseH, z = logT },
-					pos = { x = 0, y = r.wallHeight + rise * t + courseH * 0.5, z = sgn * (hd + logT * 0.5) },
+					size = { x = halfW * 2, y = gableCourseH, z = logT },
+					pos = { x = 0, y = r.wallHeight + rise * t + gableCourseH * 0.5, z = sgn * (hd + logT * 0.5) },
 					color = ArtGen.jitterColor(st, r.logColors[(i % #r.logColors) + 1], 0.05),
 					material = r.logMaterial,
 				})
@@ -1420,6 +1420,170 @@ function ArtGen.biteMarker(r: Art.CreatureRecipe, seed: number): ModelDesc
 	end
 
 	return { name = "BiteMarker", parts = out, groundPivot = { x = 0, y = 0, z = 0 } }
+end
+
+-- ── rifle ─────────────────────────────────────────────────────────────────────────────────────────────
+-- Authored in the GRIP FRAME: origin at the trigger grip, muzzle down -Z, up +Y. The same frame positions
+-- the third-person weld into the character's hand AND the first-person view model, so the two cannot
+-- disagree about where the weapon is.
+--
+-- Cylinders use the project's axis convention (`up` is the axis, size.x is the length), so a barrel lying
+-- down -Z is simply `up = {0,0,-1}`.
+
+local FWD_AXIS: Vec3 = { x = 0, y = 0, z = -1 }
+
+function ArtGen.rifle(r: Art.RifleRecipe): Art.RifleBuild
+	local st = Rand.stream(#r.name * 7717 + 13)
+	local out: { PartDesc } = {}
+
+	local function solid(name: string, size: Vec3, pos: Vec3, colors: { RGB }, material: Art.MaterialName, up: Vec3?, yaw: number?, shape: Art.Shape?)
+		table.insert(out, {
+			name = name,
+			shape = shape or Art.Shape.block,
+			size = size,
+			pos = pos,
+			up = up,
+			yaw = yaw,
+			color = ArtGen.jitterColor(st, Rand.pick(st, colors), 0.04),
+			material = material,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		})
+	end
+
+	-- ── receiver, the part everything else hangs off ──
+	local rc = r.receiver
+	solid("Receiver", { x = rc.width, y = rc.height, z = rc.length }, { x = 0, y = rc.height * 0.42, z = -rc.length * 0.1 }, r.metal, r.metalMaterial)
+
+	-- ── barrel: a tapered stack, so it is not a uniform pipe ──
+	local ba = r.barrel
+	local segs = 3
+	for i = 1, segs do
+		local t = (i - 0.5) / segs
+		local dia = Rand.lerp(ba.diameter, ba.muzzleDiameter, t)
+		solid(
+			"Barrel",
+			{ x = ba.length / segs * 1.02, y = dia, z = dia },
+			{ x = 0, y = ba.height, z = -rc.length * 0.5 - ba.length * t },
+			r.metal,
+			r.metalMaterial,
+			FWD_AXIS,
+			0,
+			Art.Shape.cylinder
+		)
+	end
+	local muzzleZ = -rc.length * 0.5 - ba.length
+	solid("MuzzleCrown", { x = ba.muzzleDiameter * 1.4, y = ba.muzzleDiameter * 1.25, z = ba.muzzleDiameter * 1.25 },
+		{ x = 0, y = ba.height, z = muzzleZ }, r.accent, r.metalMaterial, FWD_AXIS, 0, Art.Shape.cylinder)
+
+	-- ── fore-end, under the barrel ──
+	local fe = r.foreEnd
+	solid("ForeEnd", { x = fe.width, y = fe.height, z = fe.length },
+		{ x = 0, y = ba.height - fe.height * 0.55, z = -rc.length * 0.5 - fe.length * 0.45 }, r.wood, r.woodMaterial)
+
+	-- ── grip, raked back under the receiver ──
+	local g = r.grip
+	solid("Grip", { x = g.width, y = g.height, z = g.length },
+		{ x = 0, y = -g.height * 0.42, z = g.length * 0.42 }, r.wood, r.woodMaterial, nil, 0)
+	solid("GripCap", { x = g.width * 1.05, y = g.height * 0.12, z = g.length * 1.05 },
+		{ x = 0, y = -g.height * 0.92, z = g.length * 0.5 }, r.accent, r.metalMaterial)
+
+	-- ── stock, comb and butt pad ──
+	local sk = r.stock
+	solid("Stock", { x = sk.width, y = sk.height, z = sk.length },
+		{ x = 0, y = -sk.drop * 0.5 + rc.height * 0.2, z = rc.length * 0.5 + sk.length * 0.42 }, r.wood, r.woodMaterial)
+	solid("Comb", { x = sk.width * 0.82, y = sk.combHeight, z = sk.length * 0.62 },
+		{ x = 0, y = rc.height * 0.2 + sk.height * 0.42, z = rc.length * 0.5 + sk.length * 0.34 }, r.wood, r.woodMaterial)
+	solid("ButtPad", { x = sk.width * 1.04, y = sk.height * 1.06, z = sk.buttPad },
+		{ x = 0, y = -sk.drop * 0.5 + rc.height * 0.2, z = rc.length * 0.5 + sk.length * 0.86 }, r.accent, Art.Material.Leather)
+
+	-- ── trigger group and magazine ──
+	solid("TriggerGuard", { x = rc.width * 0.42, y = g.height * 0.34, z = g.length * 0.9 },
+		{ x = 0, y = -g.height * 0.3, z = -0.02 }, r.metal, r.metalMaterial)
+	solid("Trigger", { x = rc.width * 0.16, y = g.height * 0.24, z = g.length * 0.16 },
+		{ x = 0, y = -g.height * 0.22, z = 0.02 }, r.accent, r.metalMaterial)
+	local mg = r.magazine
+	solid("Magazine", { x = mg.width, y = mg.height, z = mg.length },
+		{ x = 0, y = -mg.height * 0.45, z = -rc.length * 0.22 }, r.metal, r.metalMaterial)
+
+	-- ── bolt handle, out to the right ──
+	local bo = r.bolt
+	solid("BoltShaft", { x = bo.length, y = bo.diameter, z = bo.diameter },
+		{ x = rc.width * 0.5 + bo.length * 0.45, y = rc.height * 0.5, z = rc.length * 0.22 },
+		r.metal, r.metalMaterial, { x = 1, y = 0, z = 0 }, 0, Art.Shape.cylinder)
+	solid("BoltKnob", { x = bo.knobDiameter, y = bo.knobDiameter, z = bo.knobDiameter },
+		{ x = rc.width * 0.5 + bo.length * 0.95, y = rc.height * 0.5, z = rc.length * 0.22 },
+		r.accent, r.metalMaterial, nil, 0, Art.Shape.ball)
+
+	-- ── sling swivels: two studs of detail that read as a real firearm rather than a prop ──
+	for _, z in { -rc.length * 0.5 - fe.length * 0.8, rc.length * 0.5 + sk.length * 0.7 } do
+		solid("SlingSwivel", { x = 0.05, y = 0.13, z = 0.05 }, { x = 0, y = ba.height - fe.height - 0.05, z = z }, r.accent, r.metalMaterial)
+	end
+
+	local sightHeight = ba.height
+	local sightPoint: Vec3 = { x = 0, y = ba.height, z = rc.length * 0.5 }
+	local magnification = 1
+	local hasScope = false
+
+	if r.scope ~= nil then
+		local sc = r.scope
+		hasScope = true
+		magnification = sc.magnification
+		sightHeight = sc.height
+		local zc = -sc.forward
+
+		-- rings, tying the tube to the receiver
+		for _, dz in { -sc.tubeLength * 0.3, sc.tubeLength * 0.3 } do
+			solid("ScopeRing", { x = sc.tubeDiameter * 1.35, y = (sc.height - rc.height * 0.85) + sc.tubeDiameter, z = sc.tubeDiameter * 0.6 },
+				{ x = 0, y = (sc.height + rc.height * 0.85) * 0.5 - sc.tubeDiameter * 0.1, z = zc + dz }, r.accent, r.metalMaterial)
+		end
+		solid("ScopeTube", { x = sc.tubeLength, y = sc.tubeDiameter, z = sc.tubeDiameter },
+			{ x = 0, y = sc.height, z = zc }, r.accent, r.metalMaterial, FWD_AXIS, 0, Art.Shape.cylinder)
+		-- objective bell at the front, eyepiece at the back: the silhouette that says "scope" at a glance
+		solid("ScopeObjective", { x = sc.objectiveLength, y = sc.objectiveDiameter, z = sc.objectiveDiameter },
+			{ x = 0, y = sc.height, z = zc - sc.tubeLength * 0.5 - sc.objectiveLength * 0.5 }, r.accent, r.metalMaterial, FWD_AXIS, 0, Art.Shape.cylinder)
+		solid("ScopeEyepiece", { x = sc.eyepieceLength, y = sc.eyepieceDiameter, z = sc.eyepieceDiameter },
+			{ x = 0, y = sc.height, z = zc + sc.tubeLength * 0.5 + sc.eyepieceLength * 0.5 }, r.accent, r.metalMaterial, FWD_AXIS, 0, Art.Shape.cylinder)
+		solid("ScopeTurret", { x = sc.turretSize, y = sc.turretSize, z = sc.turretSize },
+			{ x = 0, y = sc.height + sc.tubeDiameter * 0.5 + sc.turretSize * 0.4, z = zc }, r.accent, r.metalMaterial, nil, 0, Art.Shape.cylinder)
+		solid("ScopeTurretSide", { x = sc.turretSize * 0.8, y = sc.turretSize * 0.8, z = sc.turretSize * 0.8 },
+			{ x = -(sc.tubeDiameter * 0.5 + sc.turretSize * 0.3), y = sc.height, z = zc }, r.accent, r.metalMaterial, { x = 1, y = 0, z = 0 }, 0, Art.Shape.cylinder)
+
+		-- glass, front and back
+		table.insert(out, {
+			name = "ScopeGlassFront",
+			shape = Art.Shape.cylinder,
+			size = { x = 0.03, y = sc.objectiveDiameter * 0.86, z = sc.objectiveDiameter * 0.86 },
+			pos = { x = 0, y = sc.height, z = zc - sc.tubeLength * 0.5 - sc.objectiveLength },
+			up = FWD_AXIS,
+			color = r.glass,
+			material = Art.Material.Glass,
+			transparency = 0.45,
+			reflectance = 0.35,
+			canCollide = false,
+			canQuery = false,
+			castShadow = false,
+		})
+		sightPoint = { x = 0, y = sc.height, z = zc + sc.tubeLength * 0.5 + sc.eyepieceLength + sc.eyeRelief }
+	end
+
+	if r.ironSights ~= nil then
+		local ir = r.ironSights
+		solid("FrontPost", { x = ir.postWidth, y = ir.frontHeight, z = ir.postWidth },
+			{ x = 0, y = ba.height + ba.muzzleDiameter * 0.5 + ir.frontHeight * 0.5, z = muzzleZ + 0.18 }, r.accent, r.metalMaterial)
+		solid("RearSight", { x = ir.postWidth * 3.2, y = ir.rearHeight, z = ir.postWidth * 1.2 },
+			{ x = 0, y = rc.height * 0.85 + ir.rearHeight * 0.5, z = -rc.length * 0.34 }, r.accent, r.metalMaterial)
+	end
+
+	return {
+		model = { name = r.name, parts = out, groundPivot = { x = 0, y = 0, z = 0 } },
+		muzzle = { x = 0, y = ba.height, z = muzzleZ - r.barrel.muzzleDiameter },
+		sightPoint = sightPoint,
+		sightHeight = sightHeight,
+		magnification = magnification,
+		hasScope = hasScope,
+	}
 end
 
 -- ── aggregate helpers ─────────────────────────────────────────────────────────────────────────────────

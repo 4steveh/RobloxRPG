@@ -239,6 +239,42 @@ return function(t: Harness.T)
 		t.eq("no drift between two generations", drift, 0)
 	end)
 
+	t.section("Weapons")
+
+	t.test("the rifle builds with the anchors the aiming stack depends on", function()
+		local WEAPONS = ArtKit.weapons :: { [string]: Art.RifleRecipe }
+		for key, recipe in WEAPONS do
+			local b = ArtGen.rifle(recipe)
+			t.ok(key .. ": produces parts", #b.model.parts > 12)
+			-- The client looks the published template up by the recipe's NAME. Publishing under the ArtKit
+			-- table key instead left the hunter empty-handed with no error anywhere.
+			t.ok(key .. ": recipe carries a name", type(recipe.name) == "string" and #recipe.name > 0)
+			t.eq(key .. ": the built model is named from the recipe", b.model.name, recipe.name)
+			-- muzzle must be forward of the receiver, sight point behind it: if these swap, the tracer comes
+			-- out of the stock and the ADS camera ends up in front of the scope.
+			t.ok(("%s: muzzle is forward (z %.2f < 0)"):format(key, b.muzzle.z), b.muzzle.z < 0)
+			t.ok(("%s: sight point is behind the receiver (z %.2f > 0)"):format(key, b.sightPoint.z), b.sightPoint.z > 0)
+			t.ok(("%s: sight sits above the bore (%.2f)"):format(key, b.sightHeight), b.sightHeight > 0)
+			if recipe.scope ~= nil then
+				t.ok(key .. ": reports a scope", b.hasScope)
+				t.ok(("%s: magnification %.1f > 1"):format(key, b.magnification), b.magnification > 1)
+				-- eye relief must clear the eyepiece, or the camera lands inside the scope body
+				t.ok(key .. ": eye relief is positive", recipe.scope.eyeRelief > 0)
+			end
+			local lo, hi = ArtGen.bounds(b.model.parts)
+			local length = hi.z - lo.z
+			t.ok(("%s: overall length %.2f studs reads as a rifle (3..6)"):format(key, length), length > 3 and length < 6)
+			-- nothing on a held weapon may absorb the hunting raycast
+			local bad = 0
+			for _, p in b.model.parts do
+				if p.canQuery ~= false or p.canCollide ~= false then
+					bad += 1
+				end
+			end
+			t.eq(key .. ": no queryable or collidable weapon part", bad, 0)
+		end
+	end)
+
 	t.section("Fishing bite markers")
 
 	t.test("every fish yields a valid bite marker that never absorbs the cast", function()
