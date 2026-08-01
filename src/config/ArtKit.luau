@@ -2296,10 +2296,10 @@ ArtKit.fishArt = {
 -- ══════════════════════════════════════════════════════════════════════════════════════════════════════
 -- AMBIENCE. Positional looping beds, one per biome, plus the Lodge hearth.
 --
--- These ids came from src/config/ArtAssets.luau, the manifest the previous art pipeline used. Unlike the
--- MODEL assets in that manifest — which InsertService cannot re-authorise and which this rewrite therefore
--- discarded — AUDIO ids resolve straight from a Sound.SoundId with no LoadAsset step, so they are safe to
--- keep and are the one part of the old manifest worth carrying forward.
+-- These ids are the surviving remnant of src/config/ArtAssets.luau, the previous pipeline's asset manifest,
+-- now deleted. Unlike the MODEL assets in it — which InsertService cannot re-authorise, which is why the
+-- rewrite discarded them — AUDIO ids resolve straight from a Sound.SoundId with no LoadAsset step. They were
+-- the one part of that manifest worth carrying forward, so they were copied here and the file removed.
 --
 -- Positional rather than a client-side bed keyed on biome: the three destinations sit 2000 studs apart, so a
 -- LINEAR rolloff whose maxDistance is well under that spacing keeps each biome's sound local by construction,
