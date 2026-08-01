@@ -72,6 +72,7 @@ local specs: { (Harness.T) -> () } = {
 	-- Visual overhaul (the procedural art layer: deterministic RNG/noise, orientation contract,
 	-- tree/rock/scatter/cabin generators, part budgets, palette + terrain-material discipline)
 	require("@tests/ArtGen.spec"),
+	require("@tests/TerrainGen.spec"),
 }
 
 for _, spec in specs do

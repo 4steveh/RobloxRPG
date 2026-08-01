@@ -781,6 +781,152 @@ return function(t: Harness.T)
 		t.eq("no tree has a single-hue canopy", #thin, 0)
 	end)
 
+	-- ── PALETTE DISCIPLINE, as an assertable rule ────────────────────────────────────────────────────
+	-- Measured off the reference template's five leaf greens: hue spread 72.3 degrees, saturation spread
+	-- 0.665, value spread 0.251. Measured off this project's ORIGINAL foliage palettes: hue 15-28 degrees,
+	-- saturation 0.10-0.12. That 3-5x deficit in the hue and saturation axes is precisely why a stylized
+	-- world reads as flat programmer-green, and it is invisible to inspection — you have to measure it.
+	-- Organic palettes therefore need WIDE hue+saturation and moderate value; mineral palettes (bark, stone,
+	-- snow) need the opposite. Getting them backwards is the classic "candy rocks, flat trees" failure.
+
+	local function toHsv(c: Art.RGB): (number, number, number)
+		local r, g, b = c[1] / 255, c[2] / 255, c[3] / 255
+		local maxc = math.max(r, math.max(g, b))
+		local minc = math.min(r, math.min(g, b))
+		local d = maxc - minc
+		local h = 0
+		if d > 1e-9 then
+			if maxc == r then
+				h = 60 * (((g - b) / d) % 6)
+			elseif maxc == g then
+				h = 60 * ((b - r) / d + 2)
+			else
+				h = 60 * ((r - g) / d + 4)
+			end
+		end
+		local s = if maxc <= 1e-9 then 0 else d / maxc
+		return h, s, maxc
+	end
+
+	-- Spread of a palette on each HSV axis. Hue is measured on the raw 0-360 scale, which is correct for
+	-- every palette here (all of them sit well inside one revolution — none wraps through red).
+	local function spread(colors: { Art.RGB }): (number, number, number)
+		local hLo, hHi = math.huge, -math.huge
+		local sLo, sHi = math.huge, -math.huge
+		local vLo, vHi = math.huge, -math.huge
+		for _, c in colors do
+			local h, s, v = toHsv(c)
+			if h < hLo then
+				hLo = h
+			end
+			if h > hHi then
+				hHi = h
+			end
+			if s < sLo then
+				sLo = s
+			end
+			if s > sHi then
+				sHi = s
+			end
+			if v < vLo then
+				vLo = v
+			end
+			if v > vHi then
+				vHi = v
+			end
+		end
+		return hHi - hLo, sHi - sLo, vHi - vLo
+	end
+
+	t.test("the reference template's own foliage satisfies the discipline rule", function()
+		-- Calibration check: the thresholds below are only meaningful if the thing they were derived from
+		-- passes them. These five RGB values were read live out of Pirate Island's SavannaTree.
+		local ref: { Art.RGB } = { { 127, 142, 100 }, { 120, 144, 130 }, { 164, 189, 71 }, { 75, 151, 75 }, { 58, 125, 21 } }
+		local dh, ds, dv = spread(ref)
+		t.ok(("reference hue spread %.1f >= 60"):format(dh), dh >= 60)
+		t.ok(("reference saturation spread %.3f >= 0.42"):format(ds), ds >= 0.42)
+		t.ok(("reference value spread %.3f in 0.15..0.30"):format(dv), dv >= 0.15 and dv <= 0.30)
+	end)
+
+	t.test("organic palettes spread wide in hue and saturation, per element class", function()
+		-- One global floor is the wrong rule: different organic classes have genuinely different available
+		-- gamuts, and forcing them all to the canopy's 55 degrees would either fail correct art or push a
+		-- palette somewhere it should not go. Each class therefore declares its own floor, with the reason.
+		-- What every class still has to clear is the ORIGINAL flatness this pass was fixing: 15-28 degrees
+		-- of hue and 0.10-0.12 of saturation.
+		type Class = { hue: number, sat: number, why: string }
+		local CANOPY: Class = { hue = 55, sat = 0.42, why = "broadleaf masses carry the world's read" }
+		local UNDERSTORY: Class = { hue = 48, sat = 0.38, why = "ground cover, seen closer and in smaller pieces" }
+		local CONIFER: Class = { hue = 38, sat = 0.34, why = "cold blue-greens occupy a narrow band by nature" }
+		local WARM_RAMP: Class = { hue = 40, sat = 0.28, why = "red to yellow is only ~60 degrees of hue to work in" }
+		local COLD_GROUND: Class = { hue = 36, sat = 0.26, why = "Alaska carries contrast in value, not chroma" }
+		-- Spanish moss is grey-green by nature: its read is SILHOUETTE (long hanging strands breaking the
+		-- canopy edge), not colour. Holding it to an understory chroma floor would push it toward a green that
+		-- Spanish moss simply is not.
+		local DRAPE: Class = { hue = 38, sat = 0.18, why = "hanging moss reads by silhouette, deliberately desaturated" }
+
+		local ORGANIC: { { any } } = {
+			{ "bayou.foliage", ArtKit.palettes.bayou.foliage, CANOPY },
+			{ "bayou.reed", ArtKit.palettes.bayou.reed, UNDERSTORY },
+			{ "bayou.fern", ArtKit.palettes.bayou.fern, UNDERSTORY },
+			{ "bayou.duckweed", ArtKit.palettes.bayou.duckweed, UNDERSTORY },
+			{ "bayou.lilypad", ArtKit.palettes.bayou.lilypad, UNDERSTORY },
+			{ "bayou.moss", ArtKit.palettes.bayou.moss, DRAPE },
+			{ "appalachia.foliage", ArtKit.palettes.appalachia.foliage, CANOPY },
+			{ "appalachia.autumn", ArtKit.palettes.appalachia.autumn, WARM_RAMP },
+			{ "appalachia.needle", ArtKit.palettes.appalachia.needle, CONIFER },
+			{ "appalachia.fern", ArtKit.palettes.appalachia.fern, UNDERSTORY },
+			{ "appalachia.grassTuft", ArtKit.palettes.appalachia.grassTuft, UNDERSTORY },
+			{ "alaska.needle", ArtKit.palettes.alaska.needle, CONIFER },
+			{ "alaska.tundra", ArtKit.palettes.alaska.tundra, COLD_GROUND },
+		}
+		for _, entry in ORGANIC do
+			local name = entry[1] :: string
+			local cls = entry[3] :: Class
+			local dh, ds, dv = spread(entry[2] :: { Art.RGB })
+			t.ok(("%s: hue spread %.1f >= %d (%s)"):format(name, dh, cls.hue, cls.why), dh >= cls.hue)
+			t.ok(("%s: saturation spread %.3f >= %.2f"):format(name, ds, cls.sat), ds >= cls.sat)
+			-- and it must not be a VALUE ramp masquerading as variation
+			t.ok(("%s: value spread %.3f <= 0.40"):format(name, dv), dv <= 0.4)
+			-- the floor no organic palette may ever fall back to: the flatness this pass replaced
+			t.ok(("%s: clears the original flat-green baseline (hue > 30, sat > 0.15)"):format(name), dh > 30 and ds > 0.15)
+		end
+	end)
+
+	t.test("mineral palettes stay tight in hue and saturation", function()
+		local MINERAL = {
+			{ "bayou.bark", ArtKit.palettes.bayou.bark },
+			{ "bayou.stone", ArtKit.palettes.bayou.stone },
+			{ "appalachia.bark", ArtKit.palettes.appalachia.bark },
+			{ "appalachia.birchBark", ArtKit.palettes.appalachia.birchBark },
+			{ "appalachia.stone", ArtKit.palettes.appalachia.stone },
+			{ "alaska.bark", ArtKit.palettes.alaska.bark },
+			{ "alaska.stone", ArtKit.palettes.alaska.stone },
+			{ "alaska.snow", ArtKit.palettes.alaska.snow },
+			{ "alaska.ice", ArtKit.palettes.alaska.ice },
+			{ "shared.deadwood", ArtKit.palettes.shared.deadwood },
+			{ "lodge.log", ArtKit.palettes.lodge.log },
+			{ "lodge.stone", ArtKit.palettes.lodge.stone },
+		}
+		for _, entry in MINERAL do
+			local name = entry[1] :: string
+			local dh, ds, dv = spread(entry[2] :: { Art.RGB })
+			t.ok(("%s: hue spread %.1f <= 26 (one material, not many)"):format(name, dh), dh <= 26)
+			t.ok(("%s: saturation spread %.3f <= 0.24"):format(name, ds), ds <= 0.24)
+			-- but it must still vary in VALUE, or the surface renders as one flat plastic tone
+			t.ok(("%s: value spread %.3f >= 0.05"):format(name, dv), dv >= 0.05)
+		end
+	end)
+
+	t.test("snow-laden foliage is bimodal, not a ramp", function()
+		-- The read is the value GAP between lit snow and the shadowed needle under it. A smooth ramp between
+		-- them produces grey mush, so this palette is asserted to keep two separated clusters.
+		local dh, ds, dv = spread(ArtKit.palettes.shared.snowLaden)
+		t.ok(("snowLaden value spread %.3f >= 0.5 (two clusters)"):format(dv), dv >= 0.5)
+		t.ok(("snowLaden saturation spread %.3f >= 0.4"):format(ds), ds >= 0.4)
+		t.ok(("snowLaden hue spread %.1f is bounded"):format(dh), dh <= 200)
+	end)
+
 	t.test("every recipe material is a declared Art.MaterialName", function()
 		local bad = 0
 		for _, recipe in TREES do

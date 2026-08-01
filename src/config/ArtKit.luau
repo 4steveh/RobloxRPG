@@ -20,6 +20,9 @@
 -- material colours ARE global, which is why each biome is assigned its own disjoint material set.
 
 local Art = require("../types/Art")
+-- Required for its TYPES only (BiomeTerrainSpec / HeightBand), the same way Shells.luau reaches for
+-- logic/Shell's types. No behaviour crosses the boundary: ArtKit calls nothing.
+local TerrainGenTypes = require("../logic/TerrainGen")
 
 type RGB = Art.RGB
 type TreeRecipe = Art.TreeRecipe
@@ -46,43 +49,52 @@ ArtKit.version = 2
 ArtKit.palettes = {
 	bayou = {
 		-- wet cypress bark: grey-brown, low saturation, wide value range for the buttressed base
-		bark = { { 96, 82, 66 }, { 80, 68, 54 }, { 108, 92, 74 }, { 68, 58, 46 } } :: { RGB },
+		bark = { { 87, 70, 60 }, { 100, 78, 63 }, { 114, 87, 65 }, { 128, 96, 65 } } :: { RGB },
 		-- cypress needle green: soft, slightly yellow, five steps
-		foliage = { { 88, 106, 58 }, { 74, 94, 48 }, { 106, 122, 70 }, { 60, 80, 42 }, { 122, 136, 86 } } :: { RGB },
+		foliage = { { 87, 81, 58 }, { 98, 102, 56 }, { 92, 117, 49 }, { 72, 133, 39 }, { 33, 148, 25 } } :: { RGB },
 		-- Spanish moss: desaturated sage, the signature Bayou silhouette element
-		moss = { { 156, 164, 138 }, { 140, 150, 122 }, { 168, 174, 150 }, { 128, 138, 112 } } :: { RGB },
-		reed = { { 96, 118, 54 }, { 80, 102, 44 }, { 112, 130, 66 }, { 68, 88, 40 } } :: { RGB },
-		fern = { { 70, 98, 46 }, { 58, 84, 38 }, { 86, 112, 56 } } :: { RGB },
-		duckweed = { { 92, 116, 52 }, { 74, 98, 44 }, { 108, 128, 62 } } :: { RGB },
+		moss = { { 138, 135, 121 }, { 150, 150, 123 }, { 155, 163, 124 }, { 157, 176, 123 }, { 152, 189, 121 } } :: { RGB },
+		reed = { { 97, 89, 61 }, { 111, 112, 58 }, { 107, 128, 51 }, { 90, 143, 41 }, { 57, 158, 27 } } :: { RGB },
+		fern = { { 78, 79, 52 }, { 80, 93, 50 }, { 72, 107, 45 }, { 51, 121, 36 }, { 24, 135, 34 } } :: { RGB },
+		duckweed = { { 92, 89, 58 }, { 97, 109, 53 }, { 84, 126, 44 }, { 51, 143, 30 } } :: { RGB },
 		log = { { 88, 74, 58 }, { 72, 60, 46 }, { 102, 88, 70 } } :: { RGB },
-		stone = { { 98, 96, 88 }, { 84, 82, 76 }, { 112, 108, 100 } } :: { RGB },
-		lilypad = { { 84, 112, 56 }, { 96, 124, 62 }, { 70, 98, 48 } } :: { RGB },
+		stone = { { 77, 75, 73 }, { 94, 91, 86 }, { 111, 107, 98 }, { 128, 124, 108 } } :: { RGB },
+		lilypad = { { 86, 92, 60 }, { 83, 109, 55 }, { 64, 126, 47 }, { 33, 143, 42 } } :: { RGB },
 	},
 	appalachia = {
-		bark = { { 96, 80, 64 }, { 74, 62, 48 }, { 112, 96, 78 }, { 62, 52, 42 } } :: { RGB },
-		birchBark = { { 214, 212, 202 }, { 190, 188, 178 }, { 228, 226, 216 }, { 150, 148, 140 } } :: { RGB },
+		bark = { { 92, 74, 62 }, { 105, 83, 64 }, { 119, 92, 65 }, { 133, 101, 65 } } :: { RGB },
+		birchBark = { { 194, 191, 186 }, { 207, 203, 195 }, { 221, 216, 203 }, { 235, 230, 211 } } :: { RGB },
 		-- late-summer hardwood: deep greens with two warm turning hues so the ridge reads with depth
-		foliage = { { 92, 116, 56 }, { 74, 100, 46 }, { 116, 134, 70 }, { 56, 80, 40 }, { 138, 146, 84 } } :: { RGB },
-		autumn = { { 178, 122, 48 }, { 158, 88, 42 }, { 192, 150, 58 }, { 132, 70, 38 } } :: { RGB },
-		needle = { { 48, 74, 52 }, { 38, 62, 42 }, { 60, 88, 60 }, { 30, 52, 36 } } :: { RGB },
-		stone = { { 100, 96, 88 }, { 84, 80, 74 }, { 116, 112, 102 }, { 70, 68, 64 } } :: { RGB },
-		fern = { { 78, 104, 50 }, { 64, 90, 42 }, { 94, 118, 60 } } :: { RGB },
+		foliage = { { 102, 99, 68 }, { 108, 117, 64 }, { 97, 133, 56 }, { 70, 148, 44 }, { 28, 163, 32 } } :: { RGB },
+		autumn = { { 140, 67, 58 }, { 157, 84, 51 }, { 173, 108, 42 }, { 190, 140, 29 }, { 207, 184, 14 } } :: { RGB },
+		needle = { { 48, 61, 43 }, { 45, 74, 44 }, { 42, 87, 48 }, { 36, 99, 56 }, { 28, 112, 70 } } :: { RGB },
+		stone = { { 82, 79, 76 }, { 99, 94, 88 }, { 116, 110, 100 }, { 133, 126, 110 } } :: { RGB },
+		fern = { { 81, 84, 55 }, { 82, 98, 53 }, { 73, 112, 47 }, { 52, 126, 38 }, { 27, 140, 38 } } :: { RGB },
 		log = { { 92, 78, 62 }, { 76, 64, 50 }, { 106, 92, 74 } } :: { RGB },
-		grassTuft = { { 104, 124, 62 }, { 88, 108, 52 }, { 120, 138, 74 } } :: { RGB },
+		grassTuft = { { 99, 96, 63 }, { 107, 115, 60 }, { 96, 131, 52 }, { 69, 146, 40 }, { 30, 161, 30 } } :: { RGB },
 	},
 	alaska = {
-		bark = { { 76, 64, 54 }, { 62, 52, 44 }, { 88, 76, 64 } } :: { RGB },
+		bark = { { 66, 54, 48 }, { 80, 63, 54 }, { 94, 72, 57 }, { 107, 81, 59 } } :: { RGB },
 		-- frosted spruce: cold, dark, low chroma — the cue that reads "north" before any snow does
-		needle = { { 46, 68, 56 }, { 36, 56, 46 }, { 58, 82, 66 }, { 28, 46, 38 } } :: { RGB },
-		snow = { { 240, 244, 250 }, { 228, 234, 244 }, { 250, 252, 255 }, { 214, 224, 238 } } :: { RGB },
-		ice = { { 200, 222, 240 }, { 178, 206, 230 }, { 216, 234, 246 }, { 156, 188, 216 } } :: { RGB },
-		stone = { { 118, 120, 130 }, { 100, 102, 112 }, { 134, 136, 144 }, { 84, 86, 96 } } :: { RGB },
-		tundra = { { 118, 112, 84 }, { 100, 96, 72 }, { 134, 128, 98 } } :: { RGB },
+		needle = { { 40, 54, 39 }, { 40, 65, 42 }, { 38, 77, 48 }, { 34, 88, 58 }, { 28, 99, 73 } } :: { RGB },
+		snow = { { 228, 232, 235 }, { 233, 239, 245 }, { 237, 245, 255 } } :: { RGB },
+		ice = { { 177, 196, 204 }, { 182, 204, 218 }, { 186, 210, 231 }, { 188, 215, 245 } } :: { RGB },
+		stone = { { 82, 84, 87 }, { 95, 98, 104 }, { 107, 110, 121 }, { 117, 120, 138 } } :: { RGB },
+		tundra = { { 92, 77, 67 }, { 109, 95, 69 }, { 126, 119, 67 }, { 133, 143, 61 } } :: { RGB },
 		log = { { 82, 70, 58 }, { 66, 56, 46 }, { 96, 84, 70 } } :: { RGB },
+	},
+	-- Cross-biome elements. Dead wood and snow-laden foliage appear in more than one destination, so they
+	-- live here rather than being duplicated (or worse, inlined at the recipe, which is how a palette drifts).
+	shared = {
+		-- sun-bleached standing deadwood: bark discipline (narrow hue, narrow saturation, wide value)
+		deadwood = { { 128, 118, 104 }, { 145, 134, 118 }, { 161, 150, 132 }, { 178, 166, 146 } } :: { RGB },
+		-- snow sitting ON dark needles: deliberately BIMODAL, not a ramp. The whole read is the value gap
+		-- between lit snow and the shadowed needle underneath, so the two clusters must stay far apart.
+		snowLaden = { { 34, 88, 58 }, { 210, 218, 226 }, { 40, 65, 42 }, { 233, 239, 245 }, { 28, 99, 73 } } :: { RGB },
 	},
 	lodge = {
 		-- interior wood, warm: the hub must feel lit and lived-in against three cold exteriors
-		log = { { 122, 92, 62 }, { 106, 78, 52 }, { 138, 106, 74 }, { 92, 68, 46 } } :: { RGB },
+		log = { { 115, 86, 67 }, { 130, 96, 68 }, { 145, 106, 69 }, { 161, 117, 67 } } :: { RGB },
 		trim = { { 84, 60, 40 }, { 72, 50, 34 }, { 96, 70, 48 } } :: { RGB },
 		roof = { { 74, 62, 54 }, { 62, 52, 46 }, { 86, 72, 62 } } :: { RGB },
 		floor = { { 138, 110, 76 }, { 122, 96, 66 }, { 152, 124, 88 } } :: { RGB },
@@ -228,10 +240,10 @@ ArtKit.trees = {
 			rise = 0,
 			tilt = 0,
 			material = M.Wood,
-			colors = { { 146, 136, 118 } } :: { RGB },
+			colors = P.shared.deadwood,
 		},
 		barkMaterial = M.Wood,
-		barkColors = { { 148, 138, 120 }, { 128, 118, 102 }, { 164, 154, 136 } } :: { RGB },
+		barkColors = P.shared.deadwood,
 		contactShade = 0.32,
 		targetHeight = { min = 18, max = 30 },
 	} :: TreeRecipe,
@@ -449,13 +461,7 @@ ArtKit.trees = {
 			rise = 0.5,
 			tilt = 0.5,
 			material = M.Snow,
-			colors = {
-				{ 214, 224, 232 },
-				{ 60, 82, 68 },
-				{ 232, 240, 246 },
-				{ 46, 68, 56 },
-				{ 244, 248, 252 },
-			} :: { RGB },
+			colors = P.shared.snowLaden,
 		},
 		barkMaterial = M.Wood,
 		barkColors = P.alaska.bark,
@@ -1119,27 +1125,148 @@ ArtKit.noise = {
 	bayou = {
 		base = { frequency = 0.0075, octaves = 4, lacunarity = 2.05, gain = 0.5 },
 		detail = { frequency = 0.035, octaves = 3, lacunarity = 2.1, gain = 0.45 },
-		amplitude = 7,
-		detailAmplitude = 1.8,
-		seaLevel = 0,
-		ridged = false,
 	},
 	appalachia = {
 		base = { frequency = 0.0042, octaves = 5, lacunarity = 2.1, gain = 0.52 },
 		detail = { frequency = 0.022, octaves = 3, lacunarity = 2.2, gain = 0.42 },
-		amplitude = 86,
-		detailAmplitude = 5,
-		seaLevel = 0,
-		ridged = true,
 	},
 	alaska = {
 		base = { frequency = 0.0035, octaves = 5, lacunarity = 2.15, gain = 0.5 },
 		detail = { frequency = 0.018, octaves = 3, lacunarity = 2.2, gain = 0.4 },
-		amplitude = 64,
-		detailAmplitude = 4,
-		seaLevel = 0,
-		ridged = true,
 	},
 }
+
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+-- TERRAIN SPECS — the sculpt, per biome, in LOCAL coordinates. `flats` sit on the walkable zone anchors of
+-- src/config/Shells.luau and `basins` on its water zones, so the terrain is generated FROM the gameplay
+-- layout rather than sculpted and hoped over. tests/TerrainGen.spec.luau probes every zone and asserts the
+-- ones you must walk on are walkable and the ones you fish in hold water.
+--
+-- Material bands are ascending; each biome draws only from its own material set (ArtKit.terrainRoles),
+-- because terrain material COLOURS are global to the place.
+-- ══════════════════════════════════════════════════════════════════════════════════════════════════════
+
+local N = ArtKit.noise
+local R = ArtKit.terrainRoles
+
+ArtKit.terrainSpecs = {
+	-- Bayou: a blackwater basin at Y=0. Most of the footprint is shallow water and mud; the hunting flats,
+	-- the arrival clearing and the Landing are raised hummocks; the fishing zones are carved basins.
+	bayou = {
+		seed = 20260801,
+		center = { x = 0, z = 100 },
+		extent = { x = 420, z = 420 }, -- covers z -110..310, i.e. the Landing at z=255
+		baseHeight = -3.2,
+		amplitude = 7,
+		detailAmplitude = 1.6,
+		base = N.bayou.base,
+		detail = N.bayou.detail,
+		ridged = false,
+		waterLevel = 0,
+		shoreFalloff = 60,
+		-- DRY flats (walkable zones) and WET flats (height below waterLevel = a flat-bottomed pool).
+		-- Both are the same mechanism; the sign of `height` is what makes a zone land or water.
+		flats = {
+			{ x = 0, z = 0, radius = 15, falloff = 16, height = 2.6 }, -- arrival_clearing
+			{ x = 0, z = -50, radius = 30, falloff = 26, height = 3.0 }, -- sunny_levee
+			{ x = -45, z = -45, radius = 28, falloff = 24, height = 2.2 }, -- reed_edges
+			{ x = 0, z = 255, radius = 36, falloff = 30, height = 3.2 }, -- the_landing (vendor + travel)
+			{ x = 55, z = 110, radius = 20, falloff = 18, height = 1.6 }, -- the_old_cypress island
+			{ x = 0, z = 302, radius = 24, falloff = 32, height = -5 }, -- open water off the Landing dock
+			{ x = 24, z = 12, radius = 11, falloff = 17, height = -4 }, -- channel_banks (shore fishing)
+			{ x = 120, z = 70, radius = 30, falloff = 26, height = -9 }, -- catfish_hole
+			{ x = -110, z = 80, radius = 28, falloff = 24, height = -5 }, -- cottonmouth_slough (rare site)
+		},
+		-- natural depressions layered onto the noise BEFORE the flats, purely for texture
+		basins = {
+			{ x = 60, z = 160, radius = 40, falloff = 40, depth = 3 },
+			{ x = -70, z = 200, radius = 34, falloff = 36, depth = 2.5 },
+		},
+		bands = {
+			{ upTo = -0.6, material = TM.Mud }, -- submerged bed
+			{ upTo = 0.9, material = TM.Sand }, -- the waterline strip
+			{ upTo = 5.5, material = TM.LeafyGrass }, -- swamp grass on the hummocks
+			{ upTo = math.huge, material = TM.Ground }, -- dry levee dirt
+		},
+		cliffSlope = 1.1,
+		cliffMaterial = R.bayou.cliff,
+	},
+
+	-- Appalachia: a ridged hardwood range. The lookout ridge is genuinely high ground; the old field and
+	-- creek bottoms are flattened benches; two carved ponds hold the fishing water.
+	appalachia = {
+		seed = 20260802,
+		center = { x = 0, z = 35 },
+		extent = { x = 400, z = 430 }, -- covers z -180..250, i.e. the outpost at z=200
+		baseHeight = -6,
+		amplitude = 92,
+		detailAmplitude = 5,
+		base = N.appalachia.base,
+		detail = N.appalachia.detail,
+		ridged = true,
+		waterLevel = 0,
+		shoreFalloff = 70,
+		flats = {
+			{ x = 0, z = 80, radius = 38, falloff = 34, height = 14 }, -- old_field (first-hunt bench)
+			{ x = -120, z = 60, radius = 34, falloff = 30, height = 26 }, -- oak_ridges
+			{ x = 110, z = 50, radius = 32, falloff = 30, height = 20 }, -- creek_bottoms
+			{ x = 0, z = -130, radius = 30, falloff = 44, height = 74 }, -- lookout_ridge (the high beacon)
+			{ x = 0, z = 200, radius = 34, falloff = 30, height = 12 }, -- outpost_cabin (ARRIVAL + vendor, Shells apOutpostAnchor)
+			{ x = 100, z = -60, radius = 24, falloff = 30, height = -5 }, -- hollow_creek (wet)
+			{ x = -90, z = -80, radius = 28, falloff = 32, height = -7 }, -- mill_pond (wet)
+		},
+		basins = {
+			{ x = 50, z = 10, radius = 46, falloff = 48, depth = 8 }, -- the hollow between the benches
+		},
+		bands = {
+			{ upTo = -0.5, material = TM.Sandstone }, -- creek bed
+			{ upTo = 2.5, material = TM.Sandstone }, -- gravel margin
+			{ upTo = 56, material = TM.Grass }, -- meadow and hardwood floor
+			{ upTo = math.huge, material = TM.Rock }, -- above the treeline
+		},
+		cliffSlope = 0.85,
+		cliffMaterial = R.appalachia.cliff,
+	},
+
+	-- Alaska: boreal coast. Land falls to a real coastline in the south-east (open_gulf / coastal_inlet),
+	-- the glacier is the high beacon, and the frozen lake is a shallow carved pan.
+	alaska = {
+		seed = 20260803,
+		center = { x = 20, z = -35 },
+		extent = { x = 440, z = 520 }, -- covers z -295..225, i.e. the glacier at -250 AND the harbor at +180
+		baseHeight = -10,
+		amplitude = 70,
+		detailAmplitude = 4,
+		base = N.alaska.base,
+		detail = N.alaska.detail,
+		ridged = true,
+		waterLevel = 0,
+		shoreFalloff = 80,
+		flats = {
+			{ x = 0, z = 50, radius = 42, falloff = 36, height = 9 }, -- tundra_flats
+			{ x = -110, z = 30, radius = 34, falloff = 30, height = 13 }, -- spruce_riverbottom
+			{ x = 90, z = -70, radius = 26, falloff = 10, height = 26 }, -- the_crags (tight falloff: keeps its reach clear of interior_river 36 studs away)
+			{ x = 0, z = -250, radius = 46, falloff = 46, height = 62 }, -- the_glacier (the high beacon)
+			{ x = -60, z = -90, radius = 22, falloff = 24, height = 14 }, -- salmon_falls (rare site)
+			{ x = 0, z = 180, radius = 34, falloff = 30, height = 7 }, -- harbor_camp (ARRIVAL + vendor, Shells akOutpostAnchor)
+			{ x = 0, z = 232, radius = 28, falloff = 34, height = -8 }, -- the harbour itself: open water off the dock
+			{ x = 60, z = -50, radius = 21, falloff = 14, height = -5 }, -- interior_river (wet; reach 35 < the 36 studs to the_crags)
+			{ x = 140, z = -120, radius = 34, falloff = 38, height = -13 }, -- coastal_inlet (wet)
+			{ x = 200, z = -200, radius = 54, falloff = 56, height = -24 }, -- open_gulf (wet, deep)
+			{ x = -150, z = -160, radius = 36, falloff = 30, height = -3 }, -- frozen_lake (wet, shallow)
+		},
+		basins = {
+			{ x = -40, z = -20, radius = 50, falloff = 50, depth = 6 }, -- interior swale
+		},
+		bands = {
+			{ upTo = -1, material = TM.Basalt }, -- sea bed
+			{ upTo = 2, material = TM.Limestone }, -- pale shingle beach
+			{ upTo = 44, material = TM.Snow }, -- snowfield
+			{ upTo = math.huge, material = TM.Glacier }, -- glacial ice above the snow line
+		},
+		cliffSlope = 0.8,
+		cliffMaterial = R.alaska.cliff,
+	},
+} :: { [string]: TerrainGenTypes.BiomeTerrainSpec }
 
 return table.freeze(ArtKit)
